@@ -1,0 +1,68 @@
+name: Pre-Build Validation
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    name: Validate Before EAS Build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: TypeScript Check
+        run: npm run type-check
+        
+      - name: Lint Check
+        run: npm run lint
+        continue-on-error: false
+        
+      - name: Test Metro Bundle (Android)
+        run: npx expo export --platform android --dev --output-dir ./test-dist
+        
+      - name: Test Metro Bundle (iOS)  
+        run: npx expo export --platform ios --dev --output-dir ./test-dist
+        
+      - name: Validate App Config
+        run: |
+          echo "🔍 Validating app.json configuration..."
+          npx expo config --type public
+          
+      - name: Check Required Secrets
+        run: |
+          echo "🔐 Checking if required secrets are available in production..."
+          # This will fail if secrets are missing when triggered on main branch
+          if [ "$GITHUB_REF" == "refs/heads/main" ]; then
+            echo "Production build validation - checking secrets..."
+            if [ -z "${{ secrets.EAS_ROBOT_TOKEN }}" ]; then
+              echo "❌ EAS_ROBOT_TOKEN missing"
+              exit 1
+            fi
+            if [ -z "${{ secrets.ADMOB_APP_ID }}" ]; then
+              echo "❌ ADMOB_APP_ID missing"  
+              exit 1
+            fi
+            echo "✅ Required secrets present"
+          fi
+          
+      - name: Check Bundle Size
+        run: |
+          echo "📊 Checking bundle sizes..."
+          du -sh test-dist/* || echo "No bundles to check"
+          
+      - name: Cleanup
+        run: rm -rf test-dist

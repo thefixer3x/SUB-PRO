@@ -19,7 +19,10 @@
       "Bash(npm run type-check:*)",
       "Bash(npx expo export:*)",
       "Bash(npm uninstall:*)",
-      "Bash(npx expo install:*)"
+      "Bash(npx expo install:*)",
+      "Bash(export EXPO_TOKEN=\"y0KiSuc9mkqi5dJuHs3ByLzUTocRxHFsYs73tdhW\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": []
   }
