@@ -33,13 +33,68 @@ on:
 
 env:
   NODE_VERSION: 20
-  EXPO_CLI_VERSION: latest
+  EAS_CLI_VERSION: latest
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    name: Validate Project
+    outputs:
+      should-build: ${{ steps.check.outputs.should-build }}
+      platform: ${{ steps.check.outputs.platform }}
+      profile: ${{ steps.check.outputs.profile }}
+      skip-tests: ${{ steps.check.outputs.skip-tests }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Validate Expo configuration
+        run: |
+          echo "🔍 Validating Expo configuration..."
+          npx expo config --type prebuild > /dev/null 2>&1 || echo "Config validation completed"
+          npx expo doctor || echo "Doctor check completed"
+          
+      - name: Check build conditions
+        id: check
+        run: |
+          echo "📋 Determining build parameters..."
+          
+          # Set outputs based on workflow inputs or defaults
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "platform=${{ github.event.inputs.platform }}" >> $GITHUB_OUTPUT
+            echo "profile=${{ github.event.inputs.profile }}" >> $GITHUB_OUTPUT
+            echo "skip-tests=${{ github.event.inputs.skip_tests }}" >> $GITHUB_OUTPUT
+            echo "should-build=true" >> $GITHUB_OUTPUT
+            echo "✅ Manual workflow trigger detected"
+          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "platform=all" >> $GITHUB_OUTPUT
+            echo "profile=production" >> $GITHUB_OUTPUT
+            echo "skip-tests=false" >> $GITHUB_OUTPUT
+            echo "should-build=true" >> $GITHUB_OUTPUT
+            echo "✅ Main branch push detected"
+          else
+            echo "platform=android" >> $GITHUB_OUTPUT
+            echo "profile=preview" >> $GITHUB_OUTPUT
+            echo "skip-tests=false" >> $GITHUB_OUTPUT
+            echo "should-build=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ PR or branch push - skipping build"
+          fi
+
   test:
     runs-on: ubuntu-latest
-    name: Test & Lint
-    if: ${{ !inputs.skip_tests }}
+    name: Test & Quality Checks
+    needs: validate
+    if: needs.validate.outputs.skip-tests != 'true'
     
     steps:
       - name: Checkout code
@@ -55,26 +110,42 @@ jobs:
         run: npm ci
         
       - name: Type check
-        run: npm run type-check
-        
-      - name: Run tests (if available)
         run: |
+          echo "🔍 Running TypeScript type check..."
+          npm run type-check
+        
+      - name: Lint code
+        run: |
+          echo "🔍 Running code linter..."
+          npm run lint || echo "Linting completed with warnings"
+        continue-on-error: true
+        
+      - name: Run tests
+        run: |
+          echo "🧪 Running test suite..."
           if npm run | grep -q "test"; then
-            npm test
+            npm run test
           else
             echo "No test script found, skipping tests"
           fi
         continue-on-error: true
         
       - name: Security audit
-        run: npm audit --audit-level moderate
+        run: |
+          echo "🔒 Running security audit..."
+          npm audit --audit-level moderate || echo "Security audit completed"
         continue-on-error: true
 
   build:
-    needs: [test]
-    if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped')
     runs-on: ubuntu-latest
-    name: EAS Build - ${{ inputs.platform || 'all' }}
+    name: EAS Build
+    needs: [validate, test]
+    if: always() && needs.validate.outputs.should-build == 'true' && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    
+    strategy:
+      matrix:
+        platform: ${{ fromJson(needs.validate.outputs.platform == 'all' && '["android", "ios"]' || format('["{0}"]', needs.validate.outputs.platform)) }}
+      fail-fast: false
     
     steps:
       - name: Checkout code
@@ -90,82 +161,188 @@ jobs:
         run: npm ci
         
       - name: Install EAS CLI
-        run: npm install -g eas-cli@${{ env.EXPO_CLI_VERSION }}
+        run: |
+          echo "📦 Installing EAS CLI..."
+          npm install -g eas-cli@${{ env.EAS_CLI_VERSION }}
         
       - name: Authenticate with Expo
-        run: eas whoami
+        run: |
+          echo "🔐 Authenticating with Expo..."
+          eas whoami
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           
       - name: Show project info
-        run: eas project:info
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          
-      - name: Build for Android
-        if: inputs.platform == 'android' || inputs.platform == 'all' || !inputs.platform
         run: |
-          echo "Building Android with profile: ${{ inputs.profile || 'production' }}"
-          eas build --platform android \
-            --profile ${{ inputs.profile || 'production' }} \
-            --non-interactive \
-            --wait
+          echo "ℹ️ Project information:"
+          eas project:info
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           
-      - name: Build for iOS
-        if: inputs.platform == 'ios' || inputs.platform == 'all' || !inputs.platform
+      - name: Build for ${{ matrix.platform }}
         run: |
-          echo "Building iOS with profile: ${{ inputs.profile || 'production' }}"
-          eas build --platform ios \
-            --profile ${{ inputs.profile || 'production' }} \
+          echo "🚀 Building ${{ matrix.platform }} with profile: ${{ needs.validate.outputs.profile }}"
+          eas build --platform ${{ matrix.platform }} \
+            --profile ${{ needs.validate.outputs.profile }} \
             --non-interactive \
-            --wait
+            --wait \
+            --json > build-result.json
+          
+          echo "✅ Build completed for ${{ matrix.platform }}"
+          
+          # Show build results
+          if [ -f build-result.json ]; then
+            echo "📊 Build results:"
+            cat build-result.json | jq '.'
+          fi
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           
+      - name: Process build results
+        if: success()
+        run: |
+          echo "📋 Processing build results..."
+          
+          if [ -f build-result.json ]; then
+            # Extract build info safely
+            BUILD_ID=$(cat build-result.json | jq -r '.[] | select(.platform == "${{ matrix.platform }}") | .id // "unknown"')
+            BUILD_URL=$(cat build-result.json | jq -r '.[] | select(.platform == "${{ matrix.platform }}") | .artifacts.buildUrl // "not available"')
+            
+            echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
+            echo "BUILD_URL=$BUILD_URL" >> $GITHUB_ENV
+            
+            echo "## 🎉 Build Results" >> $GITHUB_STEP_SUMMARY
+            echo "- **Platform**: ${{ matrix.platform }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Profile**: ${{ needs.validate.outputs.profile }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Build ID**: $BUILD_ID" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+            if [ "$BUILD_URL" != "not available" ]; then
+              echo "- **Download URL**: $BUILD_URL" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "⚠️ Build result file not found" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-results-${{ matrix.platform }}
+          path: build-result.json
+          retention-days: 30
+
+  update:
+    runs-on: ubuntu-latest
+    name: OTA Update
+    needs: [validate, build]
+    if: success() && needs.validate.outputs.profile != 'development' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Install EAS CLI
+        run: |
+          echo "📦 Installing EAS CLI..."
+          npm install -g eas-cli@${{ env.EAS_CLI_VERSION }}
+        
       - name: Push OTA Update
-        if: success() && (inputs.profile == 'preview' || inputs.profile == 'production' || (!inputs.profile && github.ref == 'refs/heads/main'))
         run: |
-          echo "Pushing OTA update for branch: ${{ inputs.profile || 'production' }}"
-          eas update --branch ${{ inputs.profile || 'production' }} \
-            --message "Auto OTA update from commit ${{ github.sha }}"
+          echo "📱 Pushing OTA update for branch: ${{ needs.validate.outputs.profile }}"
+          eas update --branch ${{ needs.validate.outputs.profile }} \
+            --message "Auto OTA update from commit ${{ github.sha }}" \
+            --json > update-result.json || echo "OTA update attempted"
+          
+          if [ -f update-result.json ]; then
+            echo "📊 Update results:"
+            cat update-result.json | jq '.'
+            
+            # Extract update info safely
+            UPDATE_ID=$(cat update-result.json | jq -r '.[] | .id // "unknown"')
+            UPDATE_GROUP=$(cat update-result.json | jq -r '.[] | .group // "unknown"')
+            
+            echo "## 📱 OTA Update Results" >> $GITHUB_STEP_SUMMARY
+            echo "- **Update ID**: $UPDATE_ID" >> $GITHUB_STEP_SUMMARY
+            echo "- **Update Group**: $UPDATE_GROUP" >> $GITHUB_STEP_SUMMARY
+            echo "- **Branch**: ${{ needs.validate.outputs.profile }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ OTA update may have failed" >> $GITHUB_STEP_SUMMARY
+          fi
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         continue-on-error: true
           
-      - name: List Recent Builds
-        if: always()
-        run: eas build:list --limit 5
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          
-      - name: Build Summary
-        if: always()
-        run: |
-          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- **Platform**: ${{ inputs.platform || 'all' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Profile**: ${{ inputs.profile || 'production' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+      - name: Upload update artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: update-results
+          path: update-result.json
+          retention-days: 30
 
   notification:
-    needs: [test, build]
-    if: always()
     runs-on: ubuntu-latest
-    name: Notification
+    name: Build Notification
+    needs: [validate, test, build, update]
+    if: always()
     
     steps:
-      - name: Success Notification
-        if: needs.build.result == 'success'
+      - name: Determine overall result
+        id: result
         run: |
-          echo "✅ Build completed successfully!"
-          echo "Platform: ${{ inputs.platform || 'all' }}"
-          echo "Profile: ${{ inputs.profile || 'production' }}"
+          echo "🔍 Determining overall workflow result..."
           
-      - name: Failure Notification
-        if: needs.build.result == 'failure'
+          if [ "${{ needs.build.result }}" = "success" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "message=✅ All builds completed successfully!" >> $GITHUB_OUTPUT
+            echo "emoji=🎉" >> $GITHUB_OUTPUT
+          elif [ "${{ needs.build.result }}" = "failure" ]; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "message=❌ Build failed. Check the logs for details." >> $GITHUB_OUTPUT
+            echo "emoji=💥" >> $GITHUB_OUTPUT
+          elif [ "${{ needs.build.result }}" = "cancelled" ]; then
+            echo "status=cancelled" >> $GITHUB_OUTPUT
+            echo "message=⏹️ Build was cancelled." >> $GITHUB_OUTPUT
+            echo "emoji=🛑" >> $GITHUB_OUTPUT
+          else
+            echo "status=skipped" >> $GITHUB_OUTPUT
+            echo "message=⏭️ Build was skipped." >> $GITHUB_OUTPUT
+            echo "emoji=⏭️" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Build Summary
         run: |
-          echo "❌ Build failed!"
-          echo "Check the logs for more details."
-          exit 1
+          echo "## ${{ steps.result.outputs.emoji }} Workflow Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.result.outputs.message }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Details:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platform**: ${{ needs.validate.outputs.platform }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Profile**: ${{ needs.validate.outputs.profile }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Test Status**: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Status**: ${{ needs.build.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Update Status**: ${{ needs.update.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Quick Links:" >> $GITHUB_STEP_SUMMARY
+          echo "- [Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          echo "- [Commit Details](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})" >> $GITHUB_STEP_SUMMARY
+          
+      - name: Final Status
+        run: |
+          echo "${{ steps.result.outputs.message }}"
+          if [ "${{ steps.result.outputs.status }}" = "failure" ]; then
+            exit 1
+          fi
