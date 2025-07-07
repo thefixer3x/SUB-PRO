@@ -1,7 +1,14 @@
 name: EAS Build and Deploy
 on:
   push:
-    branches: [main, develop]
+    branches: [mai      - name: 🧪 Run tests (if available)
+        run: |
+          if npm run | grep -q "test"; then
+            npm run test
+          else
+            echo "No test script found, skipping tests"
+          fi
+        continue-on-error: trueop]
   workflow_dispatch:
     inputs:
       platform:

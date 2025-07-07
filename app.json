@@ -10,14 +10,6 @@
     "newArchEnabled": false,
     "owner": "thefixer3x",
     "description": "The ultimate subscription management app with AI-powered insights, virtual cards, and smart spending analytics.",
-    "keywords": [
-      "subscription",
-      "finance",
-      "budget",
-      "spending",
-      "tracker",
-      "virtual card"
-    ],
     "primaryColor": "#3B82F6",
     "splash": {
       "image": "./assets/images/splash.png",
@@ -113,6 +105,8 @@
       [
         "react-native-google-mobile-ads",
         {
+          "androidAppId": "ca-app-pub-7459389089200506~3035173479",
+          "iosAppId": "ca-app-pub-7459389089200506~3035173479",
           "android_app_id": "ca-app-pub-7459389089200506~3035173479",
           "ios_app_id": "ca-app-pub-7459389089200506~3035173479",
           "user_tracking_usage_description": "This identifier will be used to deliver personalized ads to you."
