@@ -170,14 +170,14 @@ jobs:
           echo "🔐 Authenticating with Expo..."
           eas whoami
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_TOKEN: ${{ secrets.EAS_ROBOT_TOKEN }}
           
       - name: Show project info
         run: |
           echo "ℹ️ Project information:"
           eas project:info
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_TOKEN: ${{ secrets.EAS_ROBOT_TOKEN }}
           
       - name: Build for ${{ matrix.platform }}
         run: |
@@ -196,7 +196,7 @@ jobs:
             cat build-result.json | jq '.'
           fi
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_TOKEN: ${{ secrets.EAS_ROBOT_TOKEN }}
           
       - name: Process build results
         if: success()
@@ -279,7 +279,7 @@ jobs:
             echo "⚠️ OTA update may have failed" >> $GITHUB_STEP_SUMMARY
           fi
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_TOKEN: ${{ secrets.EAS_ROBOT_TOKEN }}
         continue-on-error: true
           
       - name: Upload update artifacts
