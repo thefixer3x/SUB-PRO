@@ -1,14 +1,7 @@
 name: EAS Build and Deploy
 on:
   push:
-    branches: [mai      - name: 🧪 Run tests (if available)
-        run: |
-          if npm run | grep -q "test"; then
-            npm run test
-          else
-            echo "No test script found, skipping tests"
-          fi
-        continue-on-error: trueop]
+    branches: [main]
   workflow_dispatch:
     inputs:
       platform:
@@ -167,6 +160,13 @@ jobs:
           echo "✅ Build completed successfully!"
           echo "Platform: ${{ github.event.inputs.platform || 'all' }}"
           echo "Profile: ${{ github.event.inputs.profile || 'production' }}"
+          
+      - name: ❌ Failure Notification  
+        if: needs.build.result == 'failure'
+        run: |
+          echo "❌ Build failed!"
+          echo "Check the logs for more details."
+          exit 1
           
       - name: ❌ Failure Notification  
         if: needs.build.result == 'failure'
