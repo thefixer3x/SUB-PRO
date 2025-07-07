@@ -16,15 +16,8 @@ export const getStripe = () => {
   return stripePromise;
 };
 
-// Server-side Stripe initialization should only happen in API routes
-// This will be imported in API routes where process.env is available
-export const createServerStripe = () => {
-  const Stripe = require('stripe');
-  return new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: '2025-06-30.basil',
-    typescript: true,
-  });
-};
+// Server-side Stripe functions are now in stripe-server.ts
+// Import that file only in API routes that need server-side Stripe
 
 // Legacy interfaces for backward compatibility
 export interface StripeConfig {

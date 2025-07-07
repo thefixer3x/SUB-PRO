@@ -60,8 +60,8 @@
     "react-native-svg": "15.11.2",
     "react-native-web": "^0.20.0",
     "recharts": "^3.0.2",
-    "stripe": "^18.3.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "@stripe/stripe-react-native": "0.45.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
