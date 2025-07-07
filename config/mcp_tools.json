@@ -1,0 +1,123 @@
+{
+    "mcp_tools": {
+        "version": "1.0.0",
+        "enabled": true,
+        "discovery_timeout": 10
+    },
+    "available_tools": [
+        {
+            "name": "web_search",
+            "description": "Search the web for information",
+            "safety_level": "medium",
+            "enabled": true,
+            "parameters": {
+                "query": {
+                    "type": "string",
+                    "required": true,
+                    "description": "Search query"
+                },
+                "max_results": {
+                    "type": "integer",
+                    "default": 5,
+                    "max": 10
+                }
+            }
+        },
+        {
+            "name": "file_manager",
+            "description": "File operations within allowed directories",
+            "safety_level": "low",
+            "enabled": true,
+            "parameters": {
+                "operation": {
+                    "type": "string",
+                    "required": true,
+                    "allowed_values": ["read", "write", "create", "list", "copy", "move"]
+                },
+                "path": {
+                    "type": "string",
+                    "required": true,
+                    "validation": "must_be_in_allowed_directories"
+                },
+                "content": {
+                    "type": "string",
+                    "required": false
+                }
+            }
+        },
+        {
+            "name": "application_launcher",
+            "description": "Launch and control applications",
+            "safety_level": "high",
+            "enabled": true,
+            "parameters": {
+                "app_name": {
+                    "type": "string",
+                    "required": true,
+                    "validation": "must_be_in_allowed_applications"
+                },
+                "action": {
+                    "type": "string",
+                    "required": true,
+                    "allowed_values": ["launch", "terminate", "focus", "minimize"]
+                },
+                "arguments": {
+                    "type": "array",
+                    "required": false
+                }
+            }
+        },
+        {
+            "name": "system_monitor",
+            "description": "Monitor system resources and processes",
+            "safety_level": "low",
+            "enabled": true,
+            "parameters": {
+                "metric": {
+                    "type": "string",
+                    "required": true,
+                    "allowed_values": ["cpu", "memory", "disk", "processes", "network"]
+                }
+            }
+        },
+        {
+            "name": "text_processor",
+            "description": "Process and analyze text content",
+            "safety_level": "low",
+            "enabled": true,
+            "parameters": {
+                "operation": {
+                    "type": "string",
+                    "required": true,
+                    "allowed_values": ["extract", "summarize", "translate", "format"]
+                },
+                "text": {
+                    "type": "string",
+                    "required": true
+                },
+                "options": {
+                    "type": "object",
+                    "required": false
+                }
+            }
+        }
+    ],
+    "tool_discovery": {
+        "auto_discover": true,
+        "discovery_paths": [
+            "./mcp_tools",
+            "~/.mcp/tools"
+        ],
+        "refresh_interval": 300
+    },
+    "safety_constraints": {
+        "require_confirmation": {
+            "high": false,
+            "medium": false,
+            "low": false
+        },
+        "log_all_executions": true,
+        "timeout_seconds": 30,
+        "max_concurrent_tools": 3
+    }
+}

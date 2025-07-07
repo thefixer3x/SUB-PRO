@@ -1,0 +1,85 @@
+{
+  "cli": {
+    "version": ">= 5.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51IqmwEF6R3sAq2DlTHisUmo6TTLhNQGsYZMNdL3lIu3aNeQaXpMaoKPaymCNUsCtKFgYZGr7VZoKPiZYLmZxqTLQ00aNlRTSLp",
+        "EXPO_PUBLIC_ADMOB_APP_ID": "ca-app-pub-3940256099942544~3347511713",
+        "EXPO_PUBLIC_ADMOB_BANNER_ID": "@ADMOB_BANNER_ID",
+        "EXPO_PUBLIC_ADMOB_INTERSTITIAL_ID": "@ADMOB_INTERSTITIAL_ID",
+        "EXPO_PUBLIC_ADMOB_REWARDED_ID": "@ADMOB_REWARDED_ID",
+        "EXPO_PUBLIC_ADSENSE_PUBLISHER_ID": "@ADSENSE_PUBLISHER_ID",
+        "EXPO_PUBLIC_ADSENSE_SLOT_ID": "@ADSENSE_SLOT_ID",
+        "EXPO_PUBLIC_MONETIZATION_V1": "true",
+        "EXPO_PUBLIC_EMBED_FINANCE_BETA": "true",
+        "EXPO_PUBLIC_COMPLIANCE_CENTER": "true"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug"
+      },
+      "ios": {
+        "simulator": true,
+        "buildConfiguration": "Debug"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51IqmwEF6R3sAq2DlTHisUmo6TTLhNQGsYZMNdL3lIu3aNeQaXpMaoKPaymCNUsCtKFgYZGr7VZoKPiZYLmZxqTLQ00aNlRTSLp",
+        "EXPO_PUBLIC_ADMOB_APP_ID": "ca-app-pub-3940256099942544~3347511713",
+        "EXPO_PUBLIC_ADMOB_BANNER_ID": "@ADMOB_BANNER_ID",
+        "EXPO_PUBLIC_ADMOB_INTERSTITIAL_ID": "@ADMOB_INTERSTITIAL_ID",
+        "EXPO_PUBLIC_ADMOB_REWARDED_ID": "@ADMOB_REWARDED_ID",
+        "EXPO_PUBLIC_ADSENSE_PUBLISHER_ID": "@ADSENSE_PUBLISHER_ID",
+        "EXPO_PUBLIC_ADSENSE_SLOT_ID": "@ADSENSE_SLOT_ID",
+        "EXPO_PUBLIC_MONETIZATION_V1": "true",
+        "EXPO_PUBLIC_EMBED_FINANCE_BETA": "true"
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": false
+      }
+    },
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "@STRIPE_PUBLISHABLE_KEY",
+        "EXPO_PUBLIC_ADMOB_APP_ID": "@ADMOB_APP_ID",
+        "EXPO_PUBLIC_ADMOB_BANNER_ID": "@ADMOB_BANNER_ID",
+        "EXPO_PUBLIC_ADMOB_INTERSTITIAL_ID": "@ADMOB_INTERSTITIAL_ID",
+        "EXPO_PUBLIC_ADMOB_REWARDED_ID": "@ADMOB_REWARDED_ID",
+        "EXPO_PUBLIC_MONETIZATION_V1": "true",
+        "EXPO_PUBLIC_EMBED_FINANCE_BETA": "true",
+        "EXPO_PUBLIC_COMPLIANCE_CENTER": "true",
+        "EXPO_PUBLIC_SECURITY_MONITORING": "true",
+        "EXPO_PUBLIC_PARTNER_HUB": "true"
+      },
+      "android": {
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleRelease"
+      },
+      "ios": {
+        "buildConfiguration": "Release"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "track": "internal",
+        "changesNotSentForReview": false
+      },
+      "ios": {
+        "appleId": "your-apple-id@example.com",
+        "ascAppId": "1234567890"
+      }
+    }
+  }
+}

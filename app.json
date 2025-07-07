@@ -1,0 +1,55 @@
+{
+  "expo": {
+    "name": "SubTrack Pro",
+    "slug": "subtrack-pro",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "subtrack",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
+    "owner": "thefixer3x",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.thefixer3x.subtrackpro",
+      "buildNumber": "1"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.thefixer3x.subtrackpro",
+      "versionCode": 1
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-secure-store",
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "YOUR_PROJECT_ID_HERE"
+      }
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    }
+  },
+  "react-native-google-mobile-ads": {
+    "android_app_id": "ca-app-pub-YOUR_ADMOB_APP_ID",
+    "ios_app_id": "ca-app-pub-YOUR_ADMOB_APP_ID"
+  }
+}

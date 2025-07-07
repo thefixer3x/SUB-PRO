@@ -1,0 +1,125 @@
+{
+    "safety_rules": {
+        "version": "1.0.0",
+        "last_updated": "2025-07-03T10:28:21Z"
+    },
+    "command_validation": {
+        "whitelist_mode": false,
+        "blacklist_patterns": [
+            "rm\\s+-rf\\s+/",
+            "sudo\\s+rm",
+            "chmod\\s+777",
+            "curl\\s+.*\\|",
+            "wget\\s+.*\\|",
+            "dd\\s+if=",
+            "mkfs\\.",
+            "fdisk",
+            "mount\\s+",
+            "umount\\s+",
+            "kill\\s+-9\\s+1",
+            "killall\\s+-9",
+            "reboot",
+            "shutdown",
+            "halt",
+            "init\\s+0",
+            "init\\s+6"
+        ],
+        "dangerous_paths": [
+            "/",
+            "/bin",
+            "/sbin",
+            "/usr/bin",
+            "/usr/sbin",
+            "/etc",
+            "/var",
+            "/sys",
+            "/proc",
+            "/dev"
+        ],
+        "safe_command_prefixes": {
+            "low_risk": [
+                "ls", "pwd", "echo", "cat", "head", "tail", "grep", "find",
+                "which", "whoami", "date", "uptime", "df", "du", "ps"
+            ],
+            "medium_risk": [
+                "git", "npm", "yarn", "pip", "python", "node", "java",
+                "mkdir", "touch", "cp", "mv", "ln"
+            ],
+            "high_risk": [
+                "chmod", "chown", "curl", "wget", "ssh", "scp", "rsync"
+            ]
+        }
+    },
+    "file_operation_rules": {
+        "allowed_extensions": [
+            ".txt", ".md", ".json", ".yaml", ".yml", ".xml", ".csv",
+            ".js", ".ts", ".jsx", ".tsx", ".py", ".java", ".go", ".rs",
+            ".html", ".css", ".scss", ".sass", ".less",
+            ".sh", ".bash", ".zsh", ".fish",
+            ".sql", ".log", ".conf", ".config", ".ini"
+        ],
+        "blocked_extensions": [
+            ".exe", ".dll", ".so", ".dylib", ".app", ".dmg", ".pkg",
+            ".deb", ".rpm", ".msi", ".bat", ".cmd", ".scr", ".vbs"
+        ],
+        "max_file_size_mb": 100,
+        "backup_before_modify": true,
+        "require_confirmation_for": [
+            "delete_operations",
+            "large_files",
+            "system_files"
+        ]
+    },
+    "application_control_rules": {
+        "allowed_actions": [
+            "launch", "terminate", "focus", "minimize", "maximize", "hide"
+        ],
+        "blocked_applications": [
+            "Activity Monitor", "Terminal", "System Preferences",
+            "Disk Utility", "Console", "Keychain Access"
+        ],
+        "require_confirmation": [
+            "terminate", "force_quit"
+        ],
+        "launch_timeout": 10
+    },
+    "network_access_rules": {
+        "allowed_domains": [
+            "api.openai.com",
+            "api.anthropic.com",
+            "github.com",
+            "stackoverflow.com",
+            "docs.python.org"
+        ],
+        "blocked_domains": [
+            "localhost",
+            "127.0.0.1",
+            "0.0.0.0"
+        ],
+        "require_https": true,
+        "max_request_size_mb": 10
+    },
+    "execution_limits": {
+        "max_execution_time": 30,
+        "max_memory_mb": 512,
+        "max_cpu_percent": 50,
+        "max_concurrent_processes": 5,
+        "kill_on_timeout": true
+    },
+    "logging_requirements": {
+        "log_all_commands": true,
+        "log_command_output": true,
+        "log_file_operations": true,
+        "log_application_control": true,
+        "log_network_requests": true,
+        "retention_days": 30
+    },
+    "emergency_procedures": {
+        "panic_keywords": [
+            "emergency", "stop", "abort", "cancel", "halt", "panic"
+        ],
+        "auto_terminate_on_panic": true,
+        "emergency_contact": null,
+        "backup_safety_mode": true
+    }
+}

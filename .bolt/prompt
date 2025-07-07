@@ -1,0 +1,111 @@
+The project already follows strong Tailwind + React conventions, but tightening wording, ordering, and adding a few “why it matters” notes will make the standards easier to follow for everyone. Below you’ll find (1) an optimized Global Standards doc that folds in current best-practice references, and (2) a ready-to-paste “Project Knowledge Prompt” that you can drop into Bolt.new / GitHub Copilot so every AI agent knows the exact constraints.
+
+⸻
+
+Optimised Global Design-to-Deploy Standards
+
+Purpose: Provide a single, plain-English source of truth for UI/UX, media, performance, security, and comms so designers, engineers, and non-technical stakeholders stay aligned.
+
+1. Design & Development
+
+Guideline	Rationale
+Visually stunning, production-ready UI using JSX + Tailwind only; leverage Tailwind’s purge/minify workflow to keep CSS < 10 KB gzip.  ￼	Guarantees small bundles and consistent utility naming.
+React Hooks everywhere (no class comps).	Aligns with modern React patterns and tree-shaking.
+Lucide-React for icons & logos – tree-shakable SVG components.  ￼	Reduces unused icon payload.
+Document every major choice (Figma link + Notion card).	Keeps tech/non-tech teams in sync; speeds reviews.
+
+2. Content & Media
+	•	Stock images via Unsplash API without hot-linking; download, compress (WebP/AVIF), and store on CDN or Supabase Storage. Unsplash terms prohibit direct hotlinking in production.  ￼
+	•	Lazy-load non-critical images (loading="lazy"); always set width/height or use CSS aspect-ratio to avoid CLS.  ￼ ￼ ￼
+	•	Use responsive sources (srcset, <picture>).
+	•	Nightly cron: broken-link scan + media backup (UptimeRobot / Site24x7 recommendations).  ￼
+
+3. Performance & Accessibility
+	•	Meet WCAG 2.1 AA for color contrast, focus order, alt text.  ￼ ￼
+	•	Default to Static Generation or SSR for marketing pages; client-side CSR only where real-time data required.  ￼
+	•	Lighthouse & WebPageTest dashboards shared in Notion for non-tech visibility.  ￼ ￼
+
+4. Security & Compliance
+	•	Follow UK Open Banking Security Profile for all finance endpoints (FAPI + mTLS).  ￼
+	•	Require 2FA and/or biometrics via Expo expo-local-authentication or OTP flow.  ￼ ￼
+	•	Store sensitive tokens in Expo SecureStore (requireAuthentication: true).  ￼
+	•	All security docs summarised in plain language for execs.
+
+5. Project Management & Comms
+	•	Every PR description must have: What / Why / How / Screenshots.
+	•	Use Notion as the shared doc hub; link standards, decisions, and dashboards.  ￼ ￼
+	•	Error-handling rule: describe issue → refine prompt/request → implement fix.
+
+⸻
+
+Project-Specific Knowledge Prompt (paste into any AI dev tool)
+
+You are coding within the “SubTrack Pro” project (Expo + React Native + Tailwind + Supabase).
+
+Global Constraints
+- JSX with Tailwind; NO inline styles except dynamic calc().
+- Import icons from `lucide-react` only.
+- Fonts: Inter (body), Poppins (display); include via Google Fonts.
+- Every image pulled from Unsplash API must be downloaded, compressed to WebP, width/height set, and stored in Supabase Storage before use.
+
+Performance & A11y
+- Keep main JS bundle ≤ 200 KB gzipped.
+- Pass Lighthouse ≥ 90 (Performance, A11y, PWA).
+- Comply with WCAG 2.1 AA contrast, focus, alt-text.
+
+Security
+- Follow Open Banking security profile: mTLS + FAPI.
+- Use `expo-local-authentication` for FaceID/TouchID, and OTP fallback.
+- Secrets in GitHub Actions → `EAS_TOKEN`, `SUPABASE_URL`, etc.
+
+CI/CD
+- GitHub Actions workflow `eas-build.yml` runs on `main` push:
+  1) Checkout → Node 18 → global `eas-cli`
+  2) `eas build --platform android|ios --profile production --non-interactive`
+- Bolt.new commits flow into GitHub PRs; merge to `main` triggers build.
+- Feature flags (`SMART_INSIGHTS`, `MONETIZATION_V1`, etc.) gate new modules.
+
+Feature Flags (default OFF)
+- `SMART_INSIGHTS` = AI churn‐risk predictions.
+- `MONETIZATION_V1` = Free vs Pro plan & AdMob banners.
+- `EMBED_FINANCE_BETA` = Virtual card & affiliate links.
+- `COMPLIANCE_CENTER`, `PARTNER_HUB`, `SOCIAL_V1` as documented.
+
+Coding Style
+- Use React Hooks; wrap heavy comps in `React.memo`.
+- Use SWR for data + skeleton loaders > 300 ms.
+- Icons sized via `className="w-5 h-5"` (tailwind units).
+
+Documentation
+- For every new component: add MDX page in `/docs` with purpose, props, and screenshot gif.
+- Keep explanations business-friendly; avoid jargon unless in code comments.
+
+If requirements conflict, ask clarifying questions before coding. Output production-ready, WC-compliant code with concise comments.
+
+How this helps fix issues
+	•	Unified prompt ensures every agent or new dev injects fonts, icons, images, and security in the exact way expected.
+	•	Feature-flag reference prevents breaking production when experimental AI or monetization features are merged.
+	•	Clear CI/CD block reminds contributors that merging to main triggers automatic EAS builds, so they must keep bundle size and secrets in check.
+
+With these two artefacts, anyone joining the repo—or any AI assistant you spin up—gets an instant, unambiguous specification and won’t introduce design, performance, or compliance regressions.
+Quick Summary for the New Teammate (“TL;DR Briefing”)
+
+You’re joining an AI-enhanced subscription-management app built with Expo + React Native (TypeScript), Tailwind-powered styling, and Supabase for data.
+The product already ships:
+
+Layer
+Highlights
+Core Features
+Customisable dashboard, subscription list, analytics, settings. Budget alerts, weekly reports, dark/light theme, offline notice, pull-to-refresh.
+Advanced UX
+Framer-motion card animations, skeleton loaders, smart navigation caching, performance budgets ≤ 200 KB gzipped.
+Bulk Ops
+CSV / XLSX importer with field-mapping and validation (Prompt-2).
+Data-Viz
+Recharts line, pie, heat-map, scatter (Prompt-4).
+Theming
+Google Fonts (Inter/Poppins) + full dark-mode (Prompt-7).
+Feature Flags
+SMART_INSIGHTS, MONETIZATION_V1, EMBED_FINANCE_BETA, etc., let us merge code safely and toggle in production.
+Monetization Roadmap
+Freemium tier, ads for free users, Stripe-based Pro plan, partner marketplace, AI churn-risk predictions (Prompts 9-14).

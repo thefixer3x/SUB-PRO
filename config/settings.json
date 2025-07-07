@@ -1,0 +1,77 @@
+{
+    "system": {
+        "name": "Safe Desktop Automation System",
+        "version": "1.0.0",
+        "debug": false
+    },
+    "security": {
+        "allowed_directories": [
+            "~/Desktop",
+            "~/Documents", 
+            "~/Downloads",
+            "./workspace"
+        ],
+        "allowed_commands": [
+            "ls", "pwd", "echo", "cat", "head", "tail", "grep",
+            "git", "npm", "yarn", "python", "node", "pip",
+            "mkdir", "touch", "cp", "mv", "find", "which"
+        ],
+        "blocked_commands": [
+            "rm -rf", "sudo", "chmod 777", "curl |", "wget |",
+            "dd", "mkfs", "fdisk", "mount", "umount", "kill -9"
+        ],
+        "allowed_applications": [
+            "code", "cursor", "firefox", "chrome", "safari", "terminal",
+            "finder", "calculator", "textedit", "preview"
+        ],
+        "max_execution_time": 30,
+        "safety_levels": {
+            "low": {
+                "description": "Very restrictive - only basic safe commands",
+                "allowed_prefixes": ["ls", "pwd", "echo", "cat", "head", "tail", "grep"]
+            },
+            "medium": {
+                "description": "Allow file operations and common dev tools",
+                "blocked_patterns": ["rm -rf", "sudo", "chmod 777", "curl |"]
+            },
+            "high": {
+                "description": "Allow most commands except explicitly blocked",
+                "requires_confirmation": false
+            }
+        }
+    },
+    "web_interface": {
+        "host": "0.0.0.0",
+        "port": 1234,
+        "websocket_port": 1235,
+        "secret_key": "your-secret-key-change-in-production"
+    },
+    "services": {
+        "mcp_gateway_port": 1236,
+        "safe_executor_port": 1237
+    },
+    "ai_integration": {
+        "default_provider": "openai",
+        "openai": {
+            "model": "gpt-4",
+            "max_tokens": 2000,
+            "temperature": 0.1
+        },
+        "anthropic": {
+            "model": "claude-3-sonnet-20240229",
+            "max_tokens": 2000,
+            "temperature": 0.1
+        }
+    },
+    "database": {
+        "sessions_db": "storage/sessions.db",
+        "patterns_db": "storage/patterns.db",
+        "tasks_db": "storage/tasks.db"
+    },
+    "logging": {
+        "level": "INFO",
+        "file": "logs/system.log",
+        "max_size_mb": 10,
+        "backup_count": 5
+    }
+}
