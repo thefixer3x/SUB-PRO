@@ -1,0 +1,205 @@
+name: Enhanced EAS Build and Deploy
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build (android/ios/all)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - android
+          - ios
+          - all
+      profile:
+        description: 'Build profile'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - development
+          - preview
+          - production
+          - store-submission
+      skip_tests:
+        description: 'Skip test suite'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  NODE_VERSION: 18
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: 🧪 Test & Lint
+    if: ${{ !github.event.inputs.skip_tests }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 🔧 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: 📦 Install dependencies
+        run: npm ci
+        
+      - name: 🔍 Type check
+        run: npm run type-check
+        
+      - name: 🧹 Lint code
+        run: npm run lint
+        
+      - name: 🧪 Run tests
+        run: npm run test
+        continue-on-error: false
+        
+      - name: 🔒 Security audit
+        run: npm audit --audit-level moderate
+        continue-on-error: true
+
+  build:
+    needs: [test]
+    if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped' || github.event.inputs.skip_tests == 'true')
+    runs-on: ubuntu-latest
+    name: 🏗️ EAS Build - ${{ github.event.inputs.platform || 'all' }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 🔧 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: 📦 Install dependencies
+        run: npm ci
+        
+      - name: 💾 Cache EAS CLI
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: eas-cli-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          
+      - name: 🔨 Install EAS CLI
+        run: npm install -g eas-cli@latest
+        
+      - name: 🔐 Authenticate with Expo
+        run: eas whoami
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          
+      - name: 📋 Show project info
+        run: eas project:info
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          
+      - name: 📱 Build for Android
+        if: github.event.inputs.platform == 'android' || github.event.inputs.platform == 'all' || !github.event.inputs.platform
+        run: |
+          echo "Building Android with profile: ${{ github.event.inputs.profile || 'production' }}"
+          eas build --platform android \
+            --profile ${{ github.event.inputs.profile || 'production' }} \
+            --non-interactive \
+            --wait
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          
+      - name: 🍎 Build for iOS  
+        if: github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'all' || !github.event.inputs.platform
+        run: |
+          echo "Building iOS with profile: ${{ github.event.inputs.profile || 'production' }}"
+          eas build --platform ios \
+            --profile ${{ github.event.inputs.profile || 'production' }} \
+            --non-interactive \
+            --wait
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          
+      - name: 🚀 Push OTA Update
+        if: success() && (github.event.inputs.profile == 'preview' || github.event.inputs.profile == 'production' || (!github.event.inputs.profile && github.ref == 'refs/heads/main'))
+        run: |
+          echo "Pushing OTA update for branch: ${{ github.event.inputs.profile || 'production' }}"
+          eas update --branch ${{ github.event.inputs.profile || 'production' }} \
+            --message "Auto OTA update from commit ${{ github.sha }}"
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          
+      - name: 📊 List Recent Builds
+        if: always()
+        run: eas build:list --limit 5
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          
+      - name: 📈 Build Summary
+        if: always()
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platform**: ${{ github.event.inputs.platform || 'all' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Profile**: ${{ github.event.inputs.profile || 'production' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+
+  store-submission:
+    needs: [build]
+    if: github.event.inputs.profile == 'store-submission' && success()
+    runs-on: ubuntu-latest
+    name: 🏪 Store Submission
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 🔨 Install EAS CLI
+        run: npm install -g eas-cli@latest
+        
+      - name: 🔐 Authenticate with Expo
+        run: eas whoami
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          
+      - name: 🍎 Submit to App Store (iOS)
+        if: github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'all'
+        run: eas submit --platform ios --latest --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        continue-on-error: true
+          
+      - name: 🤖 Submit to Play Store (Android)
+        if: github.event.inputs.platform == 'android' || github.event.inputs.platform == 'all'
+        run: eas submit --platform android --latest --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        continue-on-error: true
+
+  notification:
+    needs: [test, build, store-submission]
+    if: always()
+    runs-on: ubuntu-latest
+    name: 📢 Notification
+    
+    steps:
+      - name: 🎉 Success Notification
+        if: needs.build.result == 'success'
+        run: |
+          echo "✅ Build completed successfully!"
+          echo "Platform: ${{ github.event.inputs.platform || 'all' }}"
+          echo "Profile: ${{ github.event.inputs.profile || 'production' }}"
+          
+      - name: ❌ Failure Notification  
+        if: needs.build.result == 'failure'
+        run: |
+          echo "❌ Build failed!"
+          echo "Check the logs for more details."
+          exit 1
