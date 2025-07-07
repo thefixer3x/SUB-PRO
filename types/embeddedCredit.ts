@@ -24,7 +24,7 @@ export interface EmbeddedCreditTransaction {
   type: 'subscription_payment' | 'settlement' | 'fee' | 'refund';
   status: 'pending' | 'completed' | 'failed' | 'reversed';
   settlementId?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, string | number | boolean | null>;
   createdAt: Date;
 }
 

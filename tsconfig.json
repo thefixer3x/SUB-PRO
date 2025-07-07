@@ -4,6 +4,10 @@
     "strict": true,
     "module": "esnext",
     "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
     "paths": {
       "@/*": ["./*"]
     }

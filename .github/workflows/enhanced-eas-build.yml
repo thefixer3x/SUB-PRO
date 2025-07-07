@@ -1,3 +1,4 @@
+# /*************  ✨ Windsurf Command 🌟  *************
 name: EAS Build and Deploy
 on:
   push:
@@ -35,27 +36,27 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
-    name: 🧪 Test & Lint
+    name: Test & Lint
     if: ${{ !github.event.inputs.skip_tests }}
     
     steps:
-      - name: 📥 Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
         
-      - name: 🔧 Set up Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           
-      - name: 📦 Install dependencies
+      - name: Install dependencies
         run: npm ci
         
-      - name: 🔍 Type check
+      - name: Type check
         run: npm run type-check
         continue-on-error: true
         
-      - name: � Run tests (if available)
+      - name: Run tests (if available)
         run: |
           if npm run | grep -q "test"; then
             npm run test
@@ -64,7 +65,7 @@ jobs:
           fi
         continue-on-error: true
         
-      - name: 🔒 Security audit
+      - name: Security audit
         run: npm audit --audit-level moderate
         continue-on-error: true
 
@@ -72,35 +73,35 @@ jobs:
     needs: [test]
     if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped' || github.event.inputs.skip_tests == 'true')
     runs-on: ubuntu-latest
-    name: 🏗️ EAS Build - ${{ github.event.inputs.platform || 'all' }}
+    name: EAS Build - ${{ github.event.inputs.platform || 'all' }}
     
     steps:
-      - name: 📥 Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
         
-      - name: 🔧 Set up Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           
-      - name: 📦 Install dependencies
+      - name: Install dependencies
         run: npm ci
         
-      - name:  Install EAS CLI
+      - name: Install EAS CLI
         run: npm install -g eas-cli@latest
         
-      - name: 🔐 Authenticate with Expo
+      - name: Authenticate with Expo
         run: eas whoami
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           
-      - name: 📋 Show project info
+      - name: Show project info
         run: eas project:info
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           
-      - name: 📱 Build for Android
+      - name: Build for Android
         if: github.event.inputs.platform == 'android' || github.event.inputs.platform == 'all' || !github.event.inputs.platform
         run: |
           echo "Building Android with profile: ${{ github.event.inputs.profile || 'production' }}"
@@ -109,9 +110,9 @@ jobs:
             --non-interactive \
             --wait
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          # EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           
-      - name: 🍎 Build for iOS  
+      - name: Build for iOS
         if: github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'all' || !github.event.inputs.platform
         run: |
           echo "Building iOS with profile: ${{ github.event.inputs.profile || 'production' }}"
@@ -120,9 +121,9 @@ jobs:
             --non-interactive \
             --wait
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          # EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           
-      - name: 🚀 Push OTA Update
+      - name: Push OTA Update
         if: success() && (github.event.inputs.profile == 'preview' || github.event.inputs.profile == 'production' || (!github.event.inputs.profile && github.ref == 'refs/heads/main'))
         run: |
           echo "Pushing OTA update for branch: ${{ github.event.inputs.profile || 'production' }}"
@@ -132,13 +133,13 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         continue-on-error: true
           
-      - name: 📊 List Recent Builds
+      - name: List Recent Builds
         if: always()
         run: eas build:list --limit 5
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           
-      - name: 📈 Build Summary
+      - name: Build Summary
         if: always()
         run: |
           echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
@@ -151,26 +152,20 @@ jobs:
     needs: [test, build]
     if: always()
     runs-on: ubuntu-latest
-    name: 📢 Notification
+    name: Notification
     
     steps:
-      - name: 🎉 Success Notification
+      - name: Success Notification
         if: needs.build.result == 'success'
         run: |
-          echo "✅ Build completed successfully!"
+          echo "Build completed successfully!"
           echo "Platform: ${{ github.event.inputs.platform || 'all' }}"
           echo "Profile: ${{ github.event.inputs.profile || 'production' }}"
           
-      - name: ❌ Failure Notification  
+      - name: Failure Notification
         if: needs.build.result == 'failure'
         run: |
-          echo "❌ Build failed!"
+          echo "Build failed!"
           echo "Check the logs for more details."
           exit 1
-          
-      - name: ❌ Failure Notification  
-        if: needs.build.result == 'failure'
-        run: |
-          echo "❌ Build failed!"
-          echo "Check the logs for more details."
-          exit 1
+
