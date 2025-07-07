@@ -1,7 +1,9 @@
-# /*************  ✨ Windsurf Command 🌟  *************
 name: EAS Build and Deploy
+
 on:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -23,7 +25,6 @@ on:
           - development
           - preview
           - production
-          - store-submission
       skip_tests:
         description: 'Skip test suite'
         required: false
@@ -31,13 +32,14 @@ on:
         type: boolean
 
 env:
-  NODE_VERSION: 18
+  NODE_VERSION: 20
+  EXPO_CLI_VERSION: latest
 
 jobs:
   test:
     runs-on: ubuntu-latest
     name: Test & Lint
-    if: ${{ !github.event.inputs.skip_tests }}
+    if: ${{ !inputs.skip_tests }}
     
     steps:
       - name: Checkout code
@@ -54,12 +56,11 @@ jobs:
         
       - name: Type check
         run: npm run type-check
-        continue-on-error: true
         
       - name: Run tests (if available)
         run: |
           if npm run | grep -q "test"; then
-            npm run test
+            npm test
           else
             echo "No test script found, skipping tests"
           fi
@@ -71,9 +72,9 @@ jobs:
 
   build:
     needs: [test]
-    if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped' || github.event.inputs.skip_tests == 'true')
+    if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped')
     runs-on: ubuntu-latest
-    name: EAS Build - ${{ github.event.inputs.platform || 'all' }}
+    name: EAS Build - ${{ inputs.platform || 'all' }}
     
     steps:
       - name: Checkout code
@@ -89,7 +90,7 @@ jobs:
         run: npm ci
         
       - name: Install EAS CLI
-        run: npm install -g eas-cli@latest
+        run: npm install -g eas-cli@${{ env.EXPO_CLI_VERSION }}
         
       - name: Authenticate with Expo
         run: eas whoami
@@ -102,32 +103,32 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           
       - name: Build for Android
-        if: github.event.inputs.platform == 'android' || github.event.inputs.platform == 'all' || !github.event.inputs.platform
+        if: inputs.platform == 'android' || inputs.platform == 'all' || !inputs.platform
         run: |
-          echo "Building Android with profile: ${{ github.event.inputs.profile || 'production' }}"
+          echo "Building Android with profile: ${{ inputs.profile || 'production' }}"
           eas build --platform android \
-            --profile ${{ github.event.inputs.profile || 'production' }} \
+            --profile ${{ inputs.profile || 'production' }} \
             --non-interactive \
             --wait
         env:
-          # EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           
       - name: Build for iOS
-        if: github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'all' || !github.event.inputs.platform
+        if: inputs.platform == 'ios' || inputs.platform == 'all' || !inputs.platform
         run: |
-          echo "Building iOS with profile: ${{ github.event.inputs.profile || 'production' }}"
+          echo "Building iOS with profile: ${{ inputs.profile || 'production' }}"
           eas build --platform ios \
-            --profile ${{ github.event.inputs.profile || 'production' }} \
+            --profile ${{ inputs.profile || 'production' }} \
             --non-interactive \
             --wait
         env:
-          # EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           
       - name: Push OTA Update
-        if: success() && (github.event.inputs.profile == 'preview' || github.event.inputs.profile == 'production' || (!github.event.inputs.profile && github.ref == 'refs/heads/main'))
+        if: success() && (inputs.profile == 'preview' || inputs.profile == 'production' || (!inputs.profile && github.ref == 'refs/heads/main'))
         run: |
-          echo "Pushing OTA update for branch: ${{ github.event.inputs.profile || 'production' }}"
-          eas update --branch ${{ github.event.inputs.profile || 'production' }} \
+          echo "Pushing OTA update for branch: ${{ inputs.profile || 'production' }}"
+          eas update --branch ${{ inputs.profile || 'production' }} \
             --message "Auto OTA update from commit ${{ github.sha }}"
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -143,8 +144,8 @@ jobs:
         if: always()
         run: |
           echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- **Platform**: ${{ github.event.inputs.platform || 'all' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Profile**: ${{ github.event.inputs.profile || 'production' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platform**: ${{ inputs.platform || 'all' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Profile**: ${{ inputs.profile || 'production' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
 
@@ -158,14 +159,13 @@ jobs:
       - name: Success Notification
         if: needs.build.result == 'success'
         run: |
-          echo "Build completed successfully!"
-          echo "Platform: ${{ github.event.inputs.platform || 'all' }}"
-          echo "Profile: ${{ github.event.inputs.profile || 'production' }}"
+          echo "✅ Build completed successfully!"
+          echo "Platform: ${{ inputs.platform || 'all' }}"
+          echo "Profile: ${{ inputs.profile || 'production' }}"
           
       - name: Failure Notification
         if: needs.build.result == 'failure'
         run: |
-          echo "Build failed!"
+          echo "❌ Build failed!"
           echo "Check the logs for more details."
           exit 1
-
