@@ -18,7 +18,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.thefixer3x.subtrackpro",
+      "bundleIdentifier": "com.lanonasis.subpro",
       "buildNumber": "1",
       "requireFullScreen": false,
       "config": {
@@ -41,7 +41,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.thefixer3x.subtrackpro",
+      "package": "com.lanonasis.subpro",
       "versionCode": 1,
       "permissions": [
         "android.permission.CAMERA",
@@ -68,7 +68,7 @@
           ]
         }
       ],
-      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.thefixer3x.subtrackpro"
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.lanonasis.subpro"
     },
     "web": {
       "bundler": "metro",
@@ -106,9 +106,9 @@
         "react-native-google-mobile-ads",
         {
           "androidAppId": "ca-app-pub-7459389089200506~3035173479",
-          "iosAppId": "ca-app-pub-7459389089200506~3035173479",
+          "iosAppId": "ca-app-pub-7459389089200506~3544672881",
           "android_app_id": "ca-app-pub-7459389089200506~3035173479",
-          "ios_app_id": "ca-app-pub-7459389089200506~3035173479",
+          "ios_app_id": "ca-app-pub-7459389089200506~3544672881",
           "user_tracking_usage_description": "This identifier will be used to deliver personalized ads to you."
         }
       ]
