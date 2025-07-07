@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 5.0.0"
+    "version": ">= 5.0.0",
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -51,14 +52,37 @@
       "env": {
         "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "@STRIPE_PUBLISHABLE_KEY",
         "EXPO_PUBLIC_ADMOB_APP_ID": "@ADMOB_APP_ID",
-        "EXPO_PUBLIC_ADMOB_BANNER_ID": "@ADMOB_BANNER_ID",
+        "EXPO_PUBLIC_ADMOB_BANNER_ID": "@ADMOB_BANNER_ID", 
         "EXPO_PUBLIC_ADMOB_INTERSTITIAL_ID": "@ADMOB_INTERSTITIAL_ID",
         "EXPO_PUBLIC_ADMOB_REWARDED_ID": "@ADMOB_REWARDED_ID",
+        "EXPO_PUBLIC_SUPABASE_URL": "@SUPABASE_URL",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "@SUPABASE_ANON_KEY",
         "EXPO_PUBLIC_MONETIZATION_V1": "true",
-        "EXPO_PUBLIC_EMBED_FINANCE_BETA": "true",
+        "EXPO_PUBLIC_EMBED_FINANCE_BETA": "false",
         "EXPO_PUBLIC_COMPLIANCE_CENTER": "true",
         "EXPO_PUBLIC_SECURITY_MONITORING": "true",
-        "EXPO_PUBLIC_PARTNER_HUB": "true"
+        "EXPO_PUBLIC_PARTNER_HUB": "true",
+        "EXPO_PUBLIC_SOCIAL_V1": "true"
+      },
+      "android": {
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleRelease"
+      },
+      "ios": {
+        "buildConfiguration": "Release"
+      }
+    },
+    "store-submission": {
+      "extends": "production",
+      "env": {
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "@STRIPE_LIVE_PUBLISHABLE_KEY",
+        "EXPO_PUBLIC_ADMOB_APP_ID": "@ADMOB_LIVE_APP_ID",
+        "EXPO_PUBLIC_ADMOB_BANNER_ID": "@ADMOB_LIVE_BANNER_ID",
+        "EXPO_PUBLIC_ADMOB_INTERSTITIAL_ID": "@ADMOB_LIVE_INTERSTITIAL_ID", 
+        "EXPO_PUBLIC_ADMOB_REWARDED_ID": "@ADMOB_LIVE_REWARDED_ID",
+        "EXPO_PUBLIC_SUPABASE_URL": "@SUPABASE_PRODUCTION_URL",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "@SUPABASE_PRODUCTION_ANON_KEY",
+        "EXPO_PUBLIC_EMBED_FINANCE_BETA": "true"
       },
       "android": {
         "buildType": "app-bundle",
@@ -74,11 +98,26 @@
       "android": {
         "serviceAccountKeyPath": "./google-service-account.json",
         "track": "internal",
-        "changesNotSentForReview": false
+        "changesNotSentForReview": false,
+        "releaseStatus": "draft"
       },
       "ios": {
         "appleId": "your-apple-id@example.com",
-        "ascAppId": "1234567890"
+        "ascAppId": "1234567890",
+        "appleTeamId": "YOUR_TEAM_ID"
+      }
+    },
+    "store-submission": {
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "track": "production",
+        "changesNotSentForReview": false,
+        "releaseStatus": "completed"
+      },
+      "ios": {
+        "appleId": "your-apple-id@example.com",
+        "ascAppId": "1234567890",
+        "appleTeamId": "YOUR_TEAM_ID"
       }
     }
   }

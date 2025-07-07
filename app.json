@@ -9,10 +9,40 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "owner": "thefixer3x",
+    "description": "The ultimate subscription management app with AI-powered insights, virtual cards, and smart spending analytics.",
+    "keywords": [
+      "subscription",
+      "finance",
+      "budget",
+      "spending",
+      "tracker",
+      "virtual card"
+    ],
+    "primaryColor": "#3B82F6",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.thefixer3x.subtrackpro",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "requireFullScreen": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera to scan subscription documents for easier data entry.",
+        "NSPhotoLibraryUsageDescription": "This app accesses your photo library to allow you to select subscription documents.",
+        "NSFaceIDUsageDescription": "Use Face ID to securely access your subscription data.",
+        "NSLocationWhenInUseUsageDescription": "Location is used to find nearby merchants and improve spending insights.",
+        "NSUserTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you."
+      },
+      "associatedDomains": [
+        "applinks:subtrack-pro.com"
+      ],
+      "appStoreUrl": "https://apps.apple.com/app/subtrack-pro/id123456789"
     },
     "android": {
       "adaptiveIcon": {
@@ -20,7 +50,33 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.thefixer3x.subtrackpro",
-      "versionCode": 1
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "com.google.android.gms.permission.AD_ID",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "https",
+              "host": "subtrack-pro.com"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.thefixer3x.subtrackpro"
     },
     "web": {
       "bundler": "metro",
@@ -31,15 +87,46 @@
       "expo-router",
       "expo-font",
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-document-picker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you select subscription documents.",
+          "cameraPermission": "The app accesses your camera to let you scan subscription documents."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow SubTrack Pro to use your location to find nearby merchants and improve spending insights."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#3B82F6",
+          "defaultChannel": "default"
+        }
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "android_app_id": "ca-app-pub-3940256099942544~3347511713",
+          "ios_app_id": "ca-app-pub-3940256099942544~1458002511",
+          "user_tracking_usage_description": "This identifier will be used to deliver personalized ads to you."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
       "eas": {
-        "projectId": "YOUR_PROJECT_ID_HERE"
-      }
+        "projectId": "c026aca9-e212-434f-bb68-65603b900112"
+      },
+      "router": {}
     },
     "updates": {
       "fallbackToCacheTimeout": 0
@@ -47,9 +134,5 @@
     "runtimeVersion": {
       "policy": "sdkVersion"
     }
-  },
-  "react-native-google-mobile-ads": {
-    "android_app_id": "ca-app-pub-YOUR_ADMOB_APP_ID",
-    "ios_app_id": "ca-app-pub-YOUR_ADMOB_APP_ID"
   }
 }
