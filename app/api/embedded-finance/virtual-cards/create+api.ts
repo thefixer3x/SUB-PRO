@@ -39,22 +39,24 @@ export async function POST(request: Request) {
 
 async function createStripeIssuingCard(params: any) {
   try {
-    const { subscriptionId, userId, spendingLimit, merchantCategory } = params;
+    const { subscriptionId, userId, spendingLimit, merchantCategory, userEmail, userName, userPhone } = params;
 
-    // Create or get Stripe customer
+    // Step 1: Create or get Stripe customer (following Stripe docs)
     let customer;
     try {
-      // Try to find existing customer by metadata
-      const customers = await stripe.customers.list({
+      // Search for existing customer by email or metadata
+      const existingCustomers = await stripe.customers.search({
+        query: `email:'${userEmail}' OR metadata['userId']:'${userId}'`,
         limit: 1,
-        expand: ['data'],
       });
       
-      customer = customers.data.find((c: any) => c.metadata?.userId === userId);
+      customer = existingCustomers.data[0];
       
       if (!customer) {
         // Create new customer if not found
         customer = await stripe.customers.create({
+          email: userEmail,
+          name: userName,
           metadata: {
             userId: userId,
             subscriptionId: subscriptionId,
@@ -66,44 +68,63 @@ async function createStripeIssuingCard(params: any) {
       throw new Error('Failed to manage customer');
     }
 
-    // Create cardholder for the virtual card
+    // Step 2: Create cardholder (following Stripe Issuing docs)
     const cardholder = await stripe.issuing.cardholders.create({
-      name: `User ${userId}`,
-      email: customer.email || `user-${userId}@subtrack.app`,
       type: 'individual',
+      name: userName || `User ${userId}`,
+      email: userEmail || customer.email || `user-${userId}@subtrack.app`,
+      phone_number: userPhone || '+1234567890', // Should be provided by user
       billing: {
         address: {
-          line1: '123 Main St',
+          line1: '123 Main St', // Should be user's actual address
           city: 'San Francisco',
           state: 'CA',
-          postal_code: '94111',
           country: 'US',
+          postal_code: '94111',
         },
       },
       metadata: {
         userId: userId,
         subscriptionId: subscriptionId,
+        customerId: customer.id,
       },
     });
 
-    // Create virtual card with spending controls
+    // Step 3: Issue virtual card (following Stripe Issuing docs)
     const card = await stripe.issuing.cards.create({
       cardholder: cardholder.id,
-      currency: 'usd',
       type: 'virtual',
+      currency: 'usd',
+      status: 'active',
       spending_controls: {
         spending_limits: [
           {
             amount: spendingLimit * 100, // Convert to cents
             interval: 'monthly',
           },
+          {
+            amount: Math.min(spendingLimit * 100, 50000), // Max $500 per transaction
+            interval: 'per_authorization',
+          },
         ],
-        allowed_categories: merchantCategory ? [merchantCategory] : undefined,
+        allowed_categories: merchantCategory ? [merchantCategory] : [
+          'computer_software_stores',
+          'digital_goods_media',
+          'online_services',
+        ],
+        blocked_categories: [
+          'gambling',
+          'adult_content',
+          'cash_advances',
+        ],
       },
       metadata: {
         subscription_id: subscriptionId,
         user_id: userId,
+        customer_id: customer.id,
+        cardholder_id: cardholder.id,
         purpose: 'subscription_payment',
+        created_via: 'subtrack_pro_app',
       },
     });
 

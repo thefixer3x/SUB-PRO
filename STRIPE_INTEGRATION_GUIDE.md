@@ -221,22 +221,67 @@ const initializePaymentSheet = async () => {
 
 ### Once Enabled:
 
-#### Create Virtual Cards
+#### Create Virtual Cards (Enhanced Implementation)
 ```typescript
 // API endpoint: /api/embedded-finance/virtual-cards/create
-const createVirtualCard = async (subscriptionId: string, spendingLimit: number) => {
+const createVirtualCard = async (subscriptionData: {
+  subscriptionId: string;
+  spendingLimit: number;
+  merchantCategory?: string;
+  userEmail: string;
+  userName: string;
+  userPhone?: string;
+}) => {
   const response = await fetch('/api/embedded-finance/virtual-cards/create', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       provider: 'stripe',
-      subscriptionId,
       userId: user.id,
-      spendingLimit: spendingLimit, // in dollars
-      merchantCategory: 'online_services' // or specific category
+      ...subscriptionData
     })
   });
   
+  return response.json();
+};
+
+// Example usage
+const newCard = await createVirtualCard({
+  subscriptionId: 'netflix-subscription-123',
+  spendingLimit: 15.99, // Monthly limit in dollars
+  merchantCategory: 'digital_goods_media',
+  userEmail: user.email,
+  userName: user.fullName,
+  userPhone: user.phone
+});
+```
+
+#### Manage Existing Cards
+```typescript
+// List user's virtual cards
+const getUserCards = async (userId: string) => {
+  const response = await fetch(`/api/embedded-finance/virtual-cards/list?userId=${userId}`);
+  return response.json();
+};
+
+// Get specific card details
+const getCardDetails = async (cardId: string) => {
+  const response = await fetch(`/api/embedded-finance/virtual-cards/${cardId}/retrieve`);
+  return response.json();
+};
+
+// Update card (pause/resume, change limits)
+const updateCard = async (cardId: string, updates: {
+  status?: 'active' | 'inactive' | 'canceled';
+  spendingLimits?: Array<{amount: number, interval: string}>;
+  allowedCategories?: string[];
+  blockedCategories?: string[];
+}) => {
+  const response = await fetch(`/api/embedded-finance/virtual-cards/${cardId}/update`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates)
+  });
   return response.json();
 };
 ```
@@ -271,13 +316,31 @@ const createVirtualCard = async (subscriptionId: string, spendingLimit: number) 
    await toggleCardStatus(cardId, 'active' | 'inactive');
    ```
 
-3. **Transaction Webhooks**
+3. **Real-time Transaction Monitoring**
    ```typescript
-   // Listen for card transactions
-   case 'issuing_transaction.created':
-     const transaction = event.data.object;
-     await logTransaction(transaction);
-     break;
+   // Enhanced webhook handling for all card events
+   switch (event.type) {
+     case 'issuing_authorization.created':
+       // Real-time authorization (before transaction completes)
+       const auth = event.data.object;
+       await notifyUser(`Card ending in ${auth.card.last4} used at ${auth.merchant_data.name}`);
+       await checkSpendingLimits(auth);
+       break;
+       
+     case 'issuing_transaction.created':
+       // Transaction completed
+       const transaction = event.data.object;
+       await logTransaction(transaction);
+       await updateUserAnalytics(transaction);
+       break;
+       
+     case 'issuing_authorization.updated':
+       // Authorization status changed (approved/declined)
+       if (event.data.object.status === 'declined') {
+         await notifyDeclinedTransaction(event.data.object);
+       }
+       break;
+   }
    ```
 
 ### Required Stripe Issuing Settings:
