@@ -1,0 +1,43 @@
+[
+  {
+    "id": "8d33a27c-0b4a-43f7-b77c-40eba4d0daf7",
+    "status": "FINISHED",
+    "platform": "ANDROID",
+    "artifacts": {
+      "buildUrl": "https://expo.dev/artifacts/eas/irikrPRdzS1pSJEGJCQ6W8.aab",
+      "applicationArchiveUrl": "https://expo.dev/artifacts/eas/irikrPRdzS1pSJEGJCQ6W8.aab"
+    },
+    "initiatingActor": {
+      "id": "bcebf971-52da-437f-a7ef-0ef66ca5df40",
+      "displayName": "GitHub App · @thefixer3x"
+    },
+    "project": {
+      "id": "c026aca9-e212-434f-bb68-65603b900112",
+      "name": "subtrack-pro",
+      "slug": "subtrack-pro",
+      "ownerAccount": {
+        "id": "f3af0c52-8783-410d-ac96-aec300410cb5",
+        "name": "thefixer3x"
+      }
+    },
+    "distribution": "STORE",
+    "buildProfile": "production",
+    "sdkVersion": "53.0.0",
+    "appVersion": "1.0.0",
+    "appBuildVersion": "1",
+    "runtimeVersion": "exposdk:53.0.0",
+    "gitCommitHash": "1769faed220036da3f1b19fa8be45597bbad2273",
+    "gitCommitMessage": "security: Remove exposed token and prevent future exposure\n\n- Add .claude/ to .gitignore to prevent accidental token exposure\n- Remove .claude/settings.local.json from git tracking\n- Token y0KiSuc9mkqi5dJuHs3ByLzUTocRxHFsYs73tdhW needs to be revoked\n\nThis fixes the security issue where robot token was accidentally committed.",
+    "priority": "HIGH",
+    "createdAt": "2025-07-08T01:18:13.653Z",
+    "updatedAt": "2025-07-08T01:29:09.357Z",
+    "completedAt": "2025-07-08T01:29:01.899Z",
+    "expirationDate": "2025-08-07T01:18:13.692Z",
+    "isForIosSimulator": false,
+    "metrics": {
+      "buildWaitTime": 170,
+      "buildQueueTime": 34812,
+      "buildDuration": 612429
+    }
+  }
+]
