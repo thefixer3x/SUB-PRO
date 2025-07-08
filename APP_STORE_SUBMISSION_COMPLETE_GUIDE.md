@@ -123,24 +123,24 @@ subscription,finance,budget,tracker,virtual card,spending,analytics,money,recurr
 
 **Support URL:**
 ```
-https://subtrack-pro.com/support
+https://subtrack-pro.lanonasis.com/support
 ```
 
 **Marketing URL (optional):**
 ```
-https://subtrack-pro.com
+https://subtrack-pro.lanonasis.com
 ```
 
 **Privacy Policy URL (REQUIRED):**
 ```
-https://subtrack-pro.com/privacy
+https://subtrack-pro.lanonasis.com/privacy
 ```
 
 ### Step 5: App Review Information
 
 **Sign-in Information (if app requires login):**
 ```
-Username: demo@subtrack-pro.com
+Username: demo@subtrack-pro.lanonasis.com
 Password: DemoUser2025!
 ```
 
@@ -198,7 +198,7 @@ The app uses AdMob for monetization and Stripe for payment processing. All finan
 
 **Privacy Policy URL:**
 ```
-https://subtrack-pro.com/privacy
+https://subtrack-pro.lanonasis.com/privacy
 ```
 
 **Data Types (select all that apply):**
@@ -324,9 +324,9 @@ Tags:
 ### Step 5: Store Settings → Contact Details
 
 ```
-Email: support@subtrack-pro.com
+Email: support@subtrack-pro.lanonasis.com
 Phone: [Optional - your support phone]
-Website: https://subtrack-pro.com
+Website: https://subtrack-pro.lanonasis.com
 ```
 
 ### Step 6: Main Store Listing → App Details
@@ -354,7 +354,7 @@ This should result in "Everyone" rating.
 ### Step 7: App Content → Privacy Policy
 
 ```
-Privacy policy URL: https://subtrack-pro.com/privacy
+Privacy policy URL: https://subtrack-pro.lanonasis.com/privacy
 ```
 
 ### Step 8: App Content → Ads

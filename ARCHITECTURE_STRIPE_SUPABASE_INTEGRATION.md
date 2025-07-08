@@ -238,7 +238,7 @@ SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
 
 # App Configuration
-NEXT_PUBLIC_DOMAIN=https://subtrack-pro.com
+NEXT_PUBLIC_DOMAIN=https://subtrack-pro.lanonasis.com
 ```
 
 ## 📊 Real-time Updates Flow

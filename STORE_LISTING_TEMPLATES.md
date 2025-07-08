@@ -151,11 +151,11 @@ Start your journey to smarter subscription management today!
 
 ## Support Information
 
-**Support Email:** support@subtrack-pro.com  
-**Privacy Policy:** https://subtrack-pro.com/privacy  
-**Terms of Service:** https://subtrack-pro.com/terms  
-**Support Website:** https://subtrack-pro.com/support  
-**Marketing Website:** https://subtrack-pro.com
+**Support Email:** support@subtrack-pro.lanonasis.com  
+**Privacy Policy:** https://subtrack-pro.lanonasis.com/privacy  
+**Terms of Service:** https://subtrack-pro.lanonasis.com/terms  
+**Support Website:** https://subtrack-pro.lanonasis.com/support  
+**Marketing Website:** https://subtrack-pro.lanonasis.com
 
 ---
 

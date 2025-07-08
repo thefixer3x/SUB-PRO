@@ -30,7 +30,7 @@ export async function POST(request: Request) {
         product_description: 'Subscription management and digital services',
         name: businessName,
         support_email: email,
-        url: `https://subtrack-pro.com/providers/${encodeURIComponent(businessName)}`,
+        url: `https://subtrack-pro.lanonasis.com/providers/${encodeURIComponent(businessName)}`,
       },
       metadata: {
         platform: 'subtrack_pro',
