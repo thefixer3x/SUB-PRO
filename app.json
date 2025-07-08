@@ -32,7 +32,7 @@
         "NSUserTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you."
       },
       "associatedDomains": [
-        "applinks:subtrack-pro.com"
+        "applinks:subtrack-pro.lanonasis.com"
       ],
       "appStoreUrl": "https://apps.apple.com/app/subtrack-pro/id123456789"
     },
@@ -59,7 +59,7 @@
           "data": [
             {
               "scheme": "https",
-              "host": "subtrack-pro.com"
+              "host": "subtrack-pro.lanonasis.com"
             }
           ],
           "category": [

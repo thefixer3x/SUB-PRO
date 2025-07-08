@@ -258,14 +258,14 @@ const trackAndApprove = async (paymentIntent: any) => {
 ### Step 1: Enable Authorization Webhooks
 1. Go to https://dashboard.stripe.com/connect/webhooks
 2. Create new webhook endpoint
-3. URL: `https://your-domain.com/api/connect/webhooks/authorization`
+3. URL: `https://subtrack-pro.lanonasis.com/api/connect/webhooks/authorization`
 4. Events: Select "All Connect events"
 
 ### Step 2: Configure Authorization Controls
 ```bash
 # Set authorization webhook endpoint via API
 stripe accounts update acct_connected_account_id \
-  --settings[payments][authorization_webhook_url]="https://your-domain.com/api/connect/webhooks/authorization" \
+  --settings[payments][authorization_webhook_url]="https://subtrack-pro.lanonasis.com/api/connect/webhooks/authorization" \
   --live
 ```
 

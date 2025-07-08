@@ -172,10 +172,10 @@ eas secret:create --scope project --name SUPABASE_PRODUCTION_URL --value https:/
 ## 📞 Support Information
 
 ### Required Support URLs
-- Privacy Policy: https://subtrack-pro.com/privacy
-- Terms of Service: https://subtrack-pro.com/terms
-- Support Email: support@subtrack-pro.com
-- Support URL: https://subtrack-pro.com/support
+- Privacy Policy: https://subtrack-pro.lanonasis.com/privacy
+- Terms of Service: https://subtrack-pro.lanonasis.com/terms
+- Support Email: support@subtrack-pro.lanonasis.com
+- Support URL: https://subtrack-pro.lanonasis.com/support
 
 ## 🎯 Next Steps After Approval
 

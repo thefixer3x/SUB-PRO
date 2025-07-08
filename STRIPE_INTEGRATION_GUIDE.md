@@ -14,7 +14,7 @@ Enterprise Monthly: price_1RiSAi2KF4vMCpn8B18AAI8v ($9.99/month)
 ```
 
 ### 3. **Webhook Configuration**
-- **Endpoint URL**: https://subtrack-pro.com/api/stripe/webhook
+- **Endpoint URL**: https://subtrack-pro.lanonasis.com/api/stripe/webhook
 - **Webhook Secret**: whsec_BsDevFB9UiEuHhsUvXMCD2sirRFa8qLd
 - **Events**: All events enabled
 

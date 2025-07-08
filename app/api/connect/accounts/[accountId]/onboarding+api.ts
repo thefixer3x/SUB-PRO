@@ -19,8 +19,8 @@ export async function POST(request: Request, { params }: { params: { accountId: 
     // Create account link for onboarding
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
-      refresh_url: refresh_url || `${process.env.NEXT_PUBLIC_DOMAIN || 'http://localhost:3000'}/connect/refresh`,
-      return_url: return_url || `${process.env.NEXT_PUBLIC_DOMAIN || 'http://localhost:3000'}/connect/success`,
+      refresh_url: refresh_url || `https://subtrack-pro.lanonasis.com/connect/refresh`,
+      return_url: return_url || `https://subtrack-pro.lanonasis.com/connect/success`,
       type: 'account_onboarding',
     });
 

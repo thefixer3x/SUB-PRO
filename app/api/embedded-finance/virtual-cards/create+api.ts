@@ -72,7 +72,7 @@ async function createStripeIssuingCard(params: any) {
     const cardholder = await stripe.issuing.cardholders.create({
       type: 'individual',
       name: userName || `User ${userId}`,
-      email: userEmail || customer.email || `user-${userId}@subtrack.app`,
+      email: userEmail || customer.email || `user-${userId}@subtrack-pro.lanonasis.com`,
       phone_number: userPhone || '+1234567890', // Should be provided by user
       billing: {
         address: {

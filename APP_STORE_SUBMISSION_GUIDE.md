@@ -180,9 +180,9 @@ eas secret:create --scope project --name GOOGLE_SERVICE_ACCOUNT --value "$(cat g
 
 ### Privacy Policy & Legal Pages
 Create and host these required pages:
-- **Privacy Policy**: https://subtrack-pro.com/privacy
-- **Terms of Service**: https://subtrack-pro.com/terms
-- **Support URL**: https://subtrack-pro.com/support
+- **Privacy Policy**: https://subtrack-pro.lanonasis.com/privacy
+- **Terms of Service**: https://subtrack-pro.lanonasis.com/terms
+- **Support URL**: https://subtrack-pro.lanonasis.com/support
 
 ---
 
