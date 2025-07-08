@@ -113,9 +113,10 @@ async function createStripeIssuingCard(params: any) {
           'online_services',
         ],
         blocked_categories: [
-          'gambling',
-          'adult_content',
-          'cash_advances',
+          'betting_casino_gambling',
+          'government_licensed_online_casions_online_gambling_us_region_only',
+          'automated_cash_disburse',
+          'manual_cash_disburse',
         ],
       },
       metadata: {
