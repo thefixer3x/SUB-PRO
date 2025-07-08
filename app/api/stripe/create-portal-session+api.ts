@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       sessionId: portalSession.id,
       url: portalSession.url,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating portal session:', error);
     
     // Handle Stripe-specific errors

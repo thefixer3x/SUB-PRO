@@ -50,7 +50,7 @@ async function createStripeIssuingCard(params: any) {
         expand: ['data'],
       });
       
-      customer = customers.data.find(c => c.metadata?.userId === userId);
+      customer = customers.data.find((c: any) => c.metadata?.userId === userId);
       
       if (!customer) {
         // Create new customer if not found

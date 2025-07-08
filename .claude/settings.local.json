@@ -22,7 +22,9 @@
       "Bash(npx expo install:*)",
       "Bash(export EXPO_TOKEN=\"y0KiSuc9mkqi5dJuHs3ByLzUTocRxHFsYs73tdhW\")",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(./scripts/pre-build-check.sh:*)"
     ],
     "deny": []
   }
