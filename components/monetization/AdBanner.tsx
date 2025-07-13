@@ -17,12 +17,12 @@ export const AdBanner: React.FC<AdBannerProps> = ({
   const [adError, setAdError] = useState(false);
   const [lastShown, setLastShown] = useState<Date | null>(null);
 
-  // Don't show ads if user shouldn't see them or frequency limits
-  if (!shouldShowAds(currentTier) || !canShowBanner(lastShown)) return null;
-
   useEffect(() => {
     loadAd();
   }, []);
+
+  // Don't show ads if user shouldn't see them or frequency limits
+  if (!shouldShowAds(currentTier) || !canShowBanner(lastShown)) return null;
 
   const loadAd = async () => {
     try {
