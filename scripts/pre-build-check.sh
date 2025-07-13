@@ -20,14 +20,14 @@ echo "✅ Project structure validated"
 # Install dependencies if needed
 if [[ ! -d "node_modules" ]]; then
     echo "📦 Installing dependencies..."
-    npm ci
+    bun install
 fi
 
 echo "✅ Dependencies ready"
 
 # TypeScript check
 echo "🔍 Running TypeScript check..."
-npm run type-check || {
+bun run type-check || {
     echo "❌ TypeScript errors found. Fix before building."
     exit 1
 }
@@ -35,7 +35,7 @@ echo "✅ TypeScript check passed"
 
 # Lint check  
 echo "🔍 Running lint check..."
-npm run lint || {
+bun run lint || {
     echo "⚠️  Lint issues found but continuing (can be fixed later)"
     echo "Consider fixing linting issues for better code quality"
 }
