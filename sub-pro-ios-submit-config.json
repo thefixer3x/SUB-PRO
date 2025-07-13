@@ -1,0 +1,11 @@
+{
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "frill.roundup_3x@icloud.com",
+        "ascAppId": "REPLACE_WITH_ACTUAL_APP_ID",
+        "appleTeamId": "5D9V25DXPB"
+      }
+    }
+  }
+}
