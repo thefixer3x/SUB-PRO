@@ -73,6 +73,7 @@
     "@types/react": "~19.0.10",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
+    "babel-preset-expo": "^13.2.3",
     "eslint": "^8.57.1",
     "eslint-config-expo": "^9.2.0",
     "eslint-plugin-react": "^7.37.5",
@@ -88,5 +89,22 @@
         "listUnknownPackages": false
       }
     }
-  }
+  },
+  "description": "A comprehensive subscription management platform with embedded finance features including virtual card management, automated cancellation services, and affiliate system integration.",
+  "directories": {
+    "doc": "docs",
+    "lib": "lib"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thefixer3x/SUB-PRO.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/thefixer3x/SUB-PRO/issues"
+  },
+  "homepage": "https://github.com/thefixer3x/SUB-PRO#readme"
 }
