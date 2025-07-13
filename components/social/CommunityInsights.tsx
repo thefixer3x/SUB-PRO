@@ -16,18 +16,18 @@ export const CommunityInsights: React.FC<CommunityInsightsProps> = ({
   const { currentTier } = useSubscription();
   const [dataSharingEnabled, setDataSharingEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [mostTrackedServices, setMostTrackedServices] = useState<Array<{
+  const [mostTrackedServices, setMostTrackedServices] = useState<{
     serviceName: string;
     userCount: number;
     averageCost: number;
     category: string;
-  }>>([]);
-  const [categoryInsights, setCategoryInsights] = useState<Array<{
+  }[]>([]);
+  const [categoryInsights, setCategoryInsights] = useState<{
     category: string;
     averageCost: number;
     userCount: number;
     totalSpending: number;
-  }>>([]);
+  }[]>([]);
 
   useEffect(() => {
     loadDataSharingPreferences();

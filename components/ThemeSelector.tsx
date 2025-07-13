@@ -11,12 +11,12 @@ interface ThemeSelectorProps {
   compact?: boolean;
 }
 
-const themeOptions: Array<{
+const themeOptions: {
   mode: ThemeMode;
   label: string;
   description: string;
   icon: React.ReactNode;
-}> = [
+}[] = [
   {
     mode: 'system',
     label: 'System',
