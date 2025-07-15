@@ -44,3 +44,7 @@ yarn-error.*
 # Local Netlify folder
 .netlify
 .vercel
+
+# Sensitive credentials
+google-service-account.json
+credentials.json
