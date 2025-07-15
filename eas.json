@@ -102,9 +102,9 @@
         "releaseStatus": "draft"
       },
       "ios": {
-        "appleId": "your-apple-id@example.com",
+        "appleId": "frill.roundup_3x@icloud.com",
         "ascAppId": "1234567890",
-        "appleTeamId": "YOUR_TEAM_ID"
+        "appleTeamId": "5D9V25DXPB"
       }
     },
     "store-submission": {
@@ -115,9 +115,9 @@
         "releaseStatus": "completed"
       },
       "ios": {
-        "appleId": "your-apple-id@example.com",
+        "appleId": "frill.roundup_3x@icloud.com",
         "ascAppId": "1234567890",
-        "appleTeamId": "YOUR_TEAM_ID"
+        "appleTeamId": "5D9V25DXPB"
       }
     }
   }
