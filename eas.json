@@ -96,7 +96,7 @@
   "submit": {
     "production": {
       "android": {
-        "serviceAccountKeyPath": "./google-service-account.json",
+        "serviceAccountKeyPath": "./cohesive-mender-459104-c3-abc562777578",
         "track": "internal",
         "changesNotSentForReview": false,
         "releaseStatus": "draft"
@@ -109,7 +109,7 @@
     },
     "store-submission": {
       "android": {
-        "serviceAccountKeyPath": "./google-service-account.json",
+        "serviceAccountKeyPath": "./cohesive-mender-459104-c3-abc562777578",
         "track": "production",
         "changesNotSentForReview": false,
         "releaseStatus": "completed"
