@@ -48,3 +48,4 @@ yarn-error.*
 # Sensitive credentials
 google-service-account.json
 credentials.json
+cohesive-mender-459104-c3-abc562777578.json
