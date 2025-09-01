@@ -1,0 +1,29 @@
+{
+  "app": {
+    "title": "مدير اشتراكات سيفتك هب (مستقل)",
+    "description": "منصة مستقلة لإدارة الاشتراكات والفواتير",
+    "welcome": "مرحبًا بك في مدير اشتراكات سيفتك هب",
+    "tagline": "حل متكامل لإدارة الاشتراكات"
+  },
+  "subscriptions": {
+    "manage": "إدارة الاشتراكات",
+    "billing": "إدارة الفواتير",
+    "invoices": "الفواتير",
+    "payments": "معالجة المدفوعات",
+    "renewals": "التجديدات",
+    "cancellations": "الإلغاءات"
+  },
+  "billing": {
+    "recurring_billing": "الفواتير المتكررة",
+    "payment_methods": "طرق الدفع",
+    "tax_management": "إدارة الضرائب",
+    "dunning_management": "إدارة التحصيل",
+    "revenue_recognition": "الاعتراف بالإيرادات"
+  },
+  "analytics": {
+    "mrr": "الإيرادات الشهرية المتكررة",
+    "churn_rate": "معدل التسرب",
+    "ltv": "القيمة العمرية للعميل",
+    "subscription_metrics": "مقاييس الاشتراك"
+  }
+}

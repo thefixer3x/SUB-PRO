@@ -1,0 +1,29 @@
+{
+  "app": {
+    "title": "SeftecHub Gestor de Suscripciones (Independiente)",
+    "description": "Plataforma independiente de gestión de suscripciones y facturación",
+    "welcome": "Bienvenido a SeftecHub Gestor de Suscripciones",
+    "tagline": "Solución completa para la gestión de suscripciones"
+  },
+  "subscriptions": {
+    "manage": "Gestionar suscripciones",
+    "billing": "Gestión de facturación",
+    "invoices": "Facturas",
+    "payments": "Procesamiento de pagos",
+    "renewals": "Renovaciones",
+    "cancellations": "Cancelaciones"
+  },
+  "billing": {
+    "recurring_billing": "Facturación recurrente",
+    "payment_methods": "Métodos de pago",
+    "tax_management": "Gestión de impuestos",
+    "dunning_management": "Gestión de cobros",
+    "revenue_recognition": "Reconocimiento de ingresos"
+  },
+  "analytics": {
+    "mrr": "Ingresos mensuales recurrentes",
+    "churn_rate": "Tasa de abandono",
+    "ltv": "Valor del ciclo de vida del cliente",
+    "subscription_metrics": "Métricas de suscripción"
+  }
+}

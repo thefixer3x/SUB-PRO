@@ -1,0 +1,29 @@
+{
+  "app": {
+    "title": "SeftecHub Subscription Manager (Standalone)",
+    "description": "Standalone subscription and billing management platform",
+    "welcome": "Welcome to SeftecHub Subscription Manager",
+    "tagline": "Complete subscription management solution"
+  },
+  "subscriptions": {
+    "manage": "Manage Subscriptions",
+    "billing": "Billing Management",
+    "invoices": "Invoices",
+    "payments": "Payment Processing",
+    "renewals": "Renewals",
+    "cancellations": "Cancellations"
+  },
+  "billing": {
+    "recurring_billing": "Recurring Billing",
+    "payment_methods": "Payment Methods",
+    "tax_management": "Tax Management",
+    "dunning_management": "Dunning Management",
+    "revenue_recognition": "Revenue Recognition"
+  },
+  "analytics": {
+    "mrr": "Monthly Recurring Revenue",
+    "churn_rate": "Churn Rate",
+    "ltv": "Customer Lifetime Value",
+    "subscription_metrics": "Subscription Metrics"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "app": {
+    "title": "SeftecHub Subscription Manager（独立版）",
+    "description": "独立的订阅和账单管理平台",
+    "welcome": "欢迎使用 SeftecHub Subscription Manager",
+    "tagline": "完整的订阅管理解决方案"
+  },
+  "subscriptions": {
+    "manage": "管理订阅",
+    "billing": "账单管理",
+    "invoices": "发票",
+    "payments": "支付处理",
+    "renewals": "续订",
+    "cancellations": "取消订阅"
+  },
+  "billing": {
+    "recurring_billing": "循环账单",
+    "payment_methods": "支付方式",
+    "tax_management": "税务管理",
+    "dunning_management": "催款管理",
+    "revenue_recognition": "收入确认"
+  },
+  "analytics": {
+    "mrr": "月经常性收入",
+    "churn_rate": "流失率",
+    "ltv": "客户终身价值",
+    "subscription_metrics": "订阅指标"
+  }
+}
