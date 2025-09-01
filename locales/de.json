@@ -1,0 +1,29 @@
+{
+  "app": {
+    "title": "SeftecHub Abonnementverwaltung (Standalone)",
+    "description": "Eigenständige Plattform zur Verwaltung von Abonnements und Abrechnungen",
+    "welcome": "Willkommen bei SeftecHub Abonnementverwaltung",
+    "tagline": "Komplettlösung für Abonnementverwaltung"
+  },
+  "subscriptions": {
+    "manage": "Abonnements verwalten",
+    "billing": "Abrechnungsverwaltung",
+    "invoices": "Rechnungen",
+    "payments": "Zahlungsabwicklung",
+    "renewals": "Verlängerungen",
+    "cancellations": "Kündigungen"
+  },
+  "billing": {
+    "recurring_billing": "Wiederkehrende Abrechnung",
+    "payment_methods": "Zahlungsmethoden",
+    "tax_management": "Steuerverwaltung",
+    "dunning_management": "Mahnwesen",
+    "revenue_recognition": "Umsatzrealisierung"
+  },
+  "analytics": {
+    "mrr": "Monatlich wiederkehrender Umsatz",
+    "churn_rate": "Abwanderungsrate",
+    "ltv": "Kundenlebenszeitwert",
+    "subscription_metrics": "Abonnementkennzahlen"
+  }
+}

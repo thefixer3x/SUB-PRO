@@ -1,0 +1,29 @@
+{
+  "app": {
+    "title": "SeftecHub Subscription Manager (Standalone)",
+    "description": "Plataforma autônoma de gestão de assinaturas e faturamento",
+    "welcome": "Bem-vindo ao SeftecHub Subscription Manager",
+    "tagline": "Solução completa de gestão de assinaturas"
+  },
+  "subscriptions": {
+    "manage": "Gerenciar assinaturas",
+    "billing": "Gestão de faturamento",
+    "invoices": "Faturas",
+    "payments": "Processamento de pagamentos",
+    "renewals": "Renovações",
+    "cancellations": "Cancelamentos"
+  },
+  "billing": {
+    "recurring_billing": "Faturamento recorrente",
+    "payment_methods": "Métodos de pagamento",
+    "tax_management": "Gestão de impostos",
+    "dunning_management": "Gestão de cobranças",
+    "revenue_recognition": "Reconhecimento de receita"
+  },
+  "analytics": {
+    "mrr": "Receita recorrente mensal",
+    "churn_rate": "Taxa de cancelamento",
+    "ltv": "Valor vitalício do cliente",
+    "subscription_metrics": "Métricas de assinatura"
+  }
+}

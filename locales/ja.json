@@ -1,0 +1,29 @@
+{
+  "app": {
+    "title": "SeftecHub サブスクリプション管理（スタンドアロン）",
+    "description": "スタンドアロンのサブスクリプションと請求管理プラットフォーム",
+    "welcome": "SeftecHub サブスクリプション管理へようこそ",
+    "tagline": "完全なサブスクリプション管理ソリューション"
+  },
+  "subscriptions": {
+    "manage": "サブスクリプション管理",
+    "billing": "請求管理",
+    "invoices": "請求書",
+    "payments": "決済処理",
+    "renewals": "更新",
+    "cancellations": "解約"
+  },
+  "billing": {
+    "recurring_billing": "定期請求",
+    "payment_methods": "支払い方法",
+    "tax_management": "税金管理",
+    "dunning_management": "未払い管理",
+    "revenue_recognition": "収益認識"
+  },
+  "analytics": {
+    "mrr": "月次経常収益",
+    "churn_rate": "解約率",
+    "ltv": "顧客生涯価値",
+    "subscription_metrics": "サブスクリプション指標"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "app": {
+    "title": "Gestionnaire d'abonnements SeftecHub (Autonome)",
+    "description": "Plateforme autonome de gestion des abonnements et de facturation",
+    "welcome": "Bienvenue sur le gestionnaire d'abonnements SeftecHub",
+    "tagline": "Solution complète de gestion des abonnements"
+  },
+  "subscriptions": {
+    "manage": "Gérer les abonnements",
+    "billing": "Gestion de la facturation",
+    "invoices": "Factures",
+    "payments": "Traitement des paiements",
+    "renewals": "Renouvellements",
+    "cancellations": "Résiliations"
+  },
+  "billing": {
+    "recurring_billing": "Facturation récurrente",
+    "payment_methods": "Moyens de paiement",
+    "tax_management": "Gestion fiscale",
+    "dunning_management": "Gestion des relances",
+    "revenue_recognition": "Reconnaissance des revenus"
+  },
+  "analytics": {
+    "mrr": "Revenu mensuel récurrent",
+    "churn_rate": "Taux d'attrition",
+    "ltv": "Valeur à vie du client",
+    "subscription_metrics": "Métriques d'abonnement"
+  }
+}
