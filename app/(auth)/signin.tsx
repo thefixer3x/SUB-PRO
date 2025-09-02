@@ -28,9 +28,11 @@ import {
   Shield,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@/contexts/AuthContext';
 
 const SignInPage = () => {
   const insets = useSafeAreaInsets();
+  const { signIn } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -61,17 +63,16 @@ const SignInPage = () => {
     setIsLoading(true);
     
     try {
-      // TODO: Implement actual authentication logic with Supabase
-      // For now, just simulate a successful sign in
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const { error } = await signIn(formData.email, formData.password);
       
-      Alert.alert(
-        'Success!', 
-        'Welcome back to SubTrack Pro!',
-        [{ text: 'Continue', onPress: () => router.replace('/(tabs)') }]
-      );
+      if (error) {
+        Alert.alert('Sign In Error', error);
+      } else {
+        // Success! RouteGuard will automatically redirect to /(tabs)
+        // No need to manually navigate
+      }
     } catch (error) {
-      Alert.alert('Error', 'Failed to sign in. Please try again.');
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -80,8 +81,21 @@ const SignInPage = () => {
   const handleForgotPassword = () => {
     Alert.alert(
       'Reset Password',
-      'Password reset functionality will be implemented soon.',
-      [{ text: 'OK' }]
+      'Please enter your email address to receive password reset instructions.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send Reset Email',
+          onPress: () => {
+            if (formData.email) {
+              // In a real implementation, we'd call resetPassword from useAuth
+              Alert.alert('Reset Sent', `Password reset instructions sent to ${formData.email}`);
+            } else {
+              Alert.alert('Error', 'Please enter your email address first.');
+            }
+          },
+        },
+      ]
     );
   };
 

@@ -7,6 +7,8 @@ import { SubscriptionProvider } from '@/hooks/useSubscription';
 import { queryClient } from '@/hooks/useQueryClient';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { FeatureFlagsProvider } from '@/contexts/FeatureFlagsContext';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { RouteGuard } from '@/components/auth/RouteGuard';
 
 export default function RootLayout() {
   useFrameworkReady();
@@ -15,15 +17,19 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <FeatureFlagsProvider>
-          <SubscriptionProvider>
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="(landing)" />
-              <Stack.Screen name="(auth)" />
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="+not-found" />
-            </Stack>
-            <StatusBar style="auto" />
-          </SubscriptionProvider>
+          <AuthProvider>
+            <SubscriptionProvider>
+              <RouteGuard>
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="(landing)" />
+                  <Stack.Screen name="(auth)" />
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen name="+not-found" />
+                </Stack>
+                <StatusBar style="auto" />
+              </RouteGuard>
+            </SubscriptionProvider>
+          </AuthProvider>
         </FeatureFlagsProvider>
       </ThemeProvider>
     </QueryClientProvider>
