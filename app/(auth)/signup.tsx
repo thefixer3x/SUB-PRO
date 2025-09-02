@@ -29,6 +29,7 @@ import {
   Shield,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
 
 const SignUpPage = () => {
   const insets = useSafeAreaInsets();
@@ -267,6 +268,11 @@ const SignUpPage = () => {
                 <CheckCircle size={24} color="#10B981" />
                 <Text style={styles.trustText}>SOC 2 compliant</Text>
               </View>
+            </View>
+            
+            {/* Development Partner Credit */}
+            <View style={styles.partnerCreditContainer}>
+              <PoweredByLanOnasis variant="minimal" />
             </View>
           </View>
         </Animated.View>

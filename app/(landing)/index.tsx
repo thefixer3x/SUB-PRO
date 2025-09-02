@@ -38,6 +38,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeColors } from '@/constants/theme';
+import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -66,7 +67,7 @@ const LandingPage = () => {
   const slideAnim = useSharedValue(50);
 
   const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
+    onScroll: (event: any) => {
       scrollY.value = event.contentOffset.y;
     },
   });
@@ -494,6 +495,9 @@ const LandingPage = () => {
           <Text style={[dynamicStyles.footerText, { color: colors.textMuted }]}>
             © 2025 SubTrack Pro. All rights reserved.
           </Text>
+          <View style={dynamicStyles.partnerCreditContainer}>
+            <PoweredByLanOnasis variant="minimal" />
+          </View>
         </View>
       </Animated.ScrollView>
     </View>

@@ -1,6 +1,6 @@
 import React, { memo, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Calendar, CreditCard, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { Calendar, CreditCard, AlertCircle as AlertCircle } from 'lucide-react-native';
 import { Subscription } from '@/types/subscription';
 import { useTheme } from '@/contexts/ThemeContext';
 import { TYPOGRAPHY, SPACING } from '@/constants/Typography';
