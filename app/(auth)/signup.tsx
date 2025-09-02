@@ -271,7 +271,7 @@ const SignUpPage = () => {
             </View>
             
             {/* Development Partner Credit */}
-            <View style={{ marginTop: 32 }}>
+            <View style={styles.partnerCreditContainer}>
               <PoweredByLanOnasis variant="minimal" />
             </View>
           </View>
