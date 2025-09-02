@@ -77,6 +77,6 @@ export const applyLanOnasisBranding = (existingTheme: any, isDark: boolean = fal
     },
     
     // Keep existing theme colors for compatibility
-    ...existingTheme,
+    // (removed redundant spread of existingTheme)
   };
 };
