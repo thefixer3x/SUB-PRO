@@ -13,6 +13,7 @@ import { PrivacyCenter } from '@/components/compliance/PrivacyCenter';
 import { securityMonitoringService } from '@/services/securityMonitoring';
 import { FEATURE_FLAGS } from '@/config/compliance';
 import { SecurityHealthCheck } from '@/types/compliance';
+import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
 
 export default function Settings() {
   const router = useRouter();
@@ -227,6 +228,10 @@ export default function Settings() {
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: colors.textMuted }]}>Version 1.0.0</Text>
           <Text style={[styles.footerSubtext, { color: colors.textMuted }]}>Built with ❤️ for subscription management</Text>
+          
+          <View style={{ marginTop: 24, alignItems: 'center' }}>
+            <PoweredByLanOnasis variant="standard" />
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>

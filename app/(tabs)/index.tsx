@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
 import { UpgradeRibbon } from '@/components/monetization/UpgradeRibbon';
 import { AdBanner } from '@/components/monetization/AdBanner';
 import { FeatureGate } from '@/components/monetization/FeatureGate';
+import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeColors } from '@/constants/theme';
@@ -135,6 +136,11 @@ export default function Dashboard() {
         </FeatureGate>
 
         {currentTier === 'free' && <AdBanner placement="home" size="medium-rectangle" />}
+
+        {/* Subtle Branding Credit */}
+        <View style={dynamicStyles.brandingSection}>
+          <PoweredByLanOnasis variant="minimal" />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -292,5 +298,10 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     fontSize: 14,
     color: '#64748B',
     lineHeight: 20,
+  },
+  brandingSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    alignItems: 'center',
   },
 });
