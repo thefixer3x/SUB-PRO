@@ -4,6 +4,7 @@ import { TrendingUp, DollarSign, Calendar } from 'lucide-react-native';
 import { useSubscription } from '@/hooks/useSubscription';
 import { AdBanner } from '@/components/monetization/AdBanner';
 import { FeatureGate } from '@/components/monetization/FeatureGate';
+import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
 
 export default function Analytics() {
   const { currentTier } = useSubscription();
@@ -152,6 +153,11 @@ export default function Analytics() {
               </View>
             </View>
           </FeatureGate>
+        </View>
+
+        {/* Subtle Branding Credit */}
+        <View style={styles.brandingSection}>
+          <PoweredByLanOnasis variant="minimal" />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -343,5 +349,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     color: '#1E293B',
+  },
+  brandingSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    alignItems: 'center',
   },
 });

@@ -38,6 +38,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeColors } from '@/constants/theme';
+import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -494,6 +495,9 @@ const LandingPage = () => {
           <Text style={[dynamicStyles.footerText, { color: colors.textMuted }]}>
             © 2025 SubTrack Pro. All rights reserved.
           </Text>
+          <View style={{ marginTop: 16 }}>
+            <PoweredByLanOnasis variant="minimal" />
+          </View>
         </View>
       </Animated.ScrollView>
     </View>
