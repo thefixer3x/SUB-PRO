@@ -229,7 +229,7 @@ export default function Settings() {
           <Text style={[styles.footerText, { color: colors.textMuted }]}>Version 1.0.0</Text>
           <Text style={[styles.footerSubtext, { color: colors.textMuted }]}>Built with ❤️ for subscription management</Text>
           
-          <View style={{ marginTop: 24, alignItems: 'center' }}>
+          <View style={styles.partnerCreditContainer}>
             <PoweredByLanOnasis variant="standard" />
           </View>
         </View>
