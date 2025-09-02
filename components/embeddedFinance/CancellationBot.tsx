@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
-import { Bot, X, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Clock, Shield } from 'lucide-react-native';
+import { Bot, X, CheckCircle as CheckCircle, AlertCircle as AlertCircle, Clock, Shield } from 'lucide-react-native';
 import { CancellationRequest } from '@/types/embeddedFinance';
 import { cancellationBotService } from '@/services/cancellationBot';
 

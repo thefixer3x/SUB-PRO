@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
-import { Shield, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Clock, ChevronRight, RefreshCw } from 'lucide-react-native';
+import { Shield, AlertTriangle as AlertTriangle, CheckCircle as CheckCircle, Clock, ChevronRight, RefreshCw } from 'lucide-react-native';
 import { SecurityHealthCheck, SecurityFinding } from '@/types/compliance';
 import { securityMonitoringService } from '@/services/securityMonitoring';
 import { FEATURE_FLAGS } from '@/config/compliance';

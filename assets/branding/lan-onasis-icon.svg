@@ -1,0 +1,20 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="32" height="32" rx="8" fill="#1B265D"/>
+  
+  <!-- Letter L -->
+  <text x="6" y="24" font-family="serif" font-size="18" font-weight="700" fill="white">L</text>
+  
+  <!-- Globe/Network Icon -->
+  <g transform="translate(18, 8)">
+    <!-- Globe -->
+    <circle cx="6" cy="6" r="5" fill="none" stroke="white" stroke-width="1"/>
+    <!-- Meridians -->
+    <path d="M6,1 Q9,6 6,11 Q3,6 6,1" fill="none" stroke="white" stroke-width="0.7"/>
+    <path d="M6,1 Q3,6 6,11 Q9,6 6,1" fill="none" stroke="white" stroke-width="0.7"/>
+    <!-- Equator -->
+    <path d="M1,6 Q6,4.5 11,6 Q6,7.5 1,6" fill="none" stroke="white" stroke-width="0.7"/>
+    <!-- Network node -->
+    <circle cx="9" cy="3" r="1.2" fill="#00D4AA"/>
+  </g>
+</svg>
