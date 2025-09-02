@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { LanOnasisLogo } from './LanOnasisLogo';
 import { useTheme } from '@/contexts/ThemeContext';
 import { LanOnasisColors } from '@/constants/BrandingColors';
