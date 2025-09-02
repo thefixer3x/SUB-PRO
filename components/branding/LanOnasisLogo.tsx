@@ -7,7 +7,7 @@ interface LanOnasisLogoProps {
   variant?: 'primary' | 'secondary' | 'icon';
   size?: 'small' | 'medium' | 'large';
   showText?: boolean;
-  style?: any;
+  style?: import('react-native').StyleProp<import('react-native').ViewStyle>;
   color?: string;
 }
 
