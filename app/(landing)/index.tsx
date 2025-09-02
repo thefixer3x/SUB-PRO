@@ -548,8 +548,8 @@ const FeatureCard = ({ feature, index, scrollY, colors }: { feature: any; index:
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 8,
-        marginVertical: 5, // Add vertical margin
-        marginHorizontal: 5, // Add horizontal margin
+        marginVertical: 10, // Increased vertical margin
+        marginHorizontal: 10, // Increased horizontal margin
       },
       cardStyle
     ]}>
@@ -652,8 +652,8 @@ const StrategicCard = ({ advantage, index, scrollY, colors }: { advantage: any; 
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 8,
-        marginVertical: 5, // Add vertical margin
-        marginHorizontal: 5, // Add horizontal margin
+        marginVertical: 10, // Increased vertical margin
+        marginHorizontal: 10, // Increased horizontal margin
       },
       cardStyle
     ]}>
@@ -697,7 +697,7 @@ const PricingCard = ({ tier, index, colors }: { tier: any; index: number; colors
         backgroundColor: colors.card,
         borderRadius: 20,
         padding: 32,
-        width: Platform.OS === 'web' ? 300 : screenWidth - 40,
+        width: Platform.OS === 'web' ? 300 : Math.min(screenWidth - 60, 320),
         maxWidth: 320,
         borderWidth: 1,
         borderColor: tier.popular ? colors.primary : colors.border,
@@ -707,10 +707,14 @@ const PricingCard = ({ tier, index, colors }: { tier: any; index: number; colors
         shadowOpacity: 0.1,
         shadowRadius: 12,
         position: 'relative',
-        marginTop: tier.popular ? 20 : 10, // Extra margin for popular badge
-        marginHorizontal: 5, // Add horizontal margin to prevent overlapping
+        marginTop: tier.popular ? 30 : 20, // Increased margin for popular badge
+        marginBottom: 20, // Add bottom margin for spacing
+        marginHorizontal: 10, // Increased horizontal margin to prevent overlapping
       },
-      tier.popular && { transform: [{ scale: 1.02 }] } // Reduce scale to prevent overlap
+      tier.popular && { 
+        transform: [{ scale: Platform.OS === 'web' ? 1.02 : 1.0 }], // Only scale on web to prevent mobile overlap
+        zIndex: 1, // Ensure popular card is above others
+      }
     ]}>
       {tier.popular && (
         <View style={{
@@ -1005,8 +1009,9 @@ const createStyles = (colors: ThemeColors, themeName: string) => StyleSheet.crea
     gap: 20,
     maxWidth: 1200,
     alignSelf: 'center',
-    paddingHorizontal: 10, // Add padding to prevent edge overlapping
-    marginVertical: 10, // Add vertical margin for spacing
+    paddingHorizontal: 15, // Increased padding to prevent edge overlapping
+    marginVertical: 20, // Increased vertical margin for better spacing
+    marginTop: 40, // Extra top margin to prevent overlap with previous section
   },
   strategicGrid: {
     flexDirection: 'row',
@@ -1025,8 +1030,9 @@ const createStyles = (colors: ThemeColors, themeName: string) => StyleSheet.crea
     gap: 24,
     maxWidth: 1000,
     alignSelf: 'center',
-    paddingHorizontal: 10, // Add padding to prevent edge overlapping
-    marginVertical: 10, // Add vertical margin for spacing
+    paddingHorizontal: 15, // Increased padding to prevent edge overlapping
+    marginVertical: 20, // Increased vertical margin for better spacing
+    marginBottom: 40, // Extra bottom margin to prevent overlap with next section
   },
   testimonialGrid: {
     flexDirection: 'row',
@@ -1291,13 +1297,15 @@ const createStyles = (colors: ThemeColors, themeName: string) => StyleSheet.crea
   },
   pricingSection: {
     paddingHorizontal: 20,
-    paddingVertical: 60,
+    paddingVertical: 80, // Increased padding to prevent overlap
     alignItems: 'center',
+    marginBottom: 20, // Add bottom margin for extra spacing
   },
   featuresSection: {
     paddingHorizontal: 20,
-    paddingVertical: 60,
+    paddingVertical: 80, // Increased padding to prevent overlap
     alignItems: 'center',
+    marginTop: 20, // Add top margin for extra spacing
   },
   benefitsSection: {
     paddingHorizontal: 20,
