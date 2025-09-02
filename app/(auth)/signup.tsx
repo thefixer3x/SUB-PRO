@@ -29,9 +29,11 @@ import {
   Shield,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@/contexts/AuthContext';
 
 const SignUpPage = () => {
   const insets = useSafeAreaInsets();
+  const { signUp } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -67,6 +69,11 @@ const SignUpPage = () => {
       return;
     }
 
+    if (formData.password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters long');
+      return;
+    }
+
     if (!acceptedTerms) {
       Alert.alert('Error', 'Please accept the terms and conditions');
       return;
@@ -74,15 +81,23 @@ const SignUpPage = () => {
 
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const { error } = await signUp(formData.email, formData.password, formData.name);
+      
+      if (error) {
+        Alert.alert('Sign Up Error', error);
+      } else {
+        Alert.alert(
+          'Check Your Email',
+          'Account created successfully! Please check your email to verify your account before signing in.',
+          [{ text: 'OK', onPress: () => router.replace('/(auth)/signin') }]
+        );
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    } finally {
       setIsLoading(false);
-      Alert.alert(
-        'Success!',
-        'Account created successfully. Welcome to SubTrack Pro!',
-        [{ text: 'Get Started', onPress: () => router.replace('/(tabs)') }]
-      );
-    }, 2000);
+    }
   };
 
   const benefits = [
