@@ -495,7 +495,7 @@ const LandingPage = () => {
           <Text style={[dynamicStyles.footerText, { color: colors.textMuted }]}>
             © 2025 SubTrack Pro. All rights reserved.
           </Text>
-          <View style={{ marginTop: 16 }}>
+          <View style={dynamicStyles.partnerCreditContainer}>
             <PoweredByLanOnasis variant="minimal" />
           </View>
         </View>
