@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { Database } from '@/lib/supabase';
 
 export async function GET(request: Request) {
   try {
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient<Database>(supabaseUrl, supabaseKey);
 
     // ✅ FIXED: Using sm_feature_flags instead of feature_flags
     const { data, error } = await supabase
@@ -85,7 +86,7 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Supabase configuration missing' }, { status: 500 });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient<Database>(supabaseUrl, supabaseKey);
 
     // ✅ FIXED: Updated RPC function name to match sm_ prefix
     const { data, error } = await supabase.rpc('sm_update_feature_flag', {
