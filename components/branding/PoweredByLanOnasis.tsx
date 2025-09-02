@@ -7,7 +7,7 @@ import { LanOnasisColors } from '@/constants/BrandingColors';
 interface PoweredByLanOnasisProps {
   variant?: 'minimal' | 'standard' | 'detailed';
   onPress?: () => void;
-  style?: any;
+  style?: import('react-native').StyleProp<import('react-native').ViewStyle>;
 }
 
 export const PoweredByLanOnasis: React.FC<PoweredByLanOnasisProps> = ({
