@@ -96,7 +96,7 @@ export const SpendingTrendChart: React.FC<SpendingTrendChartProps> = ({
           data={chartData}
           margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
         >
-          <LazyCartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+          <LazyCartesianGrid strokeDasharray="3 3" color="#f1f5f9" />
           <LazyXAxis 
             dataKey="month" 
             axisLine={false}
@@ -110,11 +110,11 @@ export const SpendingTrendChart: React.FC<SpendingTrendChartProps> = ({
             tickFormatter={(value) => `$${value}`}
           />
           <LazyTooltip content={<CustomTooltip />} />
-          <LazyBrush dataKey="month" height={30} stroke="#3B82F6" />
+          <LazyBrush dataKey="month" height={30} color="#3B82F6" />
           <LazyLine 
             type="monotone" 
             dataKey="amount" 
-            stroke="#3B82F6" 
+            color="#3B82F6" 
             strokeWidth={3}
             dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
             activeDot={{ r: 6, fill: '#3B82F6' }}

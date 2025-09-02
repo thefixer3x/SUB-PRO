@@ -67,7 +67,7 @@ const LandingPage = () => {
   const slideAnim = useSharedValue(50);
 
   const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
+    onScroll: (event: any) => {
       scrollY.value = event.contentOffset.y;
     },
   });
