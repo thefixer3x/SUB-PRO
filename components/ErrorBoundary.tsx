@@ -1,6 +1,6 @@
 import React, { Component, ReactNode } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { CircleAlert as AlertCircle, RefreshCw } from 'lucide-react-native';
+import { AlertCircle as AlertCircle, RefreshCw } from 'lucide-react-native';
 import { TYPOGRAPHY, TEXT_COLORS, SPACING } from '@/constants/Typography';
 
 interface Props {

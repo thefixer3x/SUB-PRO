@@ -141,7 +141,7 @@ export const CostUsageScatterChart: React.FC<CostUsageScatterChartProps> = ({
         <LazyScatterChart
           margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
         >
-          <LazyCartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+          <LazyCartesianGrid strokeDasharray="3 3" color="#f1f5f9" />
           <LazyXAxis 
             type="number"
             dataKey="x"
@@ -167,13 +167,13 @@ export const CostUsageScatterChart: React.FC<CostUsageScatterChartProps> = ({
           {/* Reference lines for quadrants */}
           <LazyReferenceLine 
             x={avgUsage} 
-            stroke="#94a3b8" 
+            color="#94a3b8" 
             strokeDasharray="5 5"
             strokeOpacity={0.7}
           />
           <LazyReferenceLine 
             y={avgCost} 
-            stroke="#94a3b8" 
+            color="#94a3b8" 
             strokeDasharray="5 5"
             strokeOpacity={0.7}
           />

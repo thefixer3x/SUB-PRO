@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { ChevronDown, ArrowRight, CircleCheck as CheckCircle } from 'lucide-react-native';
+import { ChevronDown, ArrowRight, CheckCircle as CheckCircle } from 'lucide-react-native';
 
 interface FieldMappingComponentProps {
   headers: string[];
