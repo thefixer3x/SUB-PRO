@@ -282,5 +282,18 @@ export type Database = {
         };
       };
     };
+    Functions: {
+      sm_update_feature_flag: {
+        Args: {
+          flag_name: string;
+          flag_enabled: boolean;
+        };
+        Returns: boolean;
+      };
+      create_virtual_cards_table_if_not_exists: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
+    };
   };
 }

@@ -39,12 +39,14 @@ class DatabaseService {
 
       // Only update if subscription is active
       if (status === 'active') {
+        const profileUpdate: Database['public']['Tables']['profiles']['Update'] = {
+          subscription_tier: tier,
+          updated_at: new Date().toISOString()
+        };
+
         const { data, error } = await this.supabase
           .from('profiles')
-          .update({ 
-            subscription_tier: tier,
-            updated_at: new Date().toISOString()
-          })
+          .update(profileUpdate)
           .eq('id', userId);
 
         if (error) {
@@ -56,12 +58,14 @@ class DatabaseService {
         return true;
       } else if (status === 'canceled' || status === 'unpaid') {
         // Downgrade to free tier
+        const profileDowngrade: Database['public']['Tables']['profiles']['Update'] = {
+          subscription_tier: 'free',
+          updated_at: new Date().toISOString()
+        };
+
         const { data, error } = await this.supabase
           .from('profiles')
-          .update({ 
-            subscription_tier: 'free',
-            updated_at: new Date().toISOString()
-          })
+          .update(profileDowngrade)
           .eq('id', userId);
 
         if (error) {
@@ -98,18 +102,20 @@ class DatabaseService {
       }
 
       // Store only non-sensitive card metadata
+      const cardInsert: Database['public']['Tables']['virtual_cards']['Insert'] = {
+        user_id: userId,
+        stripe_card_id: cardData.stripe_card_id,
+        last4: cardData.last4,
+        brand: cardData.brand,
+        status: cardData.status,
+        subscription_id: cardData.subscription_id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
       const { data: cardRef, error: cardError } = await this.supabase
         .from('virtual_cards')
-        .insert({
-          user_id: userId,
-          stripe_card_id: cardData.stripe_card_id,
-          last4: cardData.last4,
-          brand: cardData.brand,
-          status: cardData.status,
-          subscription_id: cardData.subscription_id,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
+        .insert(cardInsert);
 
       if (cardError) {
         console.error('Error storing virtual card reference:', cardError);
@@ -138,19 +144,21 @@ class DatabaseService {
       console.log('Storing card authorization:', { authId: authData.authorization_id, amount: authData.amount });
 
       // Store authorization for spending tracking
+      const authInsert: Database['public']['Tables']['card_authorizations']['Insert'] = {
+        stripe_authorization_id: authData.authorization_id,
+        stripe_card_id: authData.card_id,
+        amount: authData.amount,
+        currency: authData.currency,
+        merchant_name: authData.merchant_data?.name || 'Unknown',
+        merchant_category: authData.merchant_data?.category || 'general',
+        approved: authData.approved,
+        transaction_date: authData.created.toISOString(),
+        created_at: new Date().toISOString(),
+      };
+
       const { data, error } = await this.supabase
         .from('card_authorizations')
-        .insert({
-          stripe_authorization_id: authData.authorization_id,
-          stripe_card_id: authData.card_id,
-          amount: authData.amount,
-          currency: authData.currency,
-          merchant_name: authData.merchant_data?.name || 'Unknown',
-          merchant_category: authData.merchant_data?.category || 'general',
-          approved: authData.approved,
-          transaction_date: authData.created.toISOString(),
-          created_at: new Date().toISOString(),
-        });
+        .insert(authInsert);
 
       if (error) {
         console.error('Error storing card authorization:', error);
@@ -204,12 +212,14 @@ class DatabaseService {
         status: paymentData.status 
       });
 
+      const paymentInsert: Database['public']['Tables']['payment_records']['Insert'] = {
+        ...paymentData,
+        created_at: new Date().toISOString(),
+      };
+
       const { data, error } = await this.supabase
         .from('payment_records')
-        .insert({
-          ...paymentData,
-          created_at: new Date().toISOString(),
-        });
+        .insert(paymentInsert);
 
       if (error) {
         console.error('Error storing payment record:', error);
