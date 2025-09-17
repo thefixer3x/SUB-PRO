@@ -44,6 +44,7 @@ const createStorageAdapter = () => {
 };
 
 // Create Supabase client with proper storage
+export const isSupabaseEnvConfigured = !missingEnv;
 export const supabase = !missingEnv
   ? createClient<Database>(supabaseUrl!, supabaseAnonKey!, {
       auth: {
