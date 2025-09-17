@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   Alert,
-  Platform,
   StyleSheet,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -30,6 +29,7 @@ import {
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
+import { useAuth } from '@/contexts/AuthContext';
 
 const SignUpPage = () => {
   const insets = useSafeAreaInsets();
@@ -41,8 +41,8 @@ const SignUpPage = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const { signUp: signUpWithEmail, authLoading } = useAuth();
 
   const fadeAnim = useSharedValue(0);
   const slideAnim = useSharedValue(30);
@@ -58,12 +58,17 @@ const SignUpPage = () => {
   }));
 
   const handleSignUp = async () => {
-    if (!formData.name || !formData.email || !formData.password) {
+    const name = formData.name.trim();
+    const email = formData.email.trim().toLowerCase();
+    const password = formData.password;
+    const confirmPassword = formData.confirmPassword;
+
+    if (!name || !email || !password) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
-    if (formData.password !== formData.confirmPassword) {
+    if (password !== confirmPassword) {
       Alert.alert('Error', 'Passwords do not match');
       return;
     }
@@ -73,17 +78,35 @@ const SignUpPage = () => {
       return;
     }
 
-    setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const { success, error, requiresEmailConfirmation } = await signUpWithEmail({
+        email,
+        password,
+        fullName: name,
+      });
+
+      if (!success) {
+        Alert.alert('Sign Up Failed', error ?? 'Unable to create your account. Please try again.');
+        return;
+      }
+
+      if (requiresEmailConfirmation) {
+        Alert.alert(
+          'Confirm Your Email',
+          `We sent a confirmation link to ${email}. Please verify your email before signing in.`,
+          [{ text: 'OK', onPress: () => router.replace('/(auth)/signin') }],
+        );
+        return;
+      }
+
       Alert.alert(
         'Success!',
         'Account created successfully. Welcome to SubTrack Pro!',
-        [{ text: 'Get Started', onPress: () => router.replace('/(tabs)') }]
+        [{ text: 'Get Started', onPress: () => router.replace('/(tabs)') }],
       );
-    }, 2000);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to create your account. Please try again.');
+    }
   };
 
   const benefits = [
@@ -233,16 +256,16 @@ const SignUpPage = () => {
               </Pressable>
 
               <Pressable
-                style={[styles.signUpButton, isLoading && styles.signUpButtonDisabled]}
+                style={[styles.signUpButton, authLoading && styles.signUpButtonDisabled]}
                 onPress={handleSignUp}
-                disabled={isLoading}
+                disabled={authLoading}
               >
                 <LinearGradient
-                  colors={isLoading ? ['#9CA3AF', '#6B7280'] : ['#F59E0B', '#F97316']}
+                  colors={authLoading ? ['#9CA3AF', '#6B7280'] : ['#F59E0B', '#F97316']}
                   style={styles.signUpGradient}
                 >
                   <Text style={styles.signUpText}>
-                    {isLoading ? 'Creating Account...' : 'Start Free Trial'}
+                    {authLoading ? 'Creating Account...' : 'Start Free Trial'}
                   </Text>
                 </LinearGradient>
               </Pressable>
