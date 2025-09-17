@@ -65,13 +65,23 @@ const SignInPage = () => {
       const { success, error } = await signIn(email, password);
 
       if (!success) {
-        Alert.alert('Sign In Failed', error ?? 'Unable to sign in. Please try again.');
+        const isNetworkIssue = error?.toLowerCase().includes('network');
+        Alert.alert(
+          isNetworkIssue ? 'Network Error' : 'Sign In Failed',
+          isNetworkIssue
+            ? 'We were unable to connect. Please check your internet connection and try again.'
+            : error ?? 'Unable to sign in. Please try again.',
+        );
         return;
       }
 
       router.replace('/(tabs)');
     } catch (error) {
-      Alert.alert('Error', 'Failed to sign in. Please try again.');
+      const isNetworkIssue = error instanceof Error && error.message.toLowerCase().includes('network');
+      const message = isNetworkIssue
+        ? 'We were unable to connect. Please check your internet connection and try again.'
+        : 'Failed to sign in. Please try again.';
+      Alert.alert(isNetworkIssue ? 'Network Error' : 'Sign In Failed', message);
     }
   };
 
@@ -182,6 +192,7 @@ const SignInPage = () => {
 
                 {/* Sign In Button */}
                 <Pressable
+                  testID="sign-in-submit"
                   style={[styles.signInButton, authLoading && styles.signInButtonLoading]}
                   onPress={handleSignIn}
                   disabled={authLoading}
