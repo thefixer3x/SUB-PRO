@@ -3,11 +3,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 // Supabase configuration
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL as string | undefined;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string | undefined;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables. Please check your .env file.');
+const missingEnv = !supabaseUrl || !supabaseAnonKey;
+if (missingEnv) {
+  // Avoid crashing app on web when env is missing (e.g., misconfigured Vercel preview)
+  // We’ll still log a clear error and use a safe stub client so the landing page can render.
+  // Correct fix is to set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in the host env.
+  // eslint-disable-next-line no-console
+  console.error('Missing Supabase EXPO_PUBLIC_* env. Running in limited (no-auth) mode.');
 }
 
 // Platform-specific storage adapter
@@ -39,14 +44,45 @@ const createStorageAdapter = () => {
 };
 
 // Create Supabase client with proper storage
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    storage: createStorageAdapter(),
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: Platform.OS === 'web',
-  },
-});
+export const supabase = !missingEnv
+  ? createClient<Database>(supabaseUrl!, supabaseAnonKey!, {
+      auth: {
+        storage: createStorageAdapter(),
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: Platform.OS === 'web',
+      },
+    })
+  : ({
+      auth: {
+        async getSession() {
+          return { data: { session: null }, error: { message: 'Missing Supabase env' } as any };
+        },
+        async signInWithPassword() {
+          return { data: { session: null }, error: { message: 'Missing Supabase env' } as any };
+        },
+        async signUp() {
+          return { data: { user: null, session: null }, error: { message: 'Missing Supabase env' } as any };
+        },
+        async signOut() {
+          return { error: { message: 'Missing Supabase env' } as any };
+        },
+        onAuthStateChange() {
+          return { data: { subscription: { unsubscribe() {} } } } as any;
+        },
+      },
+      from() {
+        const err = { error: { message: 'Missing Supabase env' } };
+        return {
+          insert: async () => err,
+          upsert: async () => err,
+          update: async () => err,
+          select: () => ({ single: async () => ({ data: null, error: err.error }) }),
+          eq: () => ({ select: () => ({ single: async () => ({ data: null, error: err.error }) }) }),
+        } as any;
+      },
+      rpc: async () => ({ data: null, error: { message: 'Missing Supabase env' } }),
+    } as any);
 
 // Database types (to be generated with Supabase CLI)
 export type Database = {
