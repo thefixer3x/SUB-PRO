@@ -30,6 +30,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
 import { useAuth } from '@/contexts/AuthContext';
+import { PASSWORD_REQUIREMENTS } from '@/constants/auth';
+import { validatePassword } from '@/utils/auth/validatePassword';
 
 const SignUpPage = () => {
   const insets = useSafeAreaInsets();
@@ -73,6 +75,12 @@ const SignUpPage = () => {
       return;
     }
 
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      Alert.alert('Weak Password', passwordValidation.message ?? PASSWORD_REQUIREMENTS);
+      return;
+    }
+
     if (!acceptedTerms) {
       Alert.alert('Error', 'Please accept the terms and conditions');
       return;
@@ -86,7 +94,13 @@ const SignUpPage = () => {
       });
 
       if (!success) {
-        Alert.alert('Sign Up Failed', error ?? 'Unable to create your account. Please try again.');
+        const isNetworkIssue = error?.toLowerCase().includes('network');
+        Alert.alert(
+          isNetworkIssue ? 'Network Error' : 'Sign Up Failed',
+          isNetworkIssue
+            ? 'We were unable to connect. Please check your internet connection and try again.'
+            : error ?? 'Unable to create your account. Please try again.',
+        );
         return;
       }
 
@@ -99,13 +113,14 @@ const SignUpPage = () => {
         return;
       }
 
-      Alert.alert(
-        'Success!',
-        'Account created successfully. Welcome to SubTrack Pro!',
-        [{ text: 'Get Started', onPress: () => router.replace('/(tabs)') }],
-      );
+      Alert.alert('Success!', 'Account created successfully. Welcome to SubTrack Pro!');
+      router.replace('/(tabs)');
     } catch (error) {
-      Alert.alert('Error', 'Failed to create your account. Please try again.');
+      const isNetworkIssue = error instanceof Error && error.message.toLowerCase().includes('network');
+      const message = isNetworkIssue
+        ? 'We were unable to connect. Please check your internet connection and try again.'
+        : 'Failed to create your account. Please try again.';
+      Alert.alert(isNetworkIssue ? 'Network Error' : 'Sign Up Failed', message);
     }
   };
 
@@ -256,6 +271,7 @@ const SignUpPage = () => {
               </Pressable>
 
               <Pressable
+                testID="sign-up-submit"
                 style={[styles.signUpButton, authLoading && styles.signUpButtonDisabled]}
                 onPress={handleSignUp}
                 disabled={authLoading}

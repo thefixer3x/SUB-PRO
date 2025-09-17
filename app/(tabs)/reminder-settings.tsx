@@ -182,8 +182,9 @@ export default function ReminderSettings() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
+          testID="back-button"
           onPress={() => router.back()}
         >
           <ChevronLeft size={24} color="#64748B" />
