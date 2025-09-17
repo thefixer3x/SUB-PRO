@@ -6,9 +6,14 @@
   "scripts": {
     "dev": "EXPO_NO_TELEMETRY=1 expo start",
     "start": "expo start",
-    "build:web": "expo export --platform web",
-    "build:production": "expo export --platform web --clear",
-    "vercel-build": "expo export --platform web --clear",
+    "build:web": "NODE_ENV=production expo export --platform web",
+    "build:production": "NODE_ENV=production expo export --platform web",
+    "build:mobile": "eas build --platform all",
+    "build:android": "eas build --platform android",
+    "build:ios": "eas build --platform ios",
+    "deploy:preview": "eas build --profile preview",
+    "deploy:production": "eas build --profile production",
+    "submit:store": "eas submit --profile store-submission",
     "preview": "npx serve dist",
     "analyze": "npx source-map-explorer 'dist/static/js/*.js'",
     "lint": "expo lint",
@@ -64,13 +69,13 @@
     "react-native-web": "^0.20.0",
     "recharts": "^3.0.2",
     "xlsx": "^0.18.5",
-    "babel-preset-expo": "^13.0.0"
+    "babel-preset-expo": "^13.0.0",
+    "@testing-library/react-native": "^13.2.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
     "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "^9.30.1",
-    "@testing-library/react-native": "^13.2.0",
     "@types/jest": "^30.0.0",
     "@types/papaparse": "^5.3.16",
     "@types/react": "~19.0.10",
