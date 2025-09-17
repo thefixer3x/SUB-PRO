@@ -2,8 +2,8 @@ import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { PASSWORD_REQUIREMENTS } from '@/constants/auth';
-import SignInPage from '../signin';
-import SignUpPage from '../signup';
+import SignInPage from '@/app/(auth)/signin';
+import SignUpPage from '@/app/(auth)/signup';
 
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
@@ -118,3 +118,4 @@ describe('Authentication Screens', () => {
     });
   });
 });
+

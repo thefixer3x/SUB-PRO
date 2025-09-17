@@ -76,6 +76,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "expo-updates",
       "expo-router",
       "expo-font",
       "expo-secure-store",
@@ -123,7 +124,8 @@
       "router": {}
     },
     "updates": {
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/c026aca9-e212-434f-bb68-65603b900112"
     },
     "runtimeVersion": {
       "policy": "sdkVersion"
