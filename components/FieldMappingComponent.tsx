@@ -107,7 +107,7 @@ export const FieldMappingComponent: React.FC<FieldMappingComponentProps> = ({
           <ChevronDown 
             size={16} 
             color="#64748B" 
-            style={[styles.chevron, isExpanded && styles.chevronRotated]} 
+            style={[styles.chevron, isExpanded ? styles.chevronRotated : undefined] as any} 
           />
         </TouchableOpacity>
 

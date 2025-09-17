@@ -512,6 +512,10 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontWeight: '500',
   },
+  partnerCreditContainer: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
 });
 
 export default SignUpPage;

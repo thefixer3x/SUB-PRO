@@ -1384,6 +1384,10 @@ const createStyles = (colors: ThemeColors, themeName: string) => {
     footerText: {
       fontSize: 14,
     },
+    partnerCreditContainer: {
+      marginTop: 8,
+      alignItems: 'center',
+    },
   });
 };
 

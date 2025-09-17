@@ -46,12 +46,12 @@ export const useAnimatedEntry = (config: AnimationConfig = {}): UseAnimatedEntry
     }
 
     isAnimating.value = true;
-    
+    // Reset isAnimating after the animation window
+    try { setTimeout(() => { isAnimating.value = false; }, (delay || 0) + duration); } catch {}
+
     opacity.value = withDelay(
       delay,
-      withTiming(1, { duration }, () => {
-        isAnimating.value = false;
-      })
+      withTiming(1, { duration })
     );
     
     translateY.value = withDelay(
