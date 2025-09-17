@@ -144,6 +144,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           if (profileError) {
             console.warn('Failed to create profile after sign up', profileError);
+            return { success: false, error: 'Failed to create user profile. Please try again.' };
           }
         }
 
