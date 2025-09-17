@@ -142,7 +142,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           const { error: profileError } = await supabase
             .from('profiles')
-            .upsert(profilePayload, { onConflict: 'id' });
+            .upsert(profilePayload as any, { onConflict: 'id' });
 
           if (profileError) {
             console.warn('Failed to create profile after sign up', profileError);

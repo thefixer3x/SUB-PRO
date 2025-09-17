@@ -39,8 +39,8 @@ class DatabaseService {
 
       // Only update if subscription is active
       if (status === 'active') {
-        const { data, error } = await this.supabase
-          .from('profiles')
+        const { data, error } = await (this.supabase
+          .from('profiles') as any)
           .update({ 
             subscription_tier: tier,
             updated_at: new Date().toISOString()
@@ -56,8 +56,8 @@ class DatabaseService {
         return true;
       } else if (status === 'canceled' || status === 'unpaid') {
         // Downgrade to free tier
-        const { data, error } = await this.supabase
-          .from('profiles')
+        const { data, error } = await (this.supabase
+          .from('profiles') as any)
           .update({ 
             subscription_tier: 'free',
             updated_at: new Date().toISOString()
@@ -109,7 +109,7 @@ class DatabaseService {
           subscription_id: cardData.subscription_id,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        });
+        } as any);
 
       if (cardError) {
         console.error('Error storing virtual card reference:', cardError);
@@ -150,7 +150,7 @@ class DatabaseService {
           approved: authData.approved,
           transaction_date: authData.created.toISOString(),
           created_at: new Date().toISOString(),
-        });
+        } as any);
 
       if (error) {
         console.error('Error storing card authorization:', error);
@@ -173,14 +173,14 @@ class DatabaseService {
         .from('profiles')
         .select('id')
         .eq('stripe_customer_id', stripeCustomerId)
-        .single();
+        .single<{ id: string }>();
 
       if (error || !data) {
         console.log('User not found by stripe customer ID:', stripeCustomerId);
         return null;
       }
 
-      return data.id;
+      return (data as { id: string }).id;
     } catch (error) {
       console.error('Error finding user by Stripe customer ID:', error);
       return null;
@@ -209,7 +209,7 @@ class DatabaseService {
         .insert({
           ...paymentData,
           created_at: new Date().toISOString(),
-        });
+        } as any);
 
       if (error) {
         console.error('Error storing payment record:', error);
