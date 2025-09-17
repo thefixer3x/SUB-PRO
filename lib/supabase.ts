@@ -9,10 +9,11 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string | un
 const missingEnv = !supabaseUrl || !supabaseAnonKey;
 if (missingEnv) {
   // Avoid crashing app on web when env is missing (e.g., misconfigured Vercel preview)
-  // We’ll still log a clear error and use a safe stub client so the landing page can render.
+  // We'll still log a clear error and use a safe stub client so the landing page can render.
   // Correct fix is to set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in the host env.
-  // eslint-disable-next-line no-console
-  console.error('Missing Supabase EXPO_PUBLIC_* env. Running in limited (no-auth) mode.');
+  console.warn('Missing Supabase environment variables. Running in limited (no-auth) mode.');
+  console.warn('Required: EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY');
+  console.warn('Current values:', { supabaseUrl: !!supabaseUrl, supabaseAnonKey: !!supabaseAnonKey });
 }
 
 // Platform-specific storage adapter

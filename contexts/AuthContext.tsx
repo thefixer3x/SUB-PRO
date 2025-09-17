@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { AppState, type AppStateStatus } from 'react-native';
-import { supabase, type Database } from '@/lib/supabase';
+import { supabase, isSupabaseEnvConfigured, type Database } from '@/lib/supabase';
 import { DEFAULT_SUBSCRIPTION_TIER } from '@/lib/constants/subscription';
 
 interface AuthContextValue {
@@ -39,6 +39,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const initialiseSession = async () => {
       try {
+        // Check if Supabase is properly configured
+        if (!isSupabaseEnvConfigured) {
+          console.warn('Supabase not configured, skipping session initialization');
+          if (isMounted) {
+            setIsInitializing(false);
+          }
+          return;
+        }
+
         const { data, error } = await supabase.auth.getSession();
         if (error) {
           console.error('Failed to fetch session', error);
@@ -62,15 +71,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     void initialiseSession();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event: any, nextSession: Session | null) => {
-      if (!isMounted) {
-        return;
-      }
+    const { data: authListener } = isSupabaseEnvConfigured 
+      ? supabase.auth.onAuthStateChange((_event: any, nextSession: Session | null) => {
+          if (!isMounted) {
+            return;
+          }
 
-      setSession(nextSession);
-      setUser(nextSession?.user ?? null);
-      setIsInitializing(false);
-    });
+          setSession(nextSession);
+          setUser(nextSession?.user ?? null);
+          setIsInitializing(false);
+        })
+      : { data: { subscription: { unsubscribe: () => {} } } };
 
     return () => {
       isMounted = false;
@@ -79,6 +90,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
+    if (!isSupabaseEnvConfigured) {
+      return { success: false, error: 'Authentication is not configured. Please contact support.' };
+    }
+
     setAuthLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -113,6 +128,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signUp = useCallback(
     async ({ email, password, fullName }: { email: string; password: string; fullName?: string }) => {
+      if (!isSupabaseEnvConfigured) {
+        return { success: false, error: 'Authentication is not configured. Please contact support.' };
+      }
+
       setAuthLoading(true);
       try {
         const { data, error } = await supabase.auth.signUp({
@@ -173,6 +192,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const signOut = useCallback(async () => {
+    if (!isSupabaseEnvConfigured) {
+      setSession(null);
+      setUser(null);
+      return { success: true };
+    }
+
     setAuthLoading(true);
     try {
       const { error } = await supabase.auth.signOut();
