@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 import { useSharedValue, withDelay, withTiming, useAnimatedStyle } from 'react-native-reanimated';
 
@@ -36,6 +36,7 @@ export const useAnimatedEntry = (config: AnimationConfig = {}): UseAnimatedEntry
   const opacity = useSharedValue(initialOpacity);
   const translateY = useSharedValue(initialTranslateY);
   const isAnimating = useSharedValue(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startAnimation = () => {
     if (prefersReducedMotion) {
@@ -45,25 +46,29 @@ export const useAnimatedEntry = (config: AnimationConfig = {}): UseAnimatedEntry
       return;
     }
 
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
     isAnimating.value = true;
     
-    opacity.value = withDelay(
-      delay,
-      withTiming(1, { duration }, () => {
-        isAnimating.value = false;
-      })
-    );
+    opacity.value = withDelay(delay, withTiming(1, { duration }));
     
-    translateY.value = withDelay(
-      delay,
-      withTiming(0, { duration })
-    );
+    translateY.value = withDelay(delay, withTiming(0, { duration }));
+
+    timeoutRef.current = setTimeout(() => {
+      isAnimating.value = false;
+    }, delay + duration);
   };
 
   const resetAnimation = () => {
     opacity.value = initialOpacity;
     translateY.value = initialTranslateY;
     isAnimating.value = false;
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
   };
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -74,6 +79,12 @@ export const useAnimatedEntry = (config: AnimationConfig = {}): UseAnimatedEntry
   // Auto-start animation on mount
   useEffect(() => {
     startAnimation();
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
   }, []);
 
   return {
