@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   Alert,
-  Platform,
   StyleSheet,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -28,6 +27,7 @@ import {
   Shield,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@/contexts/AuthContext';
 
 const SignInPage = () => {
   const insets = useSafeAreaInsets();
@@ -36,8 +36,8 @@ const SignInPage = () => {
     password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const { signIn, authLoading } = useAuth();
 
   const fadeAnim = useSharedValue(0);
   const slideAnim = useSharedValue(30);
@@ -53,27 +53,25 @@ const SignInPage = () => {
   }));
 
   const handleSignIn = async () => {
-    if (!formData.email || !formData.password) {
+    const email = formData.email.trim().toLowerCase();
+    const password = formData.password;
+
+    if (!email || !password) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
-    setIsLoading(true);
-    
     try {
-      // TODO: Implement actual authentication logic with Supabase
-      // For now, just simulate a successful sign in
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      Alert.alert(
-        'Success!', 
-        'Welcome back to SubTrack Pro!',
-        [{ text: 'Continue', onPress: () => router.replace('/(tabs)') }]
-      );
+      const { success, error } = await signIn(email, password);
+
+      if (!success) {
+        Alert.alert('Sign In Failed', error ?? 'Unable to sign in. Please try again.');
+        return;
+      }
+
+      router.replace('/(tabs)');
     } catch (error) {
       Alert.alert('Error', 'Failed to sign in. Please try again.');
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -184,16 +182,16 @@ const SignInPage = () => {
 
                 {/* Sign In Button */}
                 <Pressable
-                  style={[styles.signInButton, isLoading && styles.signInButtonLoading]}
+                  style={[styles.signInButton, authLoading && styles.signInButtonLoading]}
                   onPress={handleSignIn}
-                  disabled={isLoading}
+                  disabled={authLoading}
                 >
                   <LinearGradient
-                    colors={isLoading ? ['#9CA3AF', '#6B7280'] : ['#3B82F6', '#1D4ED8']}
+                    colors={authLoading ? ['#9CA3AF', '#6B7280'] : ['#3B82F6', '#1D4ED8']}
                     style={styles.signInGradient}
                   >
                     <Text style={styles.signInText}>
-                      {isLoading ? 'Signing In...' : 'Sign In'}
+                      {authLoading ? 'Signing In...' : 'Sign In'}
                     </Text>
                   </LinearGradient>
                 </Pressable>

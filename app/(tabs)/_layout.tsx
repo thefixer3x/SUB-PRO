@@ -1,19 +1,40 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { LayoutDashboard, CreditCard, BarChart3, Settings, Crown, Store, BarChart2, Users, Shield } from 'lucide-react-native';
-import { View, Platform, Dimensions } from 'react-native';
+import { ActivityIndicator, View, Platform, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useAuth } from '@/contexts/AuthContext';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375; // iPhone SE and smaller Android phones
 
 export default function TabLayout() {
+  const { session, isInitializing } = useAuth();
   const { currentTier } = useSubscription();
   const insets = useSafeAreaInsets();
 
   // Calculate dynamic tab bar height with safe area
   const tabBarHeight = Platform.OS === 'ios' ? 70 + insets.bottom : 70;
   const tabBarPaddingBottom = Platform.OS === 'ios' ? insets.bottom + 8 : 8;
+
+  if (isInitializing) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: '#F8FAFC',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <ActivityIndicator size="large" color="#3B82F6" />
+      </View>
+    );
+  }
+
+  if (!session) {
+    return <Redirect href="/(auth)/signin" />;
+  }
 
   return (
     <Tabs
