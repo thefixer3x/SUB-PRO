@@ -52,7 +52,7 @@ describe('BudgetAlertRow', () => {
     expect(getByText('Tap to edit budget limit')).toBeTruthy();
   });
 
-  it('opens modal when toggling on without budget limit', () => {
+  it('opens modal when toggling on without budget limit', async () => {
     const { getByTestId, getByText } = render(
       <BudgetAlertRow {...defaultProps} />
     );
@@ -60,30 +60,37 @@ describe('BudgetAlertRow', () => {
     const toggle = getByTestId('budget-alert-switch');
     fireEvent(toggle, 'onValueChange', true);
     
-    expect(getByText('Set Budget Limit')).toBeTruthy();
+    await waitFor(() => {
+      expect(getByText('Set Budget Limit')).toBeTruthy();
+    });
   });
 
   it('validates input correctly', async () => {
     const { getByTestId, getByText, getByPlaceholderText } = render(
       <BudgetAlertRow {...defaultProps} />
     );
-    
+
     // Open modal
     const toggle = getByTestId('budget-alert-switch');
     fireEvent(toggle, 'onValueChange', true);
-    
+
+    const input = await waitFor(() => getByPlaceholderText('0.00'));
+
     // Try to save without input
     const saveButton = getByText('Save');
     fireEvent.press(saveButton);
-    
-    expect(getByText('Budget limit is required when alerts are enabled')).toBeTruthy();
-    
+
+    await waitFor(() => {
+      expect(getByText('Budget limit is required when alerts are enabled')).toBeTruthy();
+    });
+
     // Enter invalid input
-    const input = getByPlaceholderText('0.00');
-    fireEvent.changeText(input, 'invalid');
+    fireEvent.changeText(input, '-5');
     fireEvent.press(saveButton);
-    
-    expect(getByText('Please enter a valid positive number')).toBeTruthy();
+
+    await waitFor(() => {
+      expect(getByText('Please enter a valid positive number')).toBeTruthy();
+    });
   });
 
   it('saves budget limit successfully', async () => {
@@ -91,19 +98,19 @@ describe('BudgetAlertRow', () => {
     const onBudgetChange = jest.fn();
     
     const { getByTestId, getByText, getByPlaceholderText } = render(
-      <BudgetAlertRow 
-        {...defaultProps} 
+      <BudgetAlertRow
+        {...defaultProps}
         onToggle={onToggle}
         onBudgetChange={onBudgetChange}
       />
     );
-    
+
     // Open modal
     const toggle = getByTestId('budget-alert-switch');
     fireEvent(toggle, 'onValueChange', true);
-    
+
     // Enter valid input
-    const input = getByPlaceholderText('0.00');
+    const input = await waitFor(() => getByPlaceholderText('0.00'));
     fireEvent.changeText(input, '150.50');
     
     // Save
@@ -117,16 +124,16 @@ describe('BudgetAlertRow', () => {
     });
   });
 
-  it('filters input to numbers and decimal only', () => {
+  it('filters input to numbers and decimal only', async () => {
     const { getByTestId, getByPlaceholderText } = render(
       <BudgetAlertRow {...defaultProps} />
     );
-    
+
     // Open modal
     const toggle = getByTestId('budget-alert-switch');
     fireEvent(toggle, 'onValueChange', true);
-    
-    const input = getByPlaceholderText('0.00');
+
+    const input = await waitFor(() => getByPlaceholderText('0.00'));
     
     // Test filtering
     fireEvent.changeText(input, 'abc123.45def');

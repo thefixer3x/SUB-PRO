@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
+import { AppState, type AppStateStatus } from 'react-native';
 import { supabase, type Database } from '@/lib/supabase';
+import { DEFAULT_SUBSCRIPTION_TIER } from '@/lib/constants/subscription';
 
 interface AuthContextValue {
   session: Session | null;
@@ -134,7 +136,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             id: userId,
             email,
             full_name: fullName ?? null,
-            subscription_tier: 'free',
+            subscription_tier: DEFAULT_SUBSCRIPTION_TIER,
             updated_at: now,
           };
 
@@ -207,6 +209,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        void refreshSession();
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription.remove();
+    };
+  }, [refreshSession]);
   const value = useMemo(
     () => ({
       session,

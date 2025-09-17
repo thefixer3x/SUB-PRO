@@ -1,20 +1,13 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
+import * as ReactNative from 'react-native';
 import { ThemeSelector } from '../ThemeSelector';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Mock AsyncStorage
-jest.mock('@react-native-async-storage/async-storage', () => ({
-  getItem: jest.fn(() => Promise.resolve(null)),
-  setItem: jest.fn(() => Promise.resolve()),
-}));
-
-// Mock useColorScheme
-jest.mock('react-native', () => ({
-  ...jest.requireActual('react-native'),
-  useColorScheme: () => 'light',
-}));
+const useColorSchemeSpy = jest
+  .spyOn(ReactNative, 'useColorScheme')
+  .mockReturnValue('light');
 
 const ThemeSelectorWithProvider = (props: any) => (
   <ThemeProvider>
@@ -25,6 +18,11 @@ const ThemeSelectorWithProvider = (props: any) => (
 describe('ThemeSelector', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    useColorSchemeSpy.mockReturnValue('light');
+  });
+
+  afterAll(() => {
+    useColorSchemeSpy.mockRestore();
   });
 
   it('renders all theme options', async () => {
