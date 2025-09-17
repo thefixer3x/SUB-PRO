@@ -314,4 +314,8 @@ const createStyles = (colors: any) => StyleSheet.create({
   footerSubtext: {
     ...TYPOGRAPHY.caption,
   },
+  partnerCreditContainer: {
+    marginTop: SPACING.lg,
+    alignItems: 'center',
+  },
 });

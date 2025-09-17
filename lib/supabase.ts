@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 // Supabase configuration
@@ -40,7 +39,7 @@ const createStorageAdapter = () => {
 };
 
 // Create Supabase client with proper storage
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: createStorageAdapter(),
     autoRefreshToken: true,
