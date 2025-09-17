@@ -8,6 +8,7 @@
     "start": "expo start",
     "build:web": "NODE_ENV=production expo export --platform web",
     "build:production": "NODE_ENV=production expo export --platform web",
+    "vercel-build": "npm run build:production",
     "build:mobile": "eas build --platform all",
     "build:android": "eas build --platform android",
     "build:ios": "eas build --platform ios",
