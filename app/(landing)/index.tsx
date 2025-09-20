@@ -331,7 +331,6 @@ const LandingPage = () => {
           <View style={dynamicStyles.strategicGrid}>
             {strategicAdvantages.map((advantage, index) => (
               <StrategicCard
-                key={index}
                 advantage={advantage}
                 index={index}
                 scrollY={scrollY}
@@ -354,7 +353,6 @@ const LandingPage = () => {
           <View style={dynamicStyles.pricingGrid}>
             {pricingTiers.map((tier, index) => (
               <PricingCard
-                key={index}
                 tier={tier}
                 index={index}
                 colors={colors}
@@ -373,7 +371,6 @@ const LandingPage = () => {
           <View style={dynamicStyles.featuresGrid}>
             {features.map((feature, index) => (
               <FeatureCard
-                key={index}
                 feature={feature}
                 index={index}
                 scrollY={scrollY}
@@ -467,7 +464,7 @@ const LandingPage = () => {
             contentContainerStyle={dynamicStyles.testimonialsContainer}
           >
             {testimonials.map((testimonial, index) => (
-              <TestimonialCard key={index} testimonial={testimonial} colors={colors} />
+              <TestimonialCard testimonial={testimonial} colors={colors} />
             ))}
           </ScrollView>
         </View>
