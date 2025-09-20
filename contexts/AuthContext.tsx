@@ -139,12 +139,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             updated_at: now,
           };
 
-          // Casting to any until Supabase generated types are available in the project
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { error: profileError } = await (supabase.from('profiles') as any).upsert(
-            profilePayload,
-            { onConflict: 'id' },
-          );
+          // Use Supabase generics for type safety
+          const { error: profileError } = await supabase
+            .from<Database['public']['Tables']['profiles']['Insert']>('profiles')
+            .upsert(
+              profilePayload,
+              { onConflict: 'id' },
+            );
 
           if (profileError) {
             console.warn('Failed to create profile after sign up', profileError);
