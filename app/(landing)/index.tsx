@@ -464,7 +464,7 @@ const LandingPage = () => {
             contentContainerStyle={dynamicStyles.testimonialsContainer}
           >
             {testimonials.map((testimonial, index) => (
-              <TestimonialCard testimonial={testimonial} colors={colors} />
+              <TestimonialCard key={index} testimonial={testimonial} colors={colors} />
             ))}
           </ScrollView>
         </View>
