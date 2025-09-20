@@ -51,7 +51,7 @@ export default function Settings() {
   };
 
   const toggleNotification = (key: keyof typeof notifications) => {
-    setNotifications(prev => ({
+    setNotifications((prev: typeof notifications) => ({
       ...prev,
       [key]: !prev[key]
     }));

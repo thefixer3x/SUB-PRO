@@ -187,7 +187,7 @@ const SignUpPage = () => {
                   placeholder="Full Name"
                   placeholderTextColor="#9CA3AF"
                   value={formData.name}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
+                  onChangeText={(text: string) => setFormData(prev => ({ ...prev, name: text }))}
                   autoCapitalize="words"
                 />
               </View>
@@ -201,7 +201,7 @@ const SignUpPage = () => {
                   placeholder="Email Address"
                   placeholderTextColor="#9CA3AF"
                   value={formData.email}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, email: text }))}
+                  onChangeText={(text: string) => setFormData(prev => ({ ...prev, email: text }))}
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />
@@ -216,7 +216,7 @@ const SignUpPage = () => {
                   placeholder="Password"
                   placeholderTextColor="#9CA3AF"
                   value={formData.password}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, password: text }))}
+                  onChangeText={(text: string) => setFormData(prev => ({ ...prev, password: text }))}
                   secureTextEntry={!showPassword}
                 />
                 <Pressable
@@ -240,7 +240,7 @@ const SignUpPage = () => {
                   placeholder="Confirm Password"
                   placeholderTextColor="#9CA3AF"
                   value={formData.confirmPassword}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, confirmPassword: text }))}
+                  onChangeText={(text: string) => setFormData(prev => ({ ...prev, confirmPassword: text }))}
                   secureTextEntry={!showConfirmPassword}
                 />
                 <Pressable
