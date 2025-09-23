@@ -286,12 +286,12 @@ const SignUpPage = () => {
                 </LinearGradient>
               </Pressable>
 
-              <Text style={styles.signInText}>
-                Already have an account?{' '}
+              <View style={styles.signInContainer}>
+                <Text style={styles.signInText}>Already have an account? </Text>
                 <Pressable onPress={() => router.push('/(auth)/signin')}>
                   <Text style={styles.signInLink}>Sign In</Text>
                 </Pressable>
-              </Text>
+              </View>
             </View>
           </BlurView>
 
@@ -484,6 +484,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6B7280',
     textAlign: 'center',
+    marginTop: 8,
+  },
+  signInContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginTop: 8,
   },
   signInLink: {
