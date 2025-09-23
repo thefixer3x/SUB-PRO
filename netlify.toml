@@ -8,6 +8,15 @@
   status = 200
 
 [template.environment]
-  SUPABASE_URL = "Your Supabase URL"
-  SUPABASE_ANON_KEY = "Your Supabase Anon Key"
-  STRIPE_PUBLISHABLE_KEY = "Your Stripe Publishable Key"
+  NODE_VERSION = "18"
+  EXPO_PUBLIC_SUPABASE_URL = "Your Supabase URL"
+  EXPO_PUBLIC_SUPABASE_ANON_KEY = "Your Supabase Anon Key"
+  EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY = "Your Stripe Publishable Key"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+[[headers]]
+  for = "/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
