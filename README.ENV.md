@@ -29,6 +29,10 @@ EXPO_PUBLIC_PARTNER_HUB=true
 EXPO_PUBLIC_SOCIAL_V1=true
 ```
 
+### Local testing without Supabase
+
+If you are developing locally and do not have Supabase credentials handy, the app now falls back to a lightweight mock authentication flow while `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` are missing. This mock flow is only enabled in development builds and lets you exercise the sign-in and sign-up screens without real backend access. When you add real credentials the Supabase-backed behaviour automatically resumes.
+
 ## Obtaining the values
 
 1. **Supabase Configuration**:
