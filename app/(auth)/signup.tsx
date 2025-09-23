@@ -152,7 +152,7 @@ const SignUpPage = () => {
         </Text>
       </LinearGradient>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Animated.View style={[styles.content, animatedStyle]}>
           {/* Benefits Preview */}
           <View style={styles.benefitsSection}>

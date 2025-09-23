@@ -73,7 +73,8 @@
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "indexHtml": "dist/index.html"
     },
     "plugins": [
       "expo-updates",

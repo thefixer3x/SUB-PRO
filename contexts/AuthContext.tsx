@@ -247,6 +247,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       subscription.remove();
     };
   }, [refreshSession]);
+  
   const value = useMemo(
     () => ({
       session,
