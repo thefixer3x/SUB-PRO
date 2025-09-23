@@ -20,6 +20,50 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+const isDevEnvironment =
+  (typeof __DEV__ !== 'undefined' && __DEV__) || process.env.NODE_ENV !== 'production';
+
+const mockDelay = (duration = 450) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, duration);
+  });
+
+const createMockUser = (email: string, fullName?: string): User => {
+  const now = new Date().toISOString();
+  return {
+    id: `mock-user-${Math.random().toString(36).slice(2, 10)}`,
+    app_metadata: { provider: 'email', providers: ['email'] },
+    aud: 'authenticated',
+    created_at: now,
+    user_metadata: {
+      full_name: fullName ?? email.split('@')[0] ?? 'Mock User',
+    },
+    email,
+    phone: '',
+    confirmation_sent_at: now,
+    confirmed_at: now,
+    email_confirmed_at: now,
+    phone_confirmed_at: now,
+    last_sign_in_at: now,
+    factor_ids: [],
+    identities: [],
+    // Casting is necessary because the Supabase User type includes readonly internal fields
+  } as unknown as User;
+};
+
+const createMockSession = (user: User): Session => {
+  const expiresAt = Math.round(Date.now() / 1000) + 60 * 60;
+  return {
+    access_token: 'mock-access-token',
+    token_type: 'bearer',
+    expires_in: 60 * 60,
+    expires_at: expiresAt,
+    refresh_token: 'mock-refresh-token',
+    user,
+    provider_token: null,
+  } as unknown as Session;
+};
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -34,8 +78,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
 
+  const shouldUseMockAuth = !isSupabaseEnvConfigured && isDevEnvironment;
+
   useEffect(() => {
     let isMounted = true;
+
+    if (shouldUseMockAuth) {
+      setIsInitializing(false);
+      return () => {
+        isMounted = false;
+      };
+    }
 
     const initialiseSession = async () => {
       try {
@@ -87,9 +140,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isMounted = false;
       authListener?.subscription.unsubscribe();
     };
-  }, []);
+  }, [shouldUseMockAuth]);
 
   const signIn = useCallback(async (email: string, password: string) => {
+    if (shouldUseMockAuth) {
+      setAuthLoading(true);
+      try {
+        await mockDelay();
+        const mockUser = createMockUser(email);
+        const mockSession = createMockSession(mockUser);
+        setSession(mockSession);
+        setUser(mockUser);
+        return { success: true };
+      } finally {
+        setAuthLoading(false);
+      }
+    }
+
     if (!isSupabaseEnvConfigured) {
       return { success: false, error: 'Authentication is not configured. Please contact support.' };
     }
@@ -124,10 +191,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setAuthLoading(false);
     }
-  }, []);
+  }, [shouldUseMockAuth]);
 
   const signUp = useCallback(
     async ({ email, password, fullName }: { email: string; password: string; fullName?: string }) => {
+      if (shouldUseMockAuth) {
+        setAuthLoading(true);
+        try {
+          await mockDelay();
+          const mockUser = createMockUser(email, fullName);
+          const mockSession = createMockSession(mockUser);
+          setSession(mockSession);
+          setUser(mockUser);
+          return {
+            success: true,
+            requiresEmailConfirmation: false,
+          };
+        } finally {
+          setAuthLoading(false);
+        }
+      }
+
       if (!isSupabaseEnvConfigured) {
         return { success: false, error: 'Authentication is not configured. Please contact support.' };
       }
@@ -188,10 +272,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setAuthLoading(false);
       }
     },
-    [],
+    [shouldUseMockAuth],
   );
 
   const signOut = useCallback(async () => {
+    if (shouldUseMockAuth) {
+      setAuthLoading(true);
+      try {
+        await mockDelay(250);
+        setSession(null);
+        setUser(null);
+        return { success: true };
+      } finally {
+        setAuthLoading(false);
+      }
+    }
+
     if (!isSupabaseEnvConfigured) {
       setSession(null);
       setUser(null);
@@ -217,9 +313,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setAuthLoading(false);
     }
-  }, []);
+  }, [shouldUseMockAuth]);
 
   const refreshSession = useCallback(async () => {
+    if (shouldUseMockAuth) {
+      return;
+    }
+
     try {
       const { data, error } = await supabase.auth.getSession();
       if (error) {
@@ -232,7 +332,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('Unexpected error refreshing session', error);
     }
-  }, []);
+  }, [shouldUseMockAuth]);
 
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
