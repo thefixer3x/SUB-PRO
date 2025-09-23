@@ -331,7 +331,6 @@ const LandingPage = () => {
           <View style={dynamicStyles.strategicGrid}>
             {strategicAdvantages.map((advantage, index) => (
               <StrategicCard
-                key={index}
                 advantage={advantage}
                 index={index}
                 scrollY={scrollY}
@@ -354,7 +353,6 @@ const LandingPage = () => {
           <View style={dynamicStyles.pricingGrid}>
             {pricingTiers.map((tier, index) => (
               <PricingCard
-                key={index}
                 tier={tier}
                 index={index}
                 colors={colors}
@@ -373,7 +371,6 @@ const LandingPage = () => {
           <View style={dynamicStyles.featuresGrid}>
             {features.map((feature, index) => (
               <FeatureCard
-                key={index}
                 feature={feature}
                 index={index}
                 scrollY={scrollY}
@@ -1383,6 +1380,10 @@ const createStyles = (colors: ThemeColors, themeName: string) => {
   },
     footerText: {
       fontSize: 14,
+    },
+    partnerCreditContainer: {
+      marginTop: 8,
+      alignItems: 'center',
     },
   });
 };
