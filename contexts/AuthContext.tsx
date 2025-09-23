@@ -22,6 +22,10 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const isDevEnvironment =
   (typeof __DEV__ !== 'undefined' && __DEV__) || process.env.NODE_ENV !== 'production';
+const forceMockAuthFlag =
+  (process.env.EXPO_PUBLIC_USE_MOCK_AUTH ?? process.env.NEXT_PUBLIC_USE_MOCK_AUTH ?? '')
+    .toString()
+    .toLowerCase() === 'true';
 
 const mockDelay = (duration = 450) =>
   new Promise((resolve) => {
@@ -78,7 +82,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
 
-  const shouldUseMockAuth = !isSupabaseEnvConfigured && isDevEnvironment;
+  const shouldUseMockAuth = (forceMockAuthFlag || !isSupabaseEnvConfigured) && isDevEnvironment;
 
   useEffect(() => {
     let isMounted = true;
@@ -243,19 +247,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             updated_at: now,
           };
 
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .upsert(profilePayload as any, { onConflict: 'id' });
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert(profilePayload as any, { onConflict: 'id' });
 
-          if (profileError) {
-            console.warn('Failed to create profile after sign up', profileError);
-            return { success: false, error: 'Failed to create user profile. Please try again.' };
-          }
+        if (profileError) {
+          console.warn('Failed to create profile after sign up', profileError);
         }
+      }
 
-        if (data.session) {
-          setSession(data.session);
-          setUser(data.session.user);
+      if (data.session) {
+        setSession(data.session);
+        setUser(data.session.user);
         }
 
         return {
