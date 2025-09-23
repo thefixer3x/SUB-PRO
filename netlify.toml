@@ -1,17 +1,13 @@
-[dev]
-  targetPort = 19006
-
-# Netlify Configuration
 [build]
+  command = "npm run build:production"
   publish = "dist"
-  command = "NODE_ENV=production npm run build:production"
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-[build.environment]
-  NODE_ENV = "production"
-  EXPO_PUBLIC_SUPABASE_URL = "$EXPO_PUBLIC_SUPABASE_URL"
-  EXPO_PUBLIC_SUPABASE_ANON_KEY = "$EXPO_PUBLIC_SUPABASE_ANON_KEY"
+[template.environment]
+  SUPABASE_URL = "Your Supabase URL"
+  SUPABASE_ANON_KEY = "Your Supabase Anon Key"
+  STRIPE_PUBLISHABLE_KEY = "Your Stripe Publishable Key"
