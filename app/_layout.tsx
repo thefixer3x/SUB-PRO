@@ -7,6 +7,8 @@ import { queryClient } from '@/hooks/useQueryClient';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { FeatureFlagsProvider } from '@/contexts/FeatureFlagsContext';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { EnvNotice } from '@/components/EnvNotice';
 
 export default function RootLayout() {
   useFrameworkReady();
@@ -17,13 +19,16 @@ export default function RootLayout() {
         <ThemeProvider>
           <FeatureFlagsProvider>
             <SubscriptionProvider>
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="(landing)" />
-                <Stack.Screen name="(auth)" />
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="+not-found" />
-              </Stack>
-              <StatusBar style="auto" />
+              <ErrorBoundary>
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="(landing)" />
+                  <Stack.Screen name="(auth)" />
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen name="+not-found" />
+                </Stack>
+                <EnvNotice />
+                <StatusBar style="auto" />
+              </ErrorBoundary>
             </SubscriptionProvider>
           </FeatureFlagsProvider>
         </ThemeProvider>
