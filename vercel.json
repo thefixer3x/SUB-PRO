@@ -1,19 +1,17 @@
 {
   "version": 2,
-  "builds": [
+  "buildCommand": "npx expo export -p web --output-dir dist",
+  "outputDirectory": "dist",
+  "framework": null,
+  "trailingSlash": false,
+  "rewrites": [
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": { "distDir": "dist" }
+      "source": "/api/create-checkout-session",
+      "destination": "https://subtrack-pro.lanonasis.com/.netlify/functions/create-checkout-session"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
-  ],
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
-  ],
-  "env": {
-    "EXPO_PUBLIC_SUPABASE_URL": "@SUPABASE_URL",
-    "EXPO_PUBLIC_SUPABASE_ANON_KEY": "@SUPABASE_ANON_KEY",
-    "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "@STRIPE_PUBLISHABLE_KEY"
-  }
+  ]
 }
