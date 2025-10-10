@@ -23,7 +23,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 const isDevEnvironment =
   (typeof __DEV__ !== 'undefined' && __DEV__) || process.env.NODE_ENV !== 'production';
 const forceMockAuthFlag =
-  (process.env.EXPO_PUBLIC_USE_MOCK_AUTH ?? process.env.NEXT_PUBLIC_USE_MOCK_AUTH ?? '')
+  (process.env.EXPO_PUBLIC_ENABLE_MOCK_AUTH ?? process.env.EXPO_PUBLIC_USE_MOCK_AUTH ?? process.env.NEXT_PUBLIC_USE_MOCK_AUTH ?? '')
     .toString()
     .toLowerCase() === 'true';
 
@@ -82,7 +82,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
 
-  const shouldUseMockAuth = (forceMockAuthFlag || !isSupabaseEnvConfigured) && isDevEnvironment;
+  // Only use mock auth if explicitly enabled via EXPO_PUBLIC_ENABLE_MOCK_AUTH=true
+  // Never use mock in production, even if Supabase is misconfigured
+  const shouldUseMockAuth = forceMockAuthFlag && isDevEnvironment;
 
   useEffect(() => {
     let isMounted = true;
