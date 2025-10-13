@@ -152,7 +152,7 @@ const SignUpPage = () => {
         </Text>
       </LinearGradient>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Animated.View style={[styles.content, animatedStyle]}>
           {/* Benefits Preview */}
           <View style={styles.benefitsSection}>
@@ -187,7 +187,7 @@ const SignUpPage = () => {
                   placeholder="Full Name"
                   placeholderTextColor="#9CA3AF"
                   value={formData.name}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
+                  onChangeText={(text: string) => setFormData(prev => ({ ...prev, name: text }))}
                   autoCapitalize="words"
                 />
               </View>
@@ -201,7 +201,7 @@ const SignUpPage = () => {
                   placeholder="Email Address"
                   placeholderTextColor="#9CA3AF"
                   value={formData.email}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, email: text }))}
+                  onChangeText={(text: string) => setFormData(prev => ({ ...prev, email: text }))}
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />
@@ -216,7 +216,7 @@ const SignUpPage = () => {
                   placeholder="Password"
                   placeholderTextColor="#9CA3AF"
                   value={formData.password}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, password: text }))}
+                  onChangeText={(text: string) => setFormData(prev => ({ ...prev, password: text }))}
                   secureTextEntry={!showPassword}
                 />
                 <Pressable
@@ -240,7 +240,7 @@ const SignUpPage = () => {
                   placeholder="Confirm Password"
                   placeholderTextColor="#9CA3AF"
                   value={formData.confirmPassword}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, confirmPassword: text }))}
+                  onChangeText={(text: string) => setFormData(prev => ({ ...prev, confirmPassword: text }))}
                   secureTextEntry={!showConfirmPassword}
                 />
                 <Pressable
@@ -286,12 +286,12 @@ const SignUpPage = () => {
                 </LinearGradient>
               </Pressable>
 
-              <Text style={styles.signInText}>
-                Already have an account?{' '}
+              <View style={styles.signInContainer}>
+                <Text style={styles.signInText}>Already have an account? </Text>
                 <Pressable onPress={() => router.push('/(auth)/signin')}>
                   <Text style={styles.signInLink}>Sign In</Text>
                 </Pressable>
-              </Text>
+              </View>
             </View>
           </BlurView>
 
@@ -484,6 +484,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6B7280',
     textAlign: 'center',
+    marginTop: 8,
+  },
+  signInContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginTop: 8,
   },
   signInLink: {

@@ -34,7 +34,7 @@ export const FieldMappingComponent: React.FC<FieldMappingComponentProps> = ({
     const autoMapping: Record<string, number | null> = {};
     
     SUBSCRIPTION_FIELDS.forEach(field => {
-      const matchingHeaderIndex = headers.findIndex(header => {
+      const matchingHeaderIndex = headers.findIndex((header: string) => {
         const normalizedHeader = header.toLowerCase().replace(/[^a-z]/g, '');
         const normalizedField = field.key.toLowerCase().replace(/[^a-z]/g, '');
         const normalizedLabel = field.label.toLowerCase().replace(/[^a-z]/g, '');
@@ -51,14 +51,14 @@ export const FieldMappingComponent: React.FC<FieldMappingComponentProps> = ({
   }, [headers]);
 
   const handleFieldMapping = useCallback((fieldKey: string, headerIndex: number | null) => {
-    setMapping(prev => ({ ...prev, [fieldKey]: headerIndex }));
+    setMapping((prev: Record<string, number | null>) => ({ ...prev, [fieldKey]: headerIndex }));
     setExpandedDropdown(null);
   }, []);
 
   const handleContinue = useCallback(() => {
     const finalMapping: Record<string, number> = {};
     
-    Object.entries(mapping).forEach(([key, index]) => {
+    Object.entries(mapping).forEach(([key, index]: [string, number | null]) => {
       if (index !== null) {
         finalMapping[key] = index;
       }
@@ -121,7 +121,7 @@ export const FieldMappingComponent: React.FC<FieldMappingComponentProps> = ({
             >
               <Text style={styles.dropdownOptionText}>Don't map</Text>
             </TouchableOpacity>
-            {headers.map((header, index) => (
+            {headers.map((header: string, index: number) => (
               <TouchableOpacity
                 key={index}
                 style={[
@@ -161,7 +161,7 @@ export const FieldMappingComponent: React.FC<FieldMappingComponentProps> = ({
       <View style={styles.footer}>
         <View style={styles.summary}>
           <Text style={styles.summaryText}>
-            {Object.values(mapping).filter(v => v !== null).length} of {SUBSCRIPTION_FIELDS.length} fields mapped
+            {Object.values(mapping).filter((v: number | null) => v !== null).length} of {SUBSCRIPTION_FIELDS.length} fields mapped
           </Text>
           {!canContinue && (
             <Text style={styles.warningText}>

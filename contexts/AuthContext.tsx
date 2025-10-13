@@ -38,6 +38,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const initialiseSession = async () => {
       try {
+  const shouldUseMockAuth = (forceMockAuthFlag || !isSupabaseEnvConfigured) && isDevEnvironment;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (shouldUseMockAuth) {
+      setIsInitializing(false);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const initialiseSession = async () => {
+      try {
+        // Check if Supabase is properly configured
+        if (!isSupabaseEnvConfigured) {
+          console.warn('Supabase not configured, skipping session initialization');
+          if (isMounted) {
+            setIsInitializing(false);
+          }
+          return;
+        }
+
         const { data, error } = await supabase.auth.getSession();
         if (error) {
           console.error('Failed to fetch session', error);
