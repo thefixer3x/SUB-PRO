@@ -119,7 +119,10 @@ build_app() {
     
     # Run type check
     print_step "Running type checks..."
-    if npm run type-check 2>/dev/null || echo "Type check skipped (tsc not available)"; then
+    if ! npm run type-check; then
+        print_error "Type check failed. Please fix the errors before building."
+        return 1
+    else
         print_success "Type checks passed"
     fi
     
