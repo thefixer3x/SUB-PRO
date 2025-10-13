@@ -199,6 +199,7 @@ main() {
             print_step "Running build and deploy only..."
             check_requirements
             build_app
+            deploy_netlify
             validate_deployment
             print_success "Build and deploy completed! 🚀"
             ;;
