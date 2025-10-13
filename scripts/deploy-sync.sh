@@ -90,11 +90,22 @@ sync_database() {
 generate_types() {
     print_step "Generating TypeScript types from Supabase..."
     
-    if supabase gen types typescript --local > lib/supabase-generated.ts; then
-        print_success "TypeScript types generated successfully"
-        print_warning "Remember to update your imports if using the generated types"
+    if [ -n "$SUPABASE_PROJECT_ID" ]; then
+        print_step "Using remote Supabase project: $SUPABASE_PROJECT_ID"
+        if supabase gen types typescript --project-id "$SUPABASE_PROJECT_ID" > lib/supabase-generated.ts; then
+            print_success "TypeScript types generated successfully from remote project"
+            print_warning "Remember to update your imports if using the generated types"
+        else
+            print_warning "Failed to generate types from remote project - using existing manual types"
+        fi
     else
-        print_warning "Failed to generate types - using existing manual types"
+        print_step "Using local Supabase instance"
+        if supabase gen types typescript --local > lib/supabase-generated.ts; then
+            print_success "TypeScript types generated successfully from local instance"
+            print_warning "Remember to update your imports if using the generated types"
+        else
+            print_warning "Failed to generate types from local instance - using existing manual types"
+        fi
     fi
 }
 
