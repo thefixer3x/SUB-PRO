@@ -30,6 +30,7 @@ jest.mock('@/lib/supabase', () => ({
     auth: mockSupabaseAuth,
     from: mockSupabaseFrom,
   },
+  isSupabaseEnvConfigured: true,
 }));
 
 const AuthConsumer = ({ onReady }: { onReady: (value: AuthValue) => void }) => {
