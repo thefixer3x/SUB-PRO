@@ -12,6 +12,7 @@ import { SmartNotifications } from '@/components/embeddedFinance/SmartNotificati
 import { affiliateSystemService } from '@/services/affiliateSystem';
 import { ShareSubscriptionModal } from '@/components/social/ShareSubscriptionModal';
 import { ShareButton } from '@/components/social/ShareButton';
+import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
 
 export default function Subscriptions() {
   const { currentTier, canAccessFeature, getRemainingLimit } = useSubscription();
@@ -355,6 +356,11 @@ export default function Subscriptions() {
               ${(subscriptions.reduce((sum, sub) => sum + sub.cost, 0) * 12).toFixed(2)}
             </Text>
           </View>
+        </View>
+
+        {/* Subtle Branding Credit */}
+        <View style={styles.brandingSection}>
+          <PoweredByLanOnasis variant="minimal" />
         </View>
       </ScrollView>
 
@@ -736,5 +742,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     color: '#1E293B',
+  },
+  brandingSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    alignItems: 'center',
   },
 });

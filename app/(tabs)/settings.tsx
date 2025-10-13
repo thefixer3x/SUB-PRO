@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Switch } from 'react-native';
-import { Bell, Shield, Palette, Download, CircleHelp as HelpCircle, ChevronRight, Smartphone, Mail, Calendar, DollarSign, Settings as SettingsIcon, FileText, TriangleAlert as AlertTriangle } from 'lucide-react-native';
+import { Bell, Shield, Palette, Download, HelpCircle, ChevronRight, Smartphone, Mail, Calendar, DollarSign, Settings as SettingsIcon, FileText, AlertTriangle } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeSelector } from '@/components/ThemeSelector';
@@ -13,6 +13,7 @@ import { PrivacyCenter } from '@/components/compliance/PrivacyCenter';
 import { securityMonitoringService } from '@/services/securityMonitoring';
 import { FEATURE_FLAGS } from '@/config/compliance';
 import { SecurityHealthCheck } from '@/types/compliance';
+import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
 
 export default function Settings() {
   const router = useRouter();
@@ -50,7 +51,7 @@ export default function Settings() {
   };
 
   const toggleNotification = (key: keyof typeof notifications) => {
-    setNotifications(prev => ({
+    setNotifications((prev: typeof notifications) => ({
       ...prev,
       [key]: !prev[key]
     }));
@@ -227,6 +228,10 @@ export default function Settings() {
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: colors.textMuted }]}>Version 1.0.0</Text>
           <Text style={[styles.footerSubtext, { color: colors.textMuted }]}>Built with ❤️ for subscription management</Text>
+          
+          <View style={styles.partnerCreditContainer}>
+            <PoweredByLanOnasis variant="standard" />
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -308,5 +313,9 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   footerSubtext: {
     ...TYPOGRAPHY.caption,
+  },
+  partnerCreditContainer: {
+    marginTop: SPACING.md,
+    alignItems: 'center',
   },
 });

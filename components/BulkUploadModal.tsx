@@ -10,7 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import { Upload, X, File, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Download, FileText } from 'lucide-react-native';
+import { Upload, X, File, CheckCircle as CheckCircle, AlertTriangle as AlertTriangle, Download, FileText } from 'lucide-react-native';
 import { parseFile, ParsedData } from '@/utils/fileParser';
 import { FieldMappingComponent } from './FieldMappingComponent';
 import { DataPreviewComponent } from './DataPreviewComponent';

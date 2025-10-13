@@ -27,7 +27,7 @@ if (Platform.OS !== 'web') {
 type ReminderTiming = '1' | '3' | '7';
 type ReportDay = 'monday' | 'friday';
 
-interface ReminderSettings {
+interface ReminderSettingsData {
   renewalTiming: ReminderTiming;
   reportDay: ReportDay;
 }
@@ -45,7 +45,7 @@ const REPORT_OPTIONS = [
 
 export default function ReminderSettings() {
   const router = useRouter();
-  const [settings, setSettings] = useState<ReminderSettings>({
+  const [settings, setSettings] = useState<ReminderSettingsData>({
     renewalTiming: '3',
     reportDay: 'monday',
   });
@@ -69,7 +69,7 @@ export default function ReminderSettings() {
     }
   };
 
-  const saveSettings = async (newSettings: ReminderSettings) => {
+  const saveSettings = async (newSettings: ReminderSettingsData) => {
     setIsSaving(true);
     try {
       await SecureStore.setItemAsync('reminderSettings', JSON.stringify(newSettings));
@@ -182,8 +182,9 @@ export default function ReminderSettings() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
+          testID="back-button"
           onPress={() => router.back()}
         >
           <ChevronLeft size={24} color="#64748B" />

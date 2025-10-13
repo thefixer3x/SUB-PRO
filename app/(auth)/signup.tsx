@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   Alert,
-  Platform,
   StyleSheet,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -29,6 +28,10 @@ import {
   Shield,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
+import { useAuth } from '@/contexts/AuthContext';
+import { PASSWORD_REQUIREMENTS } from '@/constants/auth';
+import { validatePassword } from '@/utils/auth/validatePassword';
 
 const SignUpPage = () => {
   const insets = useSafeAreaInsets();
@@ -40,8 +43,8 @@ const SignUpPage = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const { signUp: signUpWithEmail, authLoading } = useAuth();
 
   const fadeAnim = useSharedValue(0);
   const slideAnim = useSharedValue(30);
@@ -57,13 +60,24 @@ const SignUpPage = () => {
   }));
 
   const handleSignUp = async () => {
-    if (!formData.name || !formData.email || !formData.password) {
+    const name = formData.name.trim();
+    const email = formData.email.trim().toLowerCase();
+    const password = formData.password;
+    const confirmPassword = formData.confirmPassword;
+
+    if (!name || !email || !password) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
-    if (formData.password !== formData.confirmPassword) {
+    if (password !== confirmPassword) {
       Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      Alert.alert('Weak Password', passwordValidation.message ?? PASSWORD_REQUIREMENTS);
       return;
     }
 
@@ -72,17 +86,42 @@ const SignUpPage = () => {
       return;
     }
 
-    setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-      Alert.alert(
-        'Success!',
-        'Account created successfully. Welcome to SubTrack Pro!',
-        [{ text: 'Get Started', onPress: () => router.replace('/(tabs)') }]
-      );
-    }, 2000);
+    try {
+      const { success, error, requiresEmailConfirmation } = await signUpWithEmail({
+        email,
+        password,
+        fullName: name,
+      });
+
+      if (!success) {
+        const isNetworkIssue = error?.toLowerCase().includes('network');
+        Alert.alert(
+          isNetworkIssue ? 'Network Error' : 'Sign Up Failed',
+          isNetworkIssue
+            ? 'We were unable to connect. Please check your internet connection and try again.'
+            : error ?? 'Unable to create your account. Please try again.',
+        );
+        return;
+      }
+
+      if (requiresEmailConfirmation) {
+        Alert.alert(
+          'Confirm Your Email',
+          `We sent a confirmation link to ${email}. Please verify your email before signing in.`,
+          [{ text: 'OK', onPress: () => router.replace('/(auth)/signin') }],
+        );
+        return;
+      }
+
+      Alert.alert('Success!', 'Account created successfully. Welcome to SubTrack Pro!');
+      router.replace('/(tabs)');
+    } catch (error) {
+      const isNetworkIssue = error instanceof Error && error.message.toLowerCase().includes('network');
+      const message = isNetworkIssue
+        ? 'We were unable to connect. Please check your internet connection and try again.'
+        : 'Failed to create your account. Please try again.';
+      Alert.alert(isNetworkIssue ? 'Network Error' : 'Sign Up Failed', message);
+    }
   };
 
   const benefits = [
@@ -113,7 +152,7 @@ const SignUpPage = () => {
         </Text>
       </LinearGradient>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Animated.View style={[styles.content, animatedStyle]}>
           {/* Benefits Preview */}
           <View style={styles.benefitsSection}>
@@ -148,7 +187,7 @@ const SignUpPage = () => {
                   placeholder="Full Name"
                   placeholderTextColor="#9CA3AF"
                   value={formData.name}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
+                  onChangeText={(text: string) => setFormData(prev => ({ ...prev, name: text }))}
                   autoCapitalize="words"
                 />
               </View>
@@ -162,7 +201,7 @@ const SignUpPage = () => {
                   placeholder="Email Address"
                   placeholderTextColor="#9CA3AF"
                   value={formData.email}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, email: text }))}
+                  onChangeText={(text: string) => setFormData(prev => ({ ...prev, email: text }))}
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />
@@ -177,7 +216,7 @@ const SignUpPage = () => {
                   placeholder="Password"
                   placeholderTextColor="#9CA3AF"
                   value={formData.password}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, password: text }))}
+                  onChangeText={(text: string) => setFormData(prev => ({ ...prev, password: text }))}
                   secureTextEntry={!showPassword}
                 />
                 <Pressable
@@ -201,7 +240,7 @@ const SignUpPage = () => {
                   placeholder="Confirm Password"
                   placeholderTextColor="#9CA3AF"
                   value={formData.confirmPassword}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, confirmPassword: text }))}
+                  onChangeText={(text: string) => setFormData(prev => ({ ...prev, confirmPassword: text }))}
                   secureTextEntry={!showConfirmPassword}
                 />
                 <Pressable
@@ -232,26 +271,27 @@ const SignUpPage = () => {
               </Pressable>
 
               <Pressable
-                style={[styles.signUpButton, isLoading && styles.signUpButtonDisabled]}
+                testID="sign-up-submit"
+                style={[styles.signUpButton, authLoading && styles.signUpButtonDisabled]}
                 onPress={handleSignUp}
-                disabled={isLoading}
+                disabled={authLoading}
               >
                 <LinearGradient
-                  colors={isLoading ? ['#9CA3AF', '#6B7280'] : ['#F59E0B', '#F97316']}
+                  colors={authLoading ? ['#9CA3AF', '#6B7280'] : ['#F59E0B', '#F97316']}
                   style={styles.signUpGradient}
                 >
                   <Text style={styles.signUpText}>
-                    {isLoading ? 'Creating Account...' : 'Start Free Trial'}
+                    {authLoading ? 'Creating Account...' : 'Start Free Trial'}
                   </Text>
                 </LinearGradient>
               </Pressable>
 
-              <Text style={styles.signInText}>
-                Already have an account?{' '}
+              <View style={styles.signInContainer}>
+                <Text style={styles.signInText}>Already have an account? </Text>
                 <Pressable onPress={() => router.push('/(auth)/signin')}>
                   <Text style={styles.signInLink}>Sign In</Text>
                 </Pressable>
-              </Text>
+              </View>
             </View>
           </BlurView>
 
@@ -267,6 +307,11 @@ const SignUpPage = () => {
                 <CheckCircle size={24} color="#10B981" />
                 <Text style={styles.trustText}>SOC 2 compliant</Text>
               </View>
+            </View>
+            
+            {/* Development Partner Credit */}
+            <View style={styles.partnerCreditContainer}>
+              <PoweredByLanOnasis variant="minimal" />
             </View>
           </View>
         </Animated.View>
@@ -441,6 +486,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
   },
+  signInContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+  },
   signInLink: {
     color: '#667eea',
     fontWeight: '500',
@@ -466,6 +517,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     fontWeight: '500',
+  },
+  partnerCreditContainer: {
+    marginTop: 12,
+    alignItems: 'center',
   },
 });
 

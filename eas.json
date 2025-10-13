@@ -30,6 +30,7 @@
     },
     "preview": {
       "distribution": "internal",
+      "channel": "preview",
       "env": {
         "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51IqmwEF6R3sAq2DlTHisUmo6TTLhNQGsYZMNdL3lIu3aNeQaXpMaoKPaymCNUsCtKFgYZGr7VZoKPiZYLmZxqTLQ00aNlRTSLp",
         "EXPO_PUBLIC_ADMOB_APP_ID": "ca-app-pub-3940256099942544~3347511713",
@@ -49,6 +50,7 @@
       }
     },
     "production": {
+      "channel": "production",
       "env": {
         "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "@STRIPE_PUBLISHABLE_KEY",
         "EXPO_PUBLIC_ADMOB_APP_ID": "@ADMOB_APP_ID",
@@ -74,6 +76,7 @@
     },
     "store-submission": {
       "extends": "production",
+      "channel": "production",
       "env": {
         "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "@STRIPE_LIVE_PUBLISHABLE_KEY",
         "EXPO_PUBLIC_ADMOB_APP_ID": "@ADMOB_LIVE_APP_ID",

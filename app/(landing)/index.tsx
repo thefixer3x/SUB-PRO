@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,12 +6,10 @@ import {
   Pressable,
   Dimensions,
   Platform,
-  ImageBackground,
   StyleSheet,
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -32,12 +30,12 @@ import {
   CheckCircle,
   Bell,
   DollarSign,
-  Calendar,
   BarChart3,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeColors } from '@/constants/theme';
+import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -66,7 +64,7 @@ const LandingPage = () => {
   const slideAnim = useSharedValue(50);
 
   const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
+    onScroll: (event: any) => {
       scrollY.value = event.contentOffset.y;
     },
   });
@@ -92,6 +90,12 @@ const LandingPage = () => {
 
   // Create dynamic styles based on theme
   const dynamicStyles = React.useMemo(() => createStyles(colors, themeName), [colors, themeName]);
+
+  const heroStatsData = [
+    { value: '$1,200', label: 'Avg. Yearly Savings' },
+    { value: '50K+', label: 'Happy Users' },
+    { value: '4.9★', label: 'App Rating' },
+  ];
 
   const features = [
     {
@@ -279,20 +283,22 @@ const LandingPage = () => {
               </Text>
 
               <View style={dynamicStyles.heroStats}>
-                <View style={dynamicStyles.statItem}>
-                  <Text style={dynamicStyles.statNumber}>$1,200</Text>
-                  <Text style={dynamicStyles.statLabel}>Avg. Yearly Savings</Text>
-                </View>
-                <View style={dynamicStyles.statDivider} />
-                <View style={dynamicStyles.statItem}>
-                  <Text style={dynamicStyles.statNumber}>50K+</Text>
-                  <Text style={dynamicStyles.statLabel}>Happy Users</Text>
-                </View>
-                <View style={dynamicStyles.statDivider} />
-                <View style={dynamicStyles.statItem}>
-                  <Text style={dynamicStyles.statNumber}>4.9★</Text>
-                  <Text style={dynamicStyles.statLabel}>App Rating</Text>
-                </View>
+                {heroStatsData.map((stat, index) => (
+                  <React.Fragment key={stat.label}>
+                    <View
+                      style={[
+                        dynamicStyles.statItem,
+                        index === heroStatsData.length - 1 && dynamicStyles.statItemLast,
+                      ]}
+                    >
+                      <Text style={dynamicStyles.statNumber}>{stat.value}</Text>
+                      <Text style={dynamicStyles.statLabel}>{stat.label}</Text>
+                    </View>
+                    {index < heroStatsData.length - 1 && (
+                      <View style={dynamicStyles.statDivider} />
+                    )}
+                  </React.Fragment>
+                ))}
               </View>
 
               <Pressable
@@ -325,7 +331,6 @@ const LandingPage = () => {
           <View style={dynamicStyles.strategicGrid}>
             {strategicAdvantages.map((advantage, index) => (
               <StrategicCard
-                key={index}
                 advantage={advantage}
                 index={index}
                 scrollY={scrollY}
@@ -348,7 +353,6 @@ const LandingPage = () => {
           <View style={dynamicStyles.pricingGrid}>
             {pricingTiers.map((tier, index) => (
               <PricingCard
-                key={index}
                 tier={tier}
                 index={index}
                 colors={colors}
@@ -367,7 +371,6 @@ const LandingPage = () => {
           <View style={dynamicStyles.featuresGrid}>
             {features.map((feature, index) => (
               <FeatureCard
-                key={index}
                 feature={feature}
                 index={index}
                 scrollY={scrollY}
@@ -494,6 +497,9 @@ const LandingPage = () => {
           <Text style={[dynamicStyles.footerText, { color: colors.textMuted }]}>
             © 2025 SubTrack Pro. All rights reserved.
           </Text>
+          <View style={dynamicStyles.partnerCreditContainer}>
+            <PoweredByLanOnasis variant="minimal" />
+          </View>
         </View>
       </Animated.ScrollView>
     </View>
@@ -715,6 +721,7 @@ const PricingCard = ({ tier, index, colors }: { tier: any; index: number; colors
         transform: [{ scale: Platform.OS === 'web' ? 1.02 : 1.0 }], // Only scale on web to prevent mobile overlap
         zIndex: 1, // Ensure popular card is above others
       }
+      tier.popular && { } // Reduce scale to prevent overlap
     ]}>
       {tier.popular && (
         <View style={{
@@ -870,11 +877,14 @@ const TestimonialCard = ({ testimonial, colors }: { testimonial: any; colors: Th
 
 
 // Dynamic styles function that responds to theme changes
-const createStyles = (colors: ThemeColors, themeName: string) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+const createStyles = (colors: ThemeColors, themeName: string) => {
+  const heroStacked = screenWidth < 768;
+
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
   scrollView: {
     flex: 1,
   },
@@ -924,18 +934,27 @@ const createStyles = (colors: ThemeColors, themeName: string) => StyleSheet.crea
     marginBottom: 32,
     maxWidth: isSmallScreen ? 320 : 500,
   },
-  heroStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 40,
-  },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
+    heroStats: {
+      flexDirection: heroStacked ? 'column' : 'row',
+      alignItems: heroStacked ? 'stretch' : 'center',
+      justifyContent: heroStacked ? 'flex-start' : 'center',
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      borderRadius: 16,
+      padding: heroStacked ? 16 : 20,
+      marginBottom: 40,
+      width: '100%',
+      maxWidth: 560,
+      alignSelf: 'center',
+    },
+    statItem: {
+      alignItems: 'center',
+      flex: heroStacked ? undefined : 1,
+      width: heroStacked ? '100%' : undefined,
+      marginBottom: heroStacked ? 16 : 0,
+    },
+    statItemLast: {
+      marginBottom: 0,
+    },
   statNumber: {
     fontSize: 24,
     fontWeight: '700',
@@ -947,12 +966,13 @@ const createStyles = (colors: ThemeColors, themeName: string) => StyleSheet.crea
     marginTop: 4,
     textAlign: 'center',
   },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    marginHorizontal: 20,
-  },
+    statDivider: {
+      width: 1,
+      height: 40,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      marginHorizontal: heroStacked ? 0 : 20,
+      display: heroStacked ? 'none' : 'flex',
+    },
   ctaButton: {
     borderRadius: 16,
     overflow: 'hidden',
@@ -1367,9 +1387,14 @@ const createStyles = (colors: ThemeColors, themeName: string) => StyleSheet.crea
     paddingVertical: 20,
     alignItems: 'center',
   },
-  footerText: {
-    fontSize: 14,
-  },
-});
+    footerText: {
+      fontSize: 14,
+    },
+    partnerCreditContainer: {
+      marginTop: 8,
+      alignItems: 'center',
+    },
+  });
+};
 
 export default LandingPage;

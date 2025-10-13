@@ -1,5 +1,6 @@
 const createExpoWebpackConfigAsync = require('@expo/webpack-config');
 const path = require('path');
+const webpack = require('webpack');
 
 module.exports = async function (env, argv) {
   const config = await createExpoWebpackConfigAsync(
@@ -23,6 +24,28 @@ module.exports = async function (env, argv) {
   config.resolve.alias = {
     ...config.resolve.alias,
     'expo-secure-store': require.resolve('./utils/webSecureStore.js'),
+  };
+
+  // Define environment variables for the web build
+  config.plugins.push(
+    new webpack.DefinePlugin({
+      'process.env.EXPO_PUBLIC_SUPABASE_URL': JSON.stringify(process.env.EXPO_PUBLIC_SUPABASE_URL || ''),
+      'process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY': JSON.stringify(process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || ''),
+      'process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY': JSON.stringify(process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''),
+    })
+  );
+
+  // Fix for the "Cannot read properties of undefined (reading 'default')" error
+  // This is a common issue with Expo Router and React Native Web
+  config.resolve.fallback = {
+    ...config.resolve.fallback,
+    crypto: false,
+    stream: false,
+    buffer: false,
+    util: false,
+    path: false,
+    fs: false,
+    zlib: false,
   };
 
   // Production optimizations
@@ -85,8 +108,8 @@ module.exports = async function (env, argv) {
 
   // Add performance hints
   config.performance = {
-    maxAssetSize: 250000, // 250KB
-    maxEntrypointSize: 250000, // 250KB
+    maxAssetSize: 500000, // 500KB (increased for better compatibility)
+    maxEntrypointSize: 500000, // 500KB (increased for better compatibility)
     hints: env.mode === 'production' ? 'warning' : false,
   };
 

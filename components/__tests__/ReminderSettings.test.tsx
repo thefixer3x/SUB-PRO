@@ -99,10 +99,10 @@ describe('ReminderSettings', () => {
 
   it('navigates back when back button is pressed', async () => {
     const { getByTestId } = render(<ReminderSettings />);
-    
-    const backButton = getByTestId('back-button');
+
+    const backButton = await waitFor(() => getByTestId('back-button'));
     fireEvent.press(backButton);
-    
+
     expect(mockBack).toHaveBeenCalled();
   });
 

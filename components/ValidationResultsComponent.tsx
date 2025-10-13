@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList } from 'react-native';
-import { CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Circle as XCircle, ChevronLeft, Upload, ChevronDown, ChevronRight } from 'lucide-react-native';
+import { CheckCircle as CheckCircle, AlertTriangle as AlertTriangle, Circle as XCircle, ChevronLeft, Upload, ChevronDown, ChevronRight } from 'lucide-react-native';
 import { MappedSubscriptionData, ValidationError } from '@/utils/subscriptionValidator';
 
 interface ValidationResultsComponentProps {
