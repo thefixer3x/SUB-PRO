@@ -519,7 +519,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   partnerCreditContainer: {
-    marginTop: 12,
+    marginTop: 24,
     alignItems: 'center',
   },
 });

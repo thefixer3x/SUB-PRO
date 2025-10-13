@@ -315,7 +315,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     ...TYPOGRAPHY.caption,
   },
   partnerCreditContainer: {
-    marginTop: SPACING.md,
+    marginTop: SPACING.lg,
     alignItems: 'center',
   },
 });

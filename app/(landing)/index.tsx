@@ -55,6 +55,7 @@ const getCardWidth = () => {
 
 const isSmallScreen = screenWidth < 375;
 const isVerySmallScreen = screenWidth < 350;
+const shouldStackHeroStats = screenWidth < 768;
 
 const LandingPage = () => {
   const insets = useSafeAreaInsets();
@@ -294,7 +295,7 @@ const LandingPage = () => {
                       <Text style={dynamicStyles.statNumber}>{stat.value}</Text>
                       <Text style={dynamicStyles.statLabel}>{stat.label}</Text>
                     </View>
-                    {index < heroStatsData.length - 1 && (
+                    {!shouldStackHeroStats && index < heroStatsData.length - 1 && (
                       <View style={dynamicStyles.statDivider} />
                     )}
                   </React.Fragment>
@@ -878,7 +879,7 @@ const TestimonialCard = ({ testimonial, colors }: { testimonial: any; colors: Th
 
 // Dynamic styles function that responds to theme changes
 const createStyles = (colors: ThemeColors, themeName: string) => {
-  const heroStacked = screenWidth < 768;
+  const heroStacked = shouldStackHeroStats;
 
   return StyleSheet.create({
     container: {
@@ -936,6 +937,7 @@ const createStyles = (colors: ThemeColors, themeName: string) => {
   },
     heroStats: {
       flexDirection: heroStacked ? 'column' : 'row',
+      flexWrap: heroStacked ? 'nowrap' : 'wrap',
       alignItems: heroStacked ? 'stretch' : 'center',
       justifyContent: heroStacked ? 'flex-start' : 'center',
       backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -945,11 +947,14 @@ const createStyles = (colors: ThemeColors, themeName: string) => {
       width: '100%',
       maxWidth: 560,
       alignSelf: 'center',
+      rowGap: heroStacked ? 12 : 16,
+      columnGap: heroStacked ? 0 : 24,
     },
     statItem: {
       alignItems: 'center',
       flex: heroStacked ? undefined : 1,
       width: heroStacked ? '100%' : undefined,
+      minWidth: heroStacked ? undefined : 140,
       marginBottom: heroStacked ? 16 : 0,
     },
     statItemLast: {
@@ -970,8 +975,7 @@ const createStyles = (colors: ThemeColors, themeName: string) => {
       width: 1,
       height: 40,
       backgroundColor: 'rgba(255, 255, 255, 0.2)',
-      marginHorizontal: heroStacked ? 0 : 20,
-      display: heroStacked ? 'none' : 'flex',
+      marginHorizontal: 20,
     },
   ctaButton: {
     borderRadius: 16,
@@ -1387,14 +1391,22 @@ const createStyles = (colors: ThemeColors, themeName: string) => {
     paddingVertical: 20,
     alignItems: 'center',
   },
-    footerText: {
-      fontSize: 14,
-    },
-    partnerCreditContainer: {
-      marginTop: 8,
-      alignItems: 'center',
-    },
-  });
+  footerText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  footerSubtext: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  partnerCreditContainer: {
+    marginTop: 24,
+    alignItems: 'center',
+  },
+});
 };
 
 export default LandingPage;
