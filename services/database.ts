@@ -1,11 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
-import { Database } from '@/lib/supabase';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/lib/supabase';
 
 // Server-side database service for webhook handlers
 // This maintains the existing security model by only accessing server-side environment variables
 
 class DatabaseService {
-  private supabase;
+  private supabase: SupabaseClient<Database>;
 
   constructor() {
     const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -24,6 +24,12 @@ class DatabaseService {
     });
   }
 
+  // Temporary helper until Supabase generated types are added to the project
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private from(table: keyof Database['public']['Tables']) {
+    return this.supabase.from(table as any) as any;
+  }
+
   // Update user's subscription tier based on Stripe subscription
   async updateUserSubscriptionTier(userId: string, stripeSubscriptionId: string, status: string, planName: string) {
     try {
@@ -39,9 +45,9 @@ class DatabaseService {
 
       // Only update if subscription is active
       if (status === 'active') {
-        const { data, error } = await (this.supabase
-          .from('profiles') as any)
-          .update({ 
+        const { data, error } = await this
+          .from('profiles')
+          .update({
             subscription_tier: tier,
             updated_at: new Date().toISOString()
           })
@@ -56,9 +62,9 @@ class DatabaseService {
         return true;
       } else if (status === 'canceled' || status === 'unpaid') {
         // Downgrade to free tier
-        const { data, error } = await (this.supabase
-          .from('profiles') as any)
-          .update({ 
+        const { data, error } = await this
+          .from('profiles')
+          .update({
             subscription_tier: 'free',
             updated_at: new Date().toISOString()
           })
@@ -98,7 +104,7 @@ class DatabaseService {
       }
 
       // Store only non-sensitive card metadata
-      const { data: cardRef, error: cardError } = await this.supabase
+      const { data: cardRef, error: cardError } = await this
         .from('virtual_cards')
         .insert({
           user_id: userId,
@@ -138,7 +144,7 @@ class DatabaseService {
       console.log('Storing card authorization:', { authId: authData.authorization_id, amount: authData.amount });
 
       // Store authorization for spending tracking
-      const { data, error } = await this.supabase
+      const { data, error } = await this
         .from('card_authorizations')
         .insert({
           stripe_authorization_id: authData.authorization_id,
@@ -169,7 +175,7 @@ class DatabaseService {
   async findUserByStripeCustomerId(stripeCustomerId: string): Promise<string | null> {
     try {
       // Look for user with this stripe customer ID in metadata or profile
-      const { data, error } = await this.supabase
+      const { data, error } = await this
         .from('profiles')
         .select('id')
         .eq('stripe_customer_id', stripeCustomerId)
@@ -204,7 +210,7 @@ class DatabaseService {
         status: paymentData.status 
       });
 
-      const { data, error } = await this.supabase
+      const { data, error } = await this
         .from('payment_records')
         .insert({
           ...paymentData,

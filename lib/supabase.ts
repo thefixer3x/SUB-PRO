@@ -47,46 +47,14 @@ const createStorageAdapter = () => {
 };
 
 // Create Supabase client with proper storage
-export const isSupabaseEnvConfigured = !missingEnv && supabaseUrl.length > 0 && supabaseAnonKey.length > 0 && isUrlValid;
-export const supabase = isSupabaseEnvConfigured
-  ? createClient<Database>(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        storage: createStorageAdapter(),
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: Platform.OS === 'web',
-      },
-    })
-  : ({
-      auth: {
-        async getSession() {
-          return { data: { session: null }, error: { message: 'Missing Supabase env' } as any };
-        },
-        async signInWithPassword() {
-          return { data: { session: null }, error: { message: 'Missing Supabase env' } as any };
-        },
-        async signUp() {
-          return { data: { user: null, session: null }, error: { message: 'Missing Supabase env' } as any };
-        },
-        async signOut() {
-          return { error: { message: 'Missing Supabase env' } as any };
-        },
-        onAuthStateChange() {
-          return { data: { subscription: { unsubscribe() {} } } } as any;
-        },
-      },
-      from() {
-        const err = { error: { message: 'Missing Supabase env' } };
-        return {
-          insert: async () => err,
-          upsert: async () => err,
-          update: async () => err,
-          select: () => ({ single: async () => ({ data: null, error: err.error }) }),
-          eq: () => ({ select: () => ({ single: async () => ({ data: null, error: err.error }) }) }),
-        } as any;
-      },
-      rpc: async () => ({ data: null, error: { message: 'Missing Supabase env' } }),
-    } as any);
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: createStorageAdapter(),
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: Platform.OS === 'web',
+  },
+});
 
 // Database types (to be generated with Supabase CLI)
 export type Database = {

@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { render, waitFor, act } from '@testing-library/react-native';
 import { AuthProvider, useAuth } from '../AuthContext';
-import { AppState, type AppStateEvent, type AppStateStatus, type NativeEventSubscription } from 'react-native';
+import { AppState, type AppStateEvent, type AppStateStatus } from 'react-native';
 import { supabase as mockedSupabase } from '@/lib/supabase';
 import type { Session, User } from '@supabase/supabase-js';
 
@@ -11,9 +11,9 @@ const unsubscribeMock = jest.fn();
 let mockAppStateHandler: ((state: AppStateStatus) => void) | null = null;
 const mockRemoveListener = jest.fn();
 const addEventListenerSpy = jest.spyOn(AppState, 'addEventListener');
-addEventListenerSpy.mockImplementation((_event: AppStateEvent, handler: (state: AppStateStatus) => void): NativeEventSubscription => {
+addEventListenerSpy.mockImplementation((_event: AppStateEvent, handler: (state: AppStateStatus) => void) => {
   mockAppStateHandler = handler;
-  return { remove: mockRemoveListener } as unknown as NativeEventSubscription;
+  return { remove: mockRemoveListener };
 });
 
 const mockSupabaseAuth = {
@@ -49,9 +49,9 @@ describe('AuthContext', () => {
     unsubscribeMock.mockReset();
     mockRemoveListener.mockReset();
     addEventListenerSpy.mockClear();
-    addEventListenerSpy.mockImplementation((_event: AppStateEvent, handler: (state: AppStateStatus) => void): NativeEventSubscription => {
+    addEventListenerSpy.mockImplementation((_event: AppStateEvent, handler: (state: AppStateStatus) => void) => {
       mockAppStateHandler = handler;
-      return { remove: mockRemoveListener } as unknown as NativeEventSubscription;
+      return { remove: mockRemoveListener };
     });
 
     Object.values(mockSupabaseAuth).forEach((fn) => {

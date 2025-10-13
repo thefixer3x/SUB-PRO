@@ -75,6 +75,10 @@ export const FieldMappingComponent: React.FC<FieldMappingComponentProps> = ({
     const isExpanded = expandedDropdown === field.key;
     const selectedIndex = mapping[field.key];
     const selectedHeader = selectedIndex !== null ? headers[selectedIndex] : null;
+    const chevronContainerStyle = StyleSheet.flatten([
+      styles.chevron,
+      isExpanded ? styles.chevronRotated : undefined,
+    ]);
 
     return (
       <View key={field.key} style={styles.mappingRow}>
@@ -104,11 +108,9 @@ export const FieldMappingComponent: React.FC<FieldMappingComponentProps> = ({
           ]}>
             {selectedHeader || 'Select column...'}
           </Text>
-          <ChevronDown 
-            size={16} 
-            color="#64748B" 
-            style={[styles.chevron, isExpanded ? styles.chevronRotated : undefined] as any} 
-          />
+          <View style={chevronContainerStyle}>
+            <ChevronDown size={16} color="#64748B" />
+          </View>
         </TouchableOpacity>
 
         {isExpanded && (
