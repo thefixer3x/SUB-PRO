@@ -184,6 +184,7 @@ main() {
             migrate_database
             generate_types
             build_app
+            deploy_netlify
             validate_deployment
             print_success "Full deployment completed! 🎉"
             ;;
