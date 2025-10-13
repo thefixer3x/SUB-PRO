@@ -1051,7 +1051,7 @@ const createStyles = (colors: ThemeColors, themeName: string) => {
     maxWidth: 1000,
     alignSelf: 'center',
     paddingHorizontal: 15, // Increased padding to prevent edge overlapping
-    marginVertical: 20, // Increased vertical margin for better spacing
+    marginTop: 20, // Increased vertical margin for better spacing
     marginBottom: 40, // Extra bottom margin to prevent overlap with next section
   },
   testimonialGrid: {
