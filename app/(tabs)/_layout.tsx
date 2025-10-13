@@ -1,19 +1,40 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { LayoutDashboard, CreditCard, BarChart3, Settings, Crown, Store, BarChart2, Users, Shield } from 'lucide-react-native';
-import { View, Platform, Dimensions } from 'react-native';
+import { ActivityIndicator, View, Platform, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useAuth } from '@/contexts/AuthContext';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375; // iPhone SE and smaller Android phones
 
 export default function TabLayout() {
+  const { session, isInitializing } = useAuth();
   const { currentTier } = useSubscription();
   const insets = useSafeAreaInsets();
 
   // Calculate dynamic tab bar height with safe area
   const tabBarHeight = Platform.OS === 'ios' ? 70 + insets.bottom : 70;
   const tabBarPaddingBottom = Platform.OS === 'ios' ? insets.bottom + 8 : 8;
+
+  if (isInitializing) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: '#F8FAFC',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <ActivityIndicator size="large" color="#3B82F6" />
+      </View>
+    );
+  }
+
+  if (!session) {
+    return <Redirect href="/(auth)/signin" />;
+  }
 
   return (
     <Tabs
@@ -45,7 +66,7 @@ export default function TabLayout() {
           title: 'Dashboard',
           tabBarIcon: ({ size, color }) => (
             <View>
-              <LayoutDashboard size={isSmallScreen ? 20 : size} color={color} />
+              <LayoutDashboard size={isSmallScreen ? 20 : size} stroke={color} />
             </View>
           ),
         }}
@@ -56,7 +77,7 @@ export default function TabLayout() {
           title: 'Subscriptions',
           tabBarIcon: ({ size, color }) => (
             <View>
-              <CreditCard size={isSmallScreen ? 20 : size} color={color} />
+              <CreditCard size={isSmallScreen ? 20 : size} stroke={color} />
             </View>
           ),
         }}
@@ -67,7 +88,7 @@ export default function TabLayout() {
           title: 'Analytics',
           tabBarIcon: ({ size, color }) => (
             <View>
-              <BarChart3 size={isSmallScreen ? 20 : size} color={color} />
+              <BarChart3 size={isSmallScreen ? 20 : size} stroke={color} />
               {currentTier === 'free' && (
                 <View style={{
                   position: 'absolute',
@@ -89,7 +110,7 @@ export default function TabLayout() {
           title: 'Cards',
           tabBarIcon: ({ size, color }) => (
             <View>
-              <Shield size={isSmallScreen ? 20 : size} color={color} />
+              <Shield size={isSmallScreen ? 20 : size} stroke={color} />
             </View>
           ),
           // Hide on very small screens to reduce tab crowding
@@ -102,7 +123,7 @@ export default function TabLayout() {
           title: 'Community',
           tabBarIcon: ({ size, color }) => (
             <View>
-              <BarChart2 size={isSmallScreen ? 20 : size} color={color} />
+              <BarChart2 size={isSmallScreen ? 20 : size} stroke={color} />
             </View>
           ),
           // Hide on very small screens to reduce tab crowding
@@ -115,7 +136,7 @@ export default function TabLayout() {
           title: 'Sharing',
           tabBarIcon: ({ size, color }) => (
             <View>
-              <Users size={isSmallScreen ? 20 : size} color={color} />
+              <Users size={isSmallScreen ? 20 : size} stroke={color} />
             </View>
           ),
           // Hide on very small screens to reduce tab crowding
@@ -128,7 +149,7 @@ export default function TabLayout() {
           title: 'Marketplace',
           tabBarIcon: ({ size, color }) => (
             <View>
-              <Store size={isSmallScreen ? 20 : size} color={color} />
+              <Store size={isSmallScreen ? 20 : size} stroke={color} />
             </View>
           ),
           // Hide on very small screens to reduce tab crowding
@@ -141,7 +162,7 @@ export default function TabLayout() {
           title: 'Settings',
           tabBarIcon: ({ size, color }) => (
             <View>
-              <Settings size={isSmallScreen ? 20 : size} color={color} />
+              <Settings size={isSmallScreen ? 20 : size} stroke={color} />
             </View>
           ),
         }}
@@ -152,7 +173,7 @@ export default function TabLayout() {
           title: currentTier === 'free' ? 'Upgrade' : 'Account',
           tabBarIcon: ({ size, color }) => (
             <View>
-              <Crown size={isSmallScreen ? 20 : size} color={currentTier === 'free' ? '#F59E0B' : color} />
+              <Crown size={isSmallScreen ? 20 : size} stroke={currentTier === 'free' ? '#F59E0B' : color} />
             </View>
           ),
         }}

@@ -49,3 +49,7 @@ yarn-error.*
 google-service-account.json
 credentials.json
 cohesive-mender-459104-c3-abc562777578.json
+.qwen/
+**/.qwen/
+.qwen/
+**/.qwen/

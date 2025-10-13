@@ -12,4 +12,6 @@ config.resolver.blockList = [
 // Don't try to resolve Node.js modules in React Native
 config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
 
+config.resolver.sourceExts = [...config.resolver.sourceExts, 'jsx', 'js', 'ts', 'tsx'];
+
 module.exports = config;
