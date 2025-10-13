@@ -66,7 +66,7 @@ supabase link --project-ref YOUR_PROJECT_REF
 supabase db push
 
 # 4. Generate TypeScript types
-supabase gen types typescript --project-id YOUR_PROJECT_ID > lib/supabase-generated.ts
+supabase gen types typescript --project-ref YOUR_PROJECT_REF > lib/supabase-generated.ts
 ```
 
 ### **Step 2: Environment Variables**
