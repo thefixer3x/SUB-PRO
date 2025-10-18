@@ -716,7 +716,12 @@ const PricingCard = ({ tier, index, colors }: { tier: any; index: number; colors
         marginTop: tier.popular ? 20 : 10, // Extra margin for popular badge
         marginHorizontal: 5, // Add horizontal margin to prevent overlapping
       },
-      tier.popular && { } // Reduce scale to prevent overlap
+      tier.popular
+        ? {
+            transform: [{ scale: Platform.OS === 'web' ? 1.02 : 1.01 }],
+            zIndex: 2, // Keep popular tier visually on top without clipping
+          }
+        : null,
     ]}>
       {tier.popular && (
         <View style={{
