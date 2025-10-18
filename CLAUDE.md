@@ -5,7 +5,7 @@
 This project is configured with an EAS Robot Token for automated builds and deployments.
 
 ### GitHub Secrets Configured:
-- `EAS_ROBOT_TOKEN`: `y0KiSuc9mkqi5dJuHs3ByLzUTocRxHFsYs73tdhW`
+- `EAS_ROBOT_TOKEN`: `<set-in-github-secrets>`
 - All AdMob credentials (ADMOB_APP_ID, ADMOB_BANNER_ID, etc.)
 - Stripe and Supabase environment variables
 

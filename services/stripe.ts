@@ -212,10 +212,15 @@ class StripeService {
   }
 }
 
-// Initialize Stripe service
+const publishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+
+if (!publishableKey) {
+  console.warn('EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY is not defined. Stripe features will be limited.');
+}
+
+// Initialize Stripe service with safe client-side configuration
 export const stripeService = new StripeService({
-  publishableKey: process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_...', // Test key
-  secretKey: process.env.STRIPE_SECRET_KEY, // Should only be used server-side
+  publishableKey: publishableKey ?? '',
 });
 
 export default stripeService;

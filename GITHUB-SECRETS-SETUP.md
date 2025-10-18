@@ -10,21 +10,21 @@ Navigate to: **SUB-PRO Repository** → **Settings** → **Secrets and variables
 
 ### Core Authentication
 ```
-EAS_ROBOT_TOKEN = y0KiSuc9mkqi5dJuHs3ByLzUTocRxHFsYs73tdhW
+EAS_ROBOT_TOKEN = <set-in-github-secrets>
 ```
 
 ### Supabase Configuration  
 ```
-SUPABASE_URL = https://your-project.supabase.co
-SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_PRODUCTION_URL = https://your-prod-project.supabase.co
-SUPABASE_PRODUCTION_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_URL = https://<your-project>.supabase.co
+SUPABASE_ANON_KEY = <your-supabase-anon-key>
+SUPABASE_PRODUCTION_URL = https://<your-prod-project>.supabase.co
+SUPABASE_PRODUCTION_ANON_KEY = <your-prod-anon-key>
 ```
 
 ### Stripe Payments
 ```
-STRIPE_PUBLISHABLE_KEY = pk_test_51IqmwEF6R3sAq2DlTHisUmo6TTLhNQGsYZMNdL3lIu3aNeQaXpMaoKPaymCNUsCtKFgYZGr7VZoKPiZYLmZxqTLQ00aNlRTSLp
-STRIPE_LIVE_PUBLISHABLE_KEY = pk_live_...
+STRIPE_PUBLISHABLE_KEY = <your-stripe-test-publishable-key>
+STRIPE_LIVE_PUBLISHABLE_KEY = <your-stripe-live-publishable-key>
 ```
 
 ### AdMob Monetization
@@ -62,7 +62,7 @@ ADSENSE_SLOT_ID = YOUR_SLOT_ID
   "submit": {
     "production": {
       "ios": {
-        "appleId": "frill.roundup_3x@icloud.com",
+        "appleId": "<your-apple-id>",
         "ascAppId": "YOUR_ACTUAL_APP_ID_FROM_APP_STORE_CONNECT",
         "appleTeamId": "5D9V25DXPB"
       }

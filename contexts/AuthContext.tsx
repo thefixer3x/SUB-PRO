@@ -55,14 +55,16 @@ const createMockUser = (email: string, fullName?: string): User => {
   } as unknown as User;
 };
 
+const generateMockToken = () => `mock-${Math.random().toString(36).slice(2)}`;
+
 const createMockSession = (user: User): Session => {
   const expiresAt = Math.round(Date.now() / 1000) + 60 * 60;
   return {
-    access_token: 'mock-access-token',
+    access_token: generateMockToken(),
     token_type: 'bearer',
     expires_in: 60 * 60,
     expires_at: expiresAt,
-    refresh_token: 'mock-refresh-token',
+    refresh_token: generateMockToken(),
     user,
     provider_token: null,
   } as unknown as Session;
