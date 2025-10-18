@@ -35,7 +35,7 @@
 - Discovered billing issue - failed builds were costing money
 - Created and configured EAS Robot Token for non-interactive builds
 - Updated GitHub Actions to use robot token instead of personal token
-- Token value: `y0KiSuc9mkqi5dJuHs3ByLzUTocRxHFsYs73tdhW` (later revoked)
+- Token value: `<redacted>` (later revoked)
 
 ### 5. **Cost-Saving Measures** ✅
 - Created comprehensive pre-build validation script (`scripts/pre-build-check.sh`)
@@ -51,7 +51,7 @@
 - GitGuardian detected the exposure
 - Immediately removed sensitive file and updated `.gitignore`
 - Guided user through token revocation process
-- Successfully replaced with new token: `AUr80maP5onM2QPUOYoQESTSxI43s2KJN-wvXUxG`
+- Successfully replaced with new token: `<redacted>`
 
 ### 7. **Production Builds Success** ✅
 - Both iOS and Android production builds completed successfully

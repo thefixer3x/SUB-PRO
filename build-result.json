@@ -27,7 +27,7 @@
     "appBuildVersion": "1",
     "runtimeVersion": "exposdk:53.0.0",
     "gitCommitHash": "1769faed220036da3f1b19fa8be45597bbad2273",
-    "gitCommitMessage": "security: Remove exposed token and prevent future exposure\n\n- Add .claude/ to .gitignore to prevent accidental token exposure\n- Remove .claude/settings.local.json from git tracking\n- Token y0KiSuc9mkqi5dJuHs3ByLzUTocRxHFsYs73tdhW needs to be revoked\n\nThis fixes the security issue where robot token was accidentally committed.",
+    "gitCommitMessage": "security: Remove exposed token and prevent future exposure\n\n- Add .claude/ to .gitignore to prevent accidental token exposure\n- Remove .claude/settings.local.json from git tracking\n- Previously committed robot token (redacted) needs to be revoked\n\nThis fixes the security issue where robot token was accidentally committed.",
     "priority": "HIGH",
     "createdAt": "2025-07-08T01:18:13.653Z",
     "updatedAt": "2025-07-08T01:29:09.357Z",
