@@ -8,6 +8,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
+        "EAS_NO_BUN": "1",
         "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "@STRIPE_TEST_PUBLISHABLE_KEY",
         "EXPO_PUBLIC_ADMOB_APP_ID": "ca-app-pub-3940256099942544~3347511713",
         "EXPO_PUBLIC_ADMOB_BANNER_ID": "@ADMOB_BANNER_ID",
@@ -32,6 +33,7 @@
       "distribution": "internal",
       "channel": "preview",
       "env": {
+        "EAS_NO_BUN": "1",
         "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "@STRIPE_TEST_PUBLISHABLE_KEY",
         "EXPO_PUBLIC_ADMOB_APP_ID": "ca-app-pub-3940256099942544~3347511713",
         "EXPO_PUBLIC_ADMOB_BANNER_ID": "@ADMOB_BANNER_ID",
@@ -52,6 +54,7 @@
     "production": {
       "channel": "production",
       "env": {
+        "EAS_NO_BUN": "1",
         "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "@STRIPE_PUBLISHABLE_KEY",
         "EXPO_PUBLIC_ADMOB_APP_ID": "@ADMOB_APP_ID",
         "EXPO_PUBLIC_ADMOB_BANNER_ID": "@ADMOB_BANNER_ID",
@@ -80,6 +83,7 @@
       "extends": "production",
       "channel": "production",
       "env": {
+        "EAS_NO_BUN": "1",
         "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "@STRIPE_LIVE_PUBLISHABLE_KEY",
         "EXPO_PUBLIC_ADMOB_APP_ID": "@ADMOB_LIVE_APP_ID",
         "EXPO_PUBLIC_ADMOB_BANNER_ID": "@ADMOB_LIVE_BANNER_ID",

@@ -58,11 +58,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
         
-      - name: Validate Expo configuration
+      - name: Expo Config Check
         run: |
-          echo "🔍 Validating Expo configuration..."
-          npx expo config --type prebuild > /dev/null 2>&1 || echo "Config validation completed"
-          npx expo doctor || echo "Doctor check completed"
+          echo "🔍 Running expo config --type public"
+          npx expo config --type public
+
+      - name: Expo Doctor
+        run: |
+          echo "🩺 Running expo-doctor"
+          npx expo-doctor || echo "expo-doctor reported issues; review output above"
+        continue-on-error: true
           
       - name: Check build conditions
         id: check
