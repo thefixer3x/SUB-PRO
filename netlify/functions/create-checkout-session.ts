@@ -31,6 +31,17 @@ export const handler: NetlifyHandler = async (event) => {
   }
 
   if (event.httpMethod !== 'POST') {
+    if (event.httpMethod === 'GET' || event.httpMethod === 'HEAD') {
+      return {
+        statusCode: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+        },
+        body: JSON.stringify({ status: 'ok', uptime: process.uptime?.() ?? null, timestamp: new Date().toISOString() }),
+      };
+    }
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
 

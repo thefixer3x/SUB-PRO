@@ -14,6 +14,20 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 # Stripe Configuration
 EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
 
+# API Gateway Configuration
+EXPO_PUBLIC_API_BASE_URL=https://your-primary-function-host/.netlify/functions
+# Optional secondary endpoint used when the primary host is unavailable
+EXPO_PUBLIC_API_FALLBACK_URL=https://your-backup-function-host/.netlify/functions
+# Optional explicit checkout endpoint (only needed if it differs from `${EXPO_PUBLIC_API_BASE_URL}/create-checkout-session`)
+EXPO_PUBLIC_CHECKOUT_URL=https://your-primary-function-host/.netlify/functions/create-checkout-session
+# Optional override if your checkout host should differ from the shared API base
+EXPO_PUBLIC_CHECKOUT_BASE_URL=https://your-primary-function-host/.netlify/functions
+EXPO_PUBLIC_CHECKOUT_FALLBACK_BASE_URL=https://your-backup-function-host/.netlify/functions
+EXPO_PUBLIC_CHECKOUT_FALLBACK_URL=https://your-backup-function-host/.netlify/functions/create-checkout-session
+# Embedded finance (virtual card) API host. Defaults to the shared API base when omitted.
+EXPO_PUBLIC_EMBEDDED_FINANCE_API_BASE_URL=https://your-primary-function-host/.netlify/functions
+EXPO_PUBLIC_EMBEDDED_FINANCE_API_FALLBACK_URL=https://your-backup-function-host/.netlify/functions
+
 # AdMob Configuration (Optional)
 EXPO_PUBLIC_ADMOB_APP_ID=your_admob_app_id
 EXPO_PUBLIC_ADMOB_BANNER_ID=your_admob_banner_id
@@ -38,6 +52,7 @@ Need to force the mock flow even though credentials are present (for example, du
 ## Obtaining the values
 
 1. **Supabase Configuration**:
+
    - Go to your Supabase project dashboard
    - Copy the Project URL from Project Settings > API
    - Copy the anon key from Project Settings > API

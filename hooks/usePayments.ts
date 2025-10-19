@@ -4,8 +4,9 @@ import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@/contexts/AuthContext';
 import { SubscriptionTier } from '@/types/monetization';
 import { SUBSCRIPTION_PLANS } from '@/config/subscriptionPlans';
+import { buildApiBases, requestWithFallback } from '@/lib/apiClient';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL as string;
+const unique = <T,>(values: T[]): T[] => values.filter((value, index) => values.indexOf(value) === index);
 
 export const usePayments = () => {
   const { user } = useAuth();
@@ -14,38 +15,58 @@ export const usePayments = () => {
 
   const startUpgrade = useCallback(async (targetTier?: SubscriptionTier) => {
     setError(null);
-    
+
     if (!user?.id) {
       setError('You must be logged in to upgrade.');
       return;
     }
 
-    if (!API_BASE) {
-      setError('API configuration is missing.');
+    const includeRelative = Platform.OS === 'web' && typeof window !== 'undefined';
+    const baseCandidates = buildApiBases(
+      [
+        process.env.EXPO_PUBLIC_CHECKOUT_BASE_URL,
+        process.env.EXPO_PUBLIC_CHECKOUT_FALLBACK_BASE_URL,
+        process.env.EXPO_PUBLIC_API_BASE_URL,
+        process.env.EXPO_PUBLIC_API_FALLBACK_URL,
+      ],
+      { includeRelative: false }
+    );
+
+    const directUrls = unique(
+      [
+        process.env.EXPO_PUBLIC_CHECKOUT_URL?.trim(),
+        process.env.EXPO_PUBLIC_CHECKOUT_FALLBACK_URL?.trim(),
+        includeRelative ? '/api/create-checkout-session' : null,
+      ].filter((value): value is string => Boolean(value))
+    );
+
+    if (!directUrls.length && !baseCandidates.length && !includeRelative) {
+      setError('Payment endpoint configuration is missing.');
       return;
     }
 
     setIsLoading(true);
-    
+
     try {
       const plan = targetTier ? SUBSCRIPTION_PLANS[targetTier] : SUBSCRIPTION_PLANS['pro'];
-      
-      const response = await fetch(`${API_BASE}/create-checkout-session`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          userId: user.id, 
-          email: (user as any).email || user.id, 
-          plan: targetTier ?? 'pro' 
-        }),
-      });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await requestWithFallback<{ url: string }>(
+        '/create-checkout-session',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            email: (user as any).email || user.id,
+            plan: targetTier ?? 'pro',
+          }),
+        },
+        {
+          bases: baseCandidates,
+          urls: directUrls,
+          allowRelative: includeRelative,
+        }
+      );
 
       if (!data.url) {
         throw new Error('No checkout URL received');
@@ -71,14 +92,14 @@ export const usePayments = () => {
 
   const openCustomerPortal = useCallback(async () => {
     setError(null);
-    
+
     if (!user?.id) {
       setError('You must be logged in.');
       return;
     }
 
     setIsLoading(true);
-    
+
     try {
       // TODO: Implement customer portal endpoint
       const message = 'Customer portal coming soon. Please contact support.';
@@ -95,14 +116,14 @@ export const usePayments = () => {
 
   const cancelSubscription = useCallback(async () => {
     setError(null);
-    
+
     if (!user?.id) {
       setError('You must be logged in.');
       return;
     }
 
     setIsLoading(true);
-    
+
     try {
       // TODO: Implement cancellation endpoint
       const message = 'Cancellation via portal coming soon. Please contact support.';
