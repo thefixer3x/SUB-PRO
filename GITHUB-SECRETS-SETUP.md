@@ -9,11 +9,13 @@ Your $100 EAS plan expires soon and credits are nearly exhausted. This guide hel
 Navigate to: **SUB-PRO Repository** → **Settings** → **Secrets and variables** → **Actions**
 
 ### Core Authentication
+
 ```
 EAS_ROBOT_TOKEN = y0KiSuc9mkqi5dJuHs3ByLzUTocRxHFsYs73tdhW
 ```
 
-### Supabase Configuration  
+### Supabase Configuration
+
 ```
 SUPABASE_URL = https://your-project.supabase.co
 SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
@@ -22,12 +24,14 @@ SUPABASE_PRODUCTION_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
 ### Stripe Payments
+
 ```
-STRIPE_PUBLISHABLE_KEY = pk_test_51IqmwEF6R3sAq2DlTHisUmo6TTLhNQGsYZMNdL3lIu3aNeQaXpMaoKPaymCNUsCtKFgYZGr7VZoKPiZYLmZxqTLQ00aNlRTSLp
-STRIPE_LIVE_PUBLISHABLE_KEY = pk_live_...
+STRIPE_PUBLISHABLE_KEY = pk_test_REDACTED
+STRIPE_LIVE_PUBLISHABLE_KEY = pk_live_REDACTED
 ```
 
 ### AdMob Monetization
+
 ```
 ADMOB_APP_ID = ca-app-pub-3940256099942544~3347511713
 ADMOB_BANNER_ID = ca-app-pub-3940256099942544/6300978111
@@ -42,6 +46,7 @@ ADMOB_LIVE_REWARDED_ID = ca-app-pub-YOUR_LIVE_APP_ID/YOUR_LIVE_REWARDED_ID
 ```
 
 ### AdSense (Optional)
+
 ```
 ADSENSE_PUBLISHER_ID = pub-YOUR_PUBLISHER_ID
 ADSENSE_SLOT_ID = YOUR_SLOT_ID
@@ -52,6 +57,7 @@ ADSENSE_SLOT_ID = YOUR_SLOT_ID
 **Current Issue**: eas.json has placeholder values for iOS submission.
 
 ### Fix Required:
+
 1. Go to [App Store Connect](https://appstoreconnect.apple.com)
 2. Create new app entry for SUB-PRO
 3. Get the App Store Connect App ID
@@ -74,6 +80,7 @@ ADSENSE_SLOT_ID = YOUR_SLOT_ID
 ## 🚀 Zero-Credit Deployment Options
 
 ### Option 1: Manual Submission (Recommended)
+
 ```bash
 # Download the existing successful build
 # iOS: https://expo.dev/artifacts/eas/build-id.ipa
@@ -81,12 +88,14 @@ ADSENSE_SLOT_ID = YOUR_SLOT_ID
 ```
 
 ### Option 2: Automated Submission (Once secrets configured)
+
 ```bash
 # Uses existing build, no new credits
 eas submit --platform ios --id 4e42128c-61c4-4e07-8b39-faa30142bd4f
 ```
 
 ### Option 3: GitHub Workflow (Once secrets configured)
+
 ```bash
 # Trigger build + submission via GitHub
 gh workflow run enhanced-eas-build.yml -f platform=ios -f profile=production
@@ -109,11 +118,13 @@ gh workflow run enhanced-eas-build.yml -f platform=ios -f profile=production
 ## 🔧 Workflow Status
 
 **Fixed Issues:**
+
 - ✅ npm ci error → Now uses Bun consistently
 - ✅ Pre-build validation → Updated to Bun setup
 - ✅ EAS robot token → Already configured in CLAUDE.md
 
 **Remaining Setup:**
+
 - ⏳ GitHub secrets configuration
 - ⏳ App Store Connect app creation
 - ⏳ Real ascAppId in eas.json

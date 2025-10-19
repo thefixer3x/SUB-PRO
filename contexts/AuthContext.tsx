@@ -19,6 +19,54 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+const isDevEnvironment =
+  (typeof __DEV__ !== 'undefined' && __DEV__) || process.env.NODE_ENV !== 'production';
+const forceMockAuthFlag =
+  (process.env.EXPO_PUBLIC_ENABLE_MOCK_AUTH ?? process.env.EXPO_PUBLIC_USE_MOCK_AUTH ?? process.env.NEXT_PUBLIC_USE_MOCK_AUTH ?? '')
+    .toString()
+    .toLowerCase() === 'true';
+
+const mockDelay = (duration = 450) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, duration);
+  });
+
+const createMockUser = (email: string, fullName?: string): User => {
+  const now = new Date().toISOString();
+  return {
+    id: `mock-user-${Math.random().toString(36).slice(2, 10)}`,
+    app_metadata: { provider: 'email', providers: ['email'] },
+    aud: 'authenticated',
+    created_at: now,
+    user_metadata: {
+      full_name: fullName ?? email.split('@')[0] ?? 'Mock User',
+    },
+    email,
+    phone: '',
+    confirmation_sent_at: now,
+    confirmed_at: now,
+    email_confirmed_at: now,
+    phone_confirmed_at: now,
+    last_sign_in_at: now,
+    factor_ids: [],
+    identities: [],
+    // Casting is necessary because the Supabase User type includes readonly internal fields
+  } as unknown as User;
+};
+
+const createMockSession = (user: User): Session => {
+  const expiresAt = Math.round(Date.now() / 1000) + 60 * 60;
+  return {
+    access_token: 'mock-access-token',
+    token_type: 'bearer',
+    expires_in: 60 * 60,
+    expires_at: expiresAt,
+    refresh_token: 'mock-refresh-token',
+    user,
+    provider_token: null,
+  } as unknown as Session;
+};
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -33,12 +81,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const initialiseSession = async () => {
-      try {
-  const shouldUseMockAuth = (forceMockAuthFlag || !isSupabaseEnvConfigured) && isDevEnvironment;
+  // Only use mock auth if explicitly enabled via EXPO_PUBLIC_ENABLE_MOCK_AUTH=true
+  // Never use mock in production, even if Supabase is misconfigured
+  const shouldUseMockAuth = forceMockAuthFlag && isDevEnvironment;
 
   useEffect(() => {
     let isMounted = true;
