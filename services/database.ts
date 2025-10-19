@@ -16,7 +16,7 @@ class DatabaseService {
     }
 
     // Use service role key for server-side operations
-    this.supabase = createClient<Database>(supabaseUrl, serviceRoleKey, {
+    this.supabase = createClient<Database, 'public'>(supabaseUrl, serviceRoleKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
@@ -179,7 +179,7 @@ class DatabaseService {
         .from('profiles')
         .select('id')
         .eq('stripe_customer_id', stripeCustomerId)
-        .single<{ id: string }>();
+        .single();
 
       if (error || !data) {
         console.log('User not found by stripe customer ID:', stripeCustomerId);
@@ -204,10 +204,10 @@ class DatabaseService {
     subscription_id?: string;
   }) {
     try {
-      console.log('Storing payment record:', { 
-        userId: paymentData.user_id, 
-        amount: paymentData.amount, 
-        status: paymentData.status 
+      console.log('Storing payment record:', {
+        userId: paymentData.user_id,
+        amount: paymentData.amount,
+        status: paymentData.status
       });
 
       const { data, error } = await this
