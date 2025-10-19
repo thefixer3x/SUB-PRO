@@ -15,7 +15,7 @@ const dedupe = (values: string[]) => {
 };
 
 export const buildApiBases = (
-  candidates: Array<string | undefined | null>,
+  candidates: (string | undefined | null)[],
   { includeRelative = true }: { includeRelative?: boolean } = {}
 ): string[] => {
   const bases: string[] = [];
