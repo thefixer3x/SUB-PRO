@@ -64,7 +64,7 @@ const createStorageAdapter = () => {
 };
 
 // Create Supabase client with proper storage
-export const supabase = createClient<Database>(effectiveSupabaseUrl, effectiveSupabaseAnonKey, {
+export const supabase = createClient<Database, 'public'>(effectiveSupabaseUrl, effectiveSupabaseAnonKey, {
   auth: {
     storage: createStorageAdapter(),
     autoRefreshToken: true,

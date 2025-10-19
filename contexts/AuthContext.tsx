@@ -1,18 +1,38 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import type { ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { AppState, type AppStateStatus } from 'react-native';
-import { supabase, type Database, isSupabaseEnvConfigured } from '@/lib/supabase';
+import {
+  supabase,
+  type Database,
+  isSupabaseEnvConfigured,
+} from '@/lib/supabase';
 
 interface AuthContextValue {
   session: Session | null;
   user: User | null;
   isInitializing: boolean;
   authLoading: boolean;
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signUp: (
-    params: { email: string; password: string; fullName?: string }
-  ) => Promise<{ success: boolean; error?: string; requiresEmailConfirmation?: boolean }>;
+  signIn: (
+    email: string,
+    password: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  signUp: (params: {
+    email: string;
+    password: string;
+    fullName?: string;
+  }) => Promise<{
+    success: boolean;
+    error?: string;
+    requiresEmailConfirmation?: boolean;
+  }>;
   signOut: () => Promise<{ success: boolean; error?: string }>;
   refreshSession: () => Promise<void>;
 }
@@ -20,9 +40,15 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const isDevEnvironment =
-  (typeof __DEV__ !== 'undefined' && __DEV__) || process.env.NODE_ENV !== 'production';
+  (typeof __DEV__ !== 'undefined' && __DEV__) ||
+  process.env.NODE_ENV !== 'production';
 const forceMockAuthFlag =
-  (process.env.EXPO_PUBLIC_ENABLE_MOCK_AUTH ?? process.env.EXPO_PUBLIC_USE_MOCK_AUTH ?? process.env.NEXT_PUBLIC_USE_MOCK_AUTH ?? '')
+  (
+    process.env.EXPO_PUBLIC_ENABLE_MOCK_AUTH ??
+    process.env.EXPO_PUBLIC_USE_MOCK_AUTH ??
+    process.env.NEXT_PUBLIC_USE_MOCK_AUTH ??
+    ''
+  )
     .toString()
     .toLowerCase() === 'true';
 
@@ -99,7 +125,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         // Check if Supabase is properly configured
         if (!isSupabaseEnvConfigured) {
-          console.warn('Supabase not configured, skipping session initialization');
+          console.warn(
+            'Supabase not configured, skipping session initialization'
+          );
           if (isMounted) {
             setIsInitializing(false);
           }
@@ -129,15 +157,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     void initialiseSession();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      if (!isMounted) {
-        return;
-      }
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, nextSession) => {
+        if (!isMounted) {
+          return;
+        }
 
-      setSession(nextSession);
-      setUser(nextSession?.user ?? null);
-      setIsInitializing(false);
-    });
+        setSession(nextSession);
+        setUser(nextSession?.user ?? null);
+        setIsInitializing(false);
+      }
+    );
 
     return () => {
       isMounted = false;
@@ -171,7 +201,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error('Error during sign in', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to sign in. Please try again.',
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to sign in. Please try again.',
       };
     } finally {
       setAuthLoading(false);
@@ -179,7 +212,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signUp = useCallback(
-    async ({ email, password, fullName }: { email: string; password: string; fullName?: string }) => {
+    async ({
+      email,
+      password,
+      fullName,
+    }: {
+      email: string;
+      password: string;
+      fullName?: string;
+    }) => {
       setAuthLoading(true);
       try {
         const { data, error } = await supabase.auth.signUp({
@@ -199,24 +240,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userId = data.user?.id;
         if (userId) {
           const now = new Date().toISOString();
-          const profilePayload: Database['public']['Tables']['profiles']['Insert'] = {
-            id: userId,
-            email,
-            full_name: fullName ?? null,
-            subscription_tier: 'free',
-            updated_at: now,
-          };
+          const profilePayload: Database['public']['Tables']['profiles']['Insert'] =
+            {
+              id: userId,
+              email,
+              full_name: fullName ?? null,
+              subscription_tier: 'free',
+              updated_at: now,
+            };
 
           // Use Supabase generics for type safety
-          const { error: profileError } = await supabase
-            .from<Database['public']['Tables']['profiles']['Insert']>('profiles')
-            .upsert(
-              profilePayload,
-              { onConflict: 'id' },
-            );
+          const PROFILES_TABLE: keyof Database['public']['Tables'] = 'profiles';
+
+          const upsertResult = await (
+            supabase.from(PROFILES_TABLE) as unknown as {
+              upsert: (
+                values: Database['public']['Tables']['profiles']['Insert'],
+                options: { onConflict: string }
+              ) => Promise<{ error?: unknown }>;
+            }
+          ).upsert(profilePayload, { onConflict: 'id' });
+
+          const profileError =
+            (upsertResult as { error?: unknown }).error ?? null;
 
           if (profileError) {
-            console.warn('Failed to create profile after sign up', profileError);
+            console.warn(
+              'Failed to create profile after sign up',
+              profileError
+            );
           }
         }
 
@@ -233,13 +285,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error('Error during sign up', error);
         return {
           success: false,
-          error: error instanceof Error ? error.message : 'Failed to sign up. Please try again.',
+          error:
+            error instanceof Error
+              ? error.message
+              : 'Failed to sign up. Please try again.',
         };
       } finally {
         setAuthLoading(false);
       }
     },
-    [],
+    []
   );
 
   const signOut = useCallback(async () => {
@@ -257,7 +312,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error('Error during sign out', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to sign out. Please try again.',
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to sign out. Please try again.',
       };
     } finally {
       setAuthLoading(false);
@@ -286,7 +344,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    const subscription = AppState.addEventListener(
+      'change',
+      handleAppStateChange
+    );
 
     return () => {
       subscription.remove();
@@ -304,7 +365,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       signOut,
       refreshSession,
     }),
-    [authLoading, isInitializing, session, signIn, signOut, signUp, refreshSession, user],
+    [
+      authLoading,
+      isInitializing,
+      session,
+      signIn,
+      signOut,
+      signUp,
+      refreshSession,
+      user,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
