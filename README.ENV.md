@@ -13,6 +13,8 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 # Stripe Configuration
 EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
+STRIPE_SECRET_KEY=your_stripe_secret_key # required for Netlify/Supabase functions
+STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret # needed by /.netlify/functions/stripe-webhook
 
 # API Gateway Configuration
 EXPO_PUBLIC_API_BASE_URL=https://your-primary-function-host/.netlify/functions
@@ -64,6 +66,15 @@ Need to force the mock flow even though credentials are present (for example, du
 ## Testing your configuration
 
 Run `npm run test-supabase` to verify that your environment variables are properly set.
+
+For server-side functions (Netlify, Supabase Edge, or local testing with `netlify dev`), ensure the following variables are also configured in the platform's dashboard or your local shell:
+
+```
+STRIPE_SECRET_KEY=sk_live_or_test_key
+STRIPE_WEBHOOK_SECRET=whsec_...
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+SITE_URL=https://your-primary-domain.example (used for Stripe success/cancel URLs)
+```
 
 ## For deployment
 

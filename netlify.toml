@@ -7,6 +7,24 @@
   node_bundler = "esbuild"
 
 [[redirects]]
+  from = "/embedded-finance/virtual-cards"
+  to = "/.netlify/functions/embedded-finance-virtual-cards"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/embedded-finance/virtual-cards/*"
+  to = "/.netlify/functions/embedded-finance-virtual-cards/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/stripe/webhook"
+  to = "/.netlify/functions/stripe-webhook"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '@/lib/supabase';
+import type { Database } from '../lib/supabase';
 
 // Server-side database service for webhook handlers
 // This maintains the existing security model by only accessing server-side environment variables
