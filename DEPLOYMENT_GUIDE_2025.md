@@ -54,8 +54,6 @@ eas secret:list
 **Backend-only secrets** (NEVER exposed to client):
 
 ```bash
-# Stripe SECRET key (backend only!)
-netlify env:set STRIPE_SECRET_KEY "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"
 
 # Supabase for backend functions
 netlify env:set SUPABASE_URL "https://mxtsdgkwzjzlttpotole.supabase.co"
