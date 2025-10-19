@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { AppState, type AppStateStatus } from 'react-native';
-import { supabase, type Database } from '@/lib/supabase';
+import { supabase, type Database, isSupabaseEnvConfigured } from '@/lib/supabase';
 
 interface AuthContextValue {
   session: Session | null;

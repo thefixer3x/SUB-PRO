@@ -4,7 +4,8 @@ import { Platform } from 'react-native';
 
 // Supabase configuration
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseAnonKey =
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 // Check if we have the required environment variables
 const missingEnv = !supabaseUrl || !supabaseAnonKey;
@@ -17,6 +18,22 @@ const isValidUrl = (url: string) => {
   }
 };
 const isUrlValid = supabaseUrl ? isValidUrl(supabaseUrl) : false;
+
+export const isSupabaseEnvConfigured = !missingEnv && isUrlValid;
+
+const FALLBACK_SUPABASE_URL = 'https://placeholder.supabase.co';
+const FALLBACK_SUPABASE_ANON_KEY = 'public-anon-key-placeholder';
+
+const effectiveSupabaseUrl = isSupabaseEnvConfigured ? supabaseUrl : FALLBACK_SUPABASE_URL;
+const effectiveSupabaseAnonKey = isSupabaseEnvConfigured
+  ? supabaseAnonKey
+  : FALLBACK_SUPABASE_ANON_KEY;
+
+if (!isSupabaseEnvConfigured) {
+  console.warn(
+    'Supabase environment variables are missing or invalid. Features depending on Supabase will be disabled until EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY are configured.',
+  );
+}
 
 // Platform-specific storage adapter
 const createStorageAdapter = () => {
@@ -47,7 +64,7 @@ const createStorageAdapter = () => {
 };
 
 // Create Supabase client with proper storage
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient<Database>(effectiveSupabaseUrl, effectiveSupabaseAnonKey, {
   auth: {
     storage: createStorageAdapter(),
     autoRefreshToken: true,
