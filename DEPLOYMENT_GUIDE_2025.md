@@ -15,6 +15,7 @@
 ## 🎯 **YOUR ACTION ITEMS** (Execute in Order)
 
 ### **STEP 1: Login to EAS CLI** ⚡
+
 ```bash
 eas login
 # Enter credentials: thefixer3x / your password
@@ -22,6 +23,7 @@ eas whoami  # Verify
 ```
 
 ### **STEP 2: Set EAS Secrets** 🔐
+
 **Critical:** These secrets are used during cloud builds (never committed to git):
 
 ```bash
@@ -29,7 +31,7 @@ cd /Users/seyederick/Development/SUB-PRO
 
 # Stripe publishable key (safe to bundle in app)
 eas secret:create --scope project --name EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY \
-  --value "pk_live_51RBGUq2KF4vMCpn8m0UJW3YMyoWdTWee91EgbSj9nU6uNuQQOO8oPA7S57nuFfFVKO4O5ohKR7gdhQxovZmtKW9y00rSSLNFJB"
+  --value "pk_live_REDACTED"
 
 # Supabase public credentials
 eas secret:create --scope project --name EXPO_PUBLIC_SUPABASE_URL \
@@ -51,6 +53,7 @@ eas secret:list
 ```
 
 ### **STEP 3: Set Netlify Secrets** 🔒
+
 **Backend-only secrets** (NEVER exposed to client):
 
 ```bash
@@ -70,6 +73,7 @@ netlify env:list
 ```
 
 **🚨 TO GET STRIPE PRICE ID:**
+
 1. Visit: https://dashboard.stripe.com/products
 2. Click on "Pro Monthly" product
 3. Copy the Price ID (e.g., `price_1Abc123...`)
@@ -80,12 +84,14 @@ netlify env:list
 ### **STEP 4: Simplify Tab Bar** (5 tabs instead of 9)
 
 You can either:
-- **Option A:** I provide you with a complete updated `_layout.tsx` 
+
+- **Option A:** I provide you with a complete updated `_layout.tsx`
 - **Option B:** You manually consolidate the tabs
 
 Let me know your preference. The goal:
+
 - **Keep:** Dashboard, Cards, Groups, Activity, Account
-- **Remove:** Subscriptions, Analytics, Marketplace, Upgrade, Reminder-Settings  
+- **Remove:** Subscriptions, Analytics, Marketplace, Upgrade, Reminder-Settings
 - **Merge features** into the 5 core tabs
 
 ---
@@ -97,6 +103,7 @@ mkdir -p /Users/seyederick/Development/SUB-PRO/app/billing
 ```
 
 Create file: `app/billing/success.tsx`
+
 ```tsx
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
@@ -112,9 +119,7 @@ export default function BillingSuccess() {
       <View style={styles.content}>
         <CheckCircle size={80} color="#10B981" />
         <Text style={styles.title}>Payment Successful!</Text>
-        <Text style={styles.subtitle}>
-          Your subscription is now active.
-        </Text>
+        <Text style={styles.subtitle}>Your subscription is now active.</Text>
         <TouchableOpacity
           style={styles.button}
           onPress={() => router.replace('/(tabs)/home')}
@@ -128,21 +133,32 @@ export default function BillingSuccess() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
-  content: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  content: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
   title: { fontSize: 28, fontWeight: 'bold', marginTop: 24, color: '#1E293B' },
-  subtitle: { fontSize: 16, color: '#64748B', marginTop: 8, textAlign: 'center' },
-  button: { 
-    backgroundColor: '#3B82F6', 
-    paddingHorizontal: 32, 
-    paddingVertical: 14, 
-    borderRadius: 12, 
-    marginTop: 32 
+  subtitle: {
+    fontSize: 16,
+    color: '#64748B',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  button: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 32,
   },
   buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
 });
 ```
 
 Then commit:
+
 ```bash
 git add app/billing/
 git commit -m "feat: add billing success/cancel pages"
@@ -180,6 +196,7 @@ netlify deploy --build --prod
 ### **STEP 8: Build & Submit Mobile**
 
 #### iOS:
+
 ```bash
 # Clean rebuild
 rm -rf ios android
@@ -193,6 +210,7 @@ eas submit --platform ios --profile store-submission
 ```
 
 #### Android:
+
 ```bash
 eas build --platform android --profile store-submission
 eas submit --platform android --profile store-submission
@@ -203,6 +221,7 @@ eas submit --platform android --profile store-submission
 ## 🧪 **QA CHECKLIST**
 
 ### Mobile (TestFlight/Internal Testing)
+
 - [ ] Login works (no dummy data shown)
 - [ ] 5 tabs visible and working
 - [ ] Theme toggle persists
@@ -210,6 +229,7 @@ eas submit --platform android --profile store-submission
 - [ ] Can complete test payment
 
 ### Web (Netlify)
+
 - [ ] Login works
 - [ ] 5 tabs only
 - [ ] Theme persists across routes
@@ -220,19 +240,19 @@ eas submit --platform android --profile store-submission
 
 ## 📊 **Current Status**
 
-| Component | Status | Action |
-|-----------|--------|--------|
-| `.env` | ✅ Updated locally | Don't commit |
-| `eas.json` | ✅ Committed | Ready |
-| `AuthContext` | ✅ Fixed | Ready |
-| `usePayments` | ✅ Wired up | Ready |
-| Netlify Function | ✅ Created | Ready |
-| EAS Secrets | ⏳ TODO | Run Step 2 |
-| Netlify Secrets | ⏳ TODO | Run Step 3 |
-| Tab Bar | ⏳ TODO | Needs refactor |
-| Billing Pages | ⏳ TODO | Create files |
-| Mobile Build | ⏳ TODO | After above |
-| Web Deploy | ⏳ TODO | After above |
+| Component        | Status             | Action         |
+| ---------------- | ------------------ | -------------- |
+| `.env`           | ✅ Updated locally | Don't commit   |
+| `eas.json`       | ✅ Committed       | Ready          |
+| `AuthContext`    | ✅ Fixed           | Ready          |
+| `usePayments`    | ✅ Wired up        | Ready          |
+| Netlify Function | ✅ Created         | Ready          |
+| EAS Secrets      | ⏳ TODO            | Run Step 2     |
+| Netlify Secrets  | ⏳ TODO            | Run Step 3     |
+| Tab Bar          | ⏳ TODO            | Needs refactor |
+| Billing Pages    | ⏳ TODO            | Create files   |
+| Mobile Build     | ⏳ TODO            | After above    |
+| Web Deploy       | ⏳ TODO            | After above    |
 
 ---
 
@@ -249,6 +269,7 @@ eas submit --platform android --profile store-submission
 ## 🎉 **AFTER SUCCESS**
 
 Once all platforms are live:
+
 1. Monitor Stripe Dashboard for payments
 2. Check Supabase for user records
 3. Set up Stripe webhooks (next phase)
@@ -260,14 +281,17 @@ Once all platforms are live:
 ## 📞 **TROUBLESHOOTING**
 
 **EAS build fails:**
+
 - Check: `eas build:list` for logs
 - Verify: `eas secret:list` shows all secrets
 
 **Netlify function error:**
+
 - Check: Netlify Dashboard → Functions → Logs
 - Verify: `netlify env:list` shows all variables
 
 **Payment flow broken:**
+
 - Test locally: `netlify dev`
 - Check console for API errors
 - Verify Price ID is correct
