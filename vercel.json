@@ -10,7 +10,7 @@
       "destination": "https://subtrack-pro.lanonasis.com/.netlify/functions/create-checkout-session"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!_expo|static|favicon.ico|manifest.json|service-worker.js).*)",
       "destination": "/index.html"
     }
   ]
