@@ -138,6 +138,9 @@
   },
   "homepage": "https://github.com/thefixer3x/SUB-PRO#readme",
   "overrides": {
-    "@babel/plugin-transform-shorthand-properties": "7.24.7"
+    "@babel/plugin-transform-shorthand-properties": "7.24.7",
+    "react-native-reanimated": {
+      "@babel/plugin-transform-shorthand-properties": "7.24.7"
+    }
   }
 }

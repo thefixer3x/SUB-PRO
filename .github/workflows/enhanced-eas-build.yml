@@ -49,13 +49,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          bun-version: 1.0.0
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
           
       - name: Install dependencies
-        run: bun install
+        run: npm ci
         
       - name: Validate Expo configuration
         run: |
@@ -99,30 +100,31 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          bun-version: 1.0.0
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
           
       - name: Install dependencies
-        run: bun install
+        run: npm ci
         
       - name: Type check
         run: |
           echo "🔍 Running TypeScript type check..."
-          bun run type-check
+          npm run type-check
         
       - name: Lint code
         run: |
           echo "🔍 Running code linter..."
-          bun run lint || echo "Linting completed with warnings"
+          npm run lint || echo "Linting completed with warnings"
         continue-on-error: true
         
       - name: Run tests
         run: |
           echo "🧪 Running test suite..."
-          if bun run | grep -q "test"; then
-            bun run test
+          if npm run | grep -q "test"; then
+            npm test
           else
             echo "No test script found, skipping tests"
           fi
@@ -131,7 +133,7 @@ jobs:
       - name: Security audit
         run: |
           echo "🔒 Running security audit..."
-          echo "Skipping audit for bun" --audit-level moderate || echo "Security audit completed"
+          echo "Skipping npm audit in CI until dependency noise is resolved" || true
         continue-on-error: true
         
       - name: Pre-build Bundle Test
@@ -171,13 +173,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          bun-version: 1.0.0
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
           
       - name: Install dependencies
-        run: bun install
+        run: npm ci
         
       - name: Install EAS CLI
         run: |
@@ -267,13 +270,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          bun-version: 1.0.0
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
           
       - name: Install dependencies
-        run: bun install
+        run: npm ci
         
       - name: Install EAS CLI
         run: |
@@ -330,13 +334,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          bun-version: 1.0.0
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
           
       - name: Install dependencies
-        run: bun install
+        run: npm ci
         
       - name: Install EAS CLI
         run: |
