@@ -128,8 +128,6 @@
       "fallbackToCacheTimeout": 0,
       "url": "https://u.expo.dev/c026aca9-e212-434f-bb68-65603b900112"
     },
-    "runtimeVersion": {
-      "policy": "sdkVersion"
-    }
+    "runtimeVersion": "1.0.0"
   }
 }

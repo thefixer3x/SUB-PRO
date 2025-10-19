@@ -21,6 +21,7 @@
     "lint": "expo lint",
     "lint:fix": "expo lint --fix",
     "test": "jest",
+    "bump:runtime": "node scripts/bump-runtime-version.js",
     "test:coverage": "jest --coverage",
     "lighthouse": "lhci autorun",
     "type-check": "tsc --noEmit",
