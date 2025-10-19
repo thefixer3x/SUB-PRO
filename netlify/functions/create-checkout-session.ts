@@ -38,7 +38,13 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    const price = process.env.STRIPE_PRICE_PRO_MONTH || 'price_1234567890';
+    if (!process.env.STRIPE_PRICE_PRO_MONTH) {
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: 'Missing STRIPE_PRICE_PRO_MONTH environment variable' }),
+      };
+    }
+    const price = process.env.STRIPE_PRICE_PRO_MONTH;
     
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
