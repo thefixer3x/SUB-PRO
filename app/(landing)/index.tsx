@@ -718,11 +718,12 @@ const PricingCard = ({ tier, index, colors }: { tier: any; index: number; colors
         marginBottom: 20, // Add bottom margin for spacing
         marginHorizontal: 10, // Increased horizontal margin to prevent overlapping
       },
-      tier.popular && { 
-        transform: [{ scale: Platform.OS === 'web' ? 1.02 : 1.0 }], // Only scale on web to prevent mobile overlap
-        zIndex: 1, // Ensure popular card is above others
-      }
-      tier.popular && { } // Reduce scale to prevent overlap
+      tier.popular
+        ? {
+            transform: [{ scale: Platform.OS === 'web' ? 1.02 : 1.01 }],
+            zIndex: 2, // Keep popular tier visually on top without clipping
+          }
+        : null,
     ]}>
       {tier.popular && (
         <View style={{

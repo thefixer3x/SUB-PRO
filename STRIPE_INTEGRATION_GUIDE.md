@@ -3,23 +3,27 @@
 ## ✅ Configuration Complete
 
 ### 1. **Products Created**
+
 - **Basic Plan**: prod_Sdid8AZs4RXD4c (Free tier)
 - **Pro Plan**: prod_SdideR9hikhJ6V ($4.99/month)
 - **Enterprise Plan**: prod_SdidKo4BZeQRwb ($9.99/month)
 
 ### 2. **Pricing IDs**
+
 ```
 Pro Monthly: price_1RiSAL2KF4vMCpn8wUyDio3N ($4.99/month)
 Enterprise Monthly: price_1RiSAi2KF4vMCpn8B18AAI8v ($9.99/month)
 ```
 
 ### 3. **Webhook Configuration**
+
 - **Endpoint URL**: https://subtrack-pro.lanonasis.com/api/stripe/webhook
-- **Webhook Secret**: whsec_BsDevFB9UiEuHhsUvXMCD2sirRFa8qLd
+- **Webhook Secret**: whsec_REDACTED
 - **Events**: All events enabled
 
 ### 4. **API Keys**
-- **Publishable Key**: pk_live_51RBGUq2KF4vMCpn8m0UJW3YMyoWdTWee91EgbSj9nU6uNuQQOO8oPA7S57nuFfFVKO4O5ohKR7gdhQxovZmtKW9y00rSSLNFJB
+
+- **Publishable Key**: pk_live_REDACTED
 - **Secret Key**: Stored in .env file
 
 ---
@@ -41,10 +45,10 @@ const subscribeToPro = async () => {
       cancelUrl: `${window.location.origin}/subscription/cancel`,
       metadata: {
         userId: user.id,
-        plan: 'pro'
-      }
+        plan: 'pro',
+      },
     });
-    
+
     // Redirect to Stripe Checkout
     window.location.href = url;
   } catch (error) {
@@ -85,15 +89,15 @@ export async function POST(request: Request) {
         status: 'active',
         plan: subscription.metadata.plan,
         stripeSubscriptionId: subscription.id,
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000)
+        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
       });
       break;
-      
+
     case 'customer.subscription.deleted':
       // Downgrade user to free tier
       await downgradeUser(event.data.object.metadata.userId);
       break;
-      
+
     case 'invoice.payment_failed':
       // Send email notification
       await notifyPaymentFailed(event.data.object);
@@ -113,9 +117,9 @@ const openCustomerPortal = async () => {
   try {
     const { url } = await stripeService.createPortalSession({
       customerId: user.stripeCustomerId,
-      returnUrl: `${window.location.origin}/account`
+      returnUrl: `${window.location.origin}/account`,
     });
-    
+
     window.location.href = url;
   } catch (error) {
     console.error('Portal error:', error);
@@ -128,12 +132,15 @@ const openCustomerPortal = async () => {
 ## 🧪 Testing
 
 ### Test Cards
+
 Use these in test mode (switch keys in .env):
+
 - Success: 4242 4242 4242 4242
 - Decline: 4000 0000 0000 0002
 - 3D Secure: 4000 0025 0000 3155
 
 ### Webhook Testing
+
 ```bash
 # Forward webhooks to local development
 stripe listen --forward-to localhost:3000/api/stripe/webhook
@@ -175,11 +182,11 @@ const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
 // Initialize payment sheet
 const initializePaymentSheet = async () => {
-  const { paymentIntent, ephemeralKey, customer } = 
+  const { paymentIntent, ephemeralKey, customer } =
     await fetchPaymentSheetParams();
 
   const { error } = await initPaymentSheet({
-    merchantDisplayName: "SubTrack Pro",
+    merchantDisplayName: 'SubTrack Pro',
     customerId: customer,
     customerEphemeralKeySecret: ephemeralKey,
     paymentIntentClientSecret: paymentIntent,
@@ -192,11 +199,13 @@ const initializePaymentSheet = async () => {
 ## 🔄 Next Steps
 
 1. **Test the Integration**
+
    - Create a test subscription
    - Verify webhook events are received
    - Test customer portal
 
 2. **Configure Customer Portal**
+
    - Go to https://dashboard.stripe.com/settings/billing/portal
    - Customize branding
    - Set cancellation policy
@@ -214,7 +223,8 @@ const initializePaymentSheet = async () => {
 
 ### Current Status: **Needs Activation**
 
-**Action Required**: 
+**Action Required**:
+
 1. Visit https://dashboard.stripe.com/issuing/overview
 2. Complete Stripe Issuing onboarding
 3. Enable virtual card creation
@@ -222,6 +232,7 @@ const initializePaymentSheet = async () => {
 ### Once Enabled:
 
 #### Create Virtual Cards (Enhanced Implementation)
+
 ```typescript
 // API endpoint: /api/embedded-finance/virtual-cards/create
 const createVirtualCard = async (subscriptionData: {
@@ -238,10 +249,10 @@ const createVirtualCard = async (subscriptionData: {
     body: JSON.stringify({
       provider: 'stripe',
       userId: user.id,
-      ...subscriptionData
-    })
+      ...subscriptionData,
+    }),
   });
-  
+
   return response.json();
 };
 
@@ -252,41 +263,53 @@ const newCard = await createVirtualCard({
   merchantCategory: 'digital_goods_media',
   userEmail: user.email,
   userName: user.fullName,
-  userPhone: user.phone
+  userPhone: user.phone,
 });
 ```
 
 #### Manage Existing Cards
+
 ```typescript
 // List user's virtual cards
 const getUserCards = async (userId: string) => {
-  const response = await fetch(`/api/embedded-finance/virtual-cards/list?userId=${userId}`);
+  const response = await fetch(
+    `/api/embedded-finance/virtual-cards/list?userId=${userId}`
+  );
   return response.json();
 };
 
 // Get specific card details
 const getCardDetails = async (cardId: string) => {
-  const response = await fetch(`/api/embedded-finance/virtual-cards/${cardId}/retrieve`);
+  const response = await fetch(
+    `/api/embedded-finance/virtual-cards/${cardId}/retrieve`
+  );
   return response.json();
 };
 
 // Update card (pause/resume, change limits)
-const updateCard = async (cardId: string, updates: {
-  status?: 'active' | 'inactive' | 'canceled';
-  spendingLimits?: Array<{amount: number, interval: string}>;
-  allowedCategories?: string[];
-  blockedCategories?: string[];
-}) => {
-  const response = await fetch(`/api/embedded-finance/virtual-cards/${cardId}/update`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updates)
-  });
+const updateCard = async (
+  cardId: string,
+  updates: {
+    status?: 'active' | 'inactive' | 'canceled';
+    spendingLimits?: Array<{ amount: number; interval: string }>;
+    allowedCategories?: string[];
+    blockedCategories?: string[];
+  }
+) => {
+  const response = await fetch(
+    `/api/embedded-finance/virtual-cards/${cardId}/update`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    }
+  );
   return response.json();
 };
 ```
 
 #### Virtual Card Features Available:
+
 - **Spending Limits**: Monthly limits per card
 - **Merchant Categories**: Restrict to specific merchant types
 - **Real-time Controls**: Enable/disable instantly
@@ -294,6 +317,7 @@ const updateCard = async (cardId: string, updates: {
 - **Secure Details**: Encrypted card numbers
 
 #### Merchant Categories Supported:
+
 - `online_services` - Subscription services
 - `software_services` - SaaS platforms
 - `digital_goods` - Apps, games, media
@@ -302,16 +326,18 @@ const updateCard = async (cardId: string, updates: {
 ### Integration Points:
 
 1. **Subscription Creation**
+
    ```typescript
    // When user subscribes to a service
    const virtualCard = await createVirtualCard(subscriptionId, monthlyLimit);
    ```
 
 2. **Card Management**
+
    ```typescript
    // Update spending limits
    await updateCardSpendingLimit(cardId, newLimit);
-   
+
    // Pause/resume card
    await toggleCardStatus(cardId, 'active' | 'inactive');
    ```
@@ -323,17 +349,19 @@ const updateCard = async (cardId: string, updates: {
      case 'issuing_authorization.created':
        // Real-time authorization (before transaction completes)
        const auth = event.data.object;
-       await notifyUser(`Card ending in ${auth.card.last4} used at ${auth.merchant_data.name}`);
+       await notifyUser(
+         `Card ending in ${auth.card.last4} used at ${auth.merchant_data.name}`
+       );
        await checkSpendingLimits(auth);
        break;
-       
+
      case 'issuing_transaction.created':
        // Transaction completed
        const transaction = event.data.object;
        await logTransaction(transaction);
        await updateUserAnalytics(transaction);
        break;
-       
+
      case 'issuing_authorization.updated':
        // Authorization status changed (approved/declined)
        if (event.data.object.status === 'declined') {
@@ -346,12 +374,14 @@ const updateCard = async (cardId: string, updates: {
 ### Required Stripe Issuing Settings:
 
 1. **Business Information**
+
    - Legal business name
    - Tax ID (EIN)
    - Business address
    - Beneficial owners
 
 2. **Compliance Requirements**
+
    - KYC documentation
    - Terms of service update
    - Privacy policy update
@@ -362,6 +392,7 @@ const updateCard = async (cardId: string, updates: {
    - Fraud prevention settings
 
 ### Fees (Stripe Issuing):
+
 - **Card Creation**: $2.00 per virtual card
 - **Transactions**: $0.10 per authorization
 - **No monthly fees** for inactive cards
