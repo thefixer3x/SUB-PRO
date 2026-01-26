@@ -87,7 +87,7 @@
     "react-native-worklets": "0.5.1",
     "recharts": "^3.0.2",
     "tslib": "^2.6.2",
-    "xlsx": "^0.18.5"
+    "exceljs": "^4.4.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

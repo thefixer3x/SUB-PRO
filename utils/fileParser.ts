@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 export interface ParsedData {
   headers: string[];
@@ -50,33 +50,36 @@ export const parseExcelFile = (file: File): Promise<ParsedData> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const buffer = e.target?.result as ArrayBuffer;
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(buffer);
         
         // Get first worksheet
-        const worksheetName = workbook.SheetNames[0];
-        if (!worksheetName) {
+        const worksheet = workbook.worksheets[0];
+        if (!worksheet) {
           reject(new Error('No worksheets found in Excel file'));
           return;
         }
 
-        const worksheet = workbook.Sheets[worksheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        const rows: any[][] = [];
+        worksheet.eachRow((row) => {
+          rows.push(row.values?.slice(1) || []);
+        });
         
-        if (!Array.isArray(jsonData) || jsonData.length === 0) {
+        if (rows.length === 0) {
           reject(new Error('File is empty'));
           return;
         }
 
-        const headers = jsonData[0] as string[];
-        const rows = jsonData.slice(1) as any[][];
+        const headers = rows[0] as string[];
+        const dataRows = rows.slice(1) as any[][];
 
         resolve({
           headers,
-          rows,
-          totalRows: rows.length,
+          rows: dataRows,
+          totalRows: dataRows.length,
         });
       } catch (error) {
         reject(new Error(`Failed to parse Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`));
