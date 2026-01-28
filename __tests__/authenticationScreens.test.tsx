@@ -69,7 +69,9 @@ describe('Authentication Screens', () => {
       fireEvent.press(getByTestId('sign-up-submit'));
     });
 
-    expect(alertSpy).toHaveBeenCalledWith('Weak Password', PASSWORD_REQUIREMENTS);
+    expect(alertSpy).toHaveBeenCalled();
+    expect(alertSpy.mock.calls[0][0]).toBe('Weak Password');
+    expect(alertSpy.mock.calls[0][1]).toBe(PASSWORD_REQUIREMENTS);
     expect(signUpMock).not.toHaveBeenCalled();
 
     alertSpy.mockRestore();
