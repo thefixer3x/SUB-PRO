@@ -39,6 +39,5 @@ externalPort = 3001
 
 [deployment]
 deploymentTarget = "static"
-run = ["npx", "serve"]
 build = ["npm", "run", "build:web"]
 publicDir = "dist"
