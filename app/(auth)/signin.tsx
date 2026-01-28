@@ -7,10 +7,26 @@ import {
   ScrollView,
   Alert,
   StyleSheet,
+  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+
+const FormCard = ({ children, style }: { children: React.ReactNode; style?: any }) => {
+  if (Platform.OS === 'web') {
+    return (
+      <View style={[style, { backgroundColor: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)' }]}>
+        {children}
+      </View>
+    );
+  }
+  return (
+    <BlurView intensity={20} style={style}>
+      {children}
+    </BlurView>
+  );
+};
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -52,21 +68,33 @@ const SignInPage = () => {
     transform: [{ translateY: slideAnim.value }],
   }));
 
+  const showAlert = (title: string, message: string) => {
+    if (typeof window !== 'undefined' && window.alert) {
+      window.alert(`${title}\n\n${message}`);
+    } else {
+      Alert.alert(title, message);
+    }
+  };
+
   const handleSignIn = async () => {
+    console.log('Sign in button clicked');
     const email = formData.email.trim().toLowerCase();
     const password = formData.password;
 
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      showAlert('Error', 'Please fill in all fields');
       return;
     }
 
+    console.log('Attempting sign in for:', email);
+
     try {
       const { success, error } = await signIn(email, password);
+      console.log('Sign in result:', { success, error });
 
       if (!success) {
         const isNetworkIssue = error?.toLowerCase().includes('network');
-        Alert.alert(
+        showAlert(
           isNetworkIssue ? 'Network Error' : 'Sign In Failed',
           isNetworkIssue
             ? 'We were unable to connect. Please check your internet connection and try again.'
@@ -75,13 +103,15 @@ const SignInPage = () => {
         return;
       }
 
+      console.log('Sign in successful, navigating to tabs');
       router.replace('/(tabs)');
     } catch (error) {
+      console.error('Sign in error:', error);
       const isNetworkIssue = error instanceof Error && error.message.toLowerCase().includes('network');
       const message = isNetworkIssue
         ? 'We were unable to connect. Please check your internet connection and try again.'
         : 'Failed to sign in. Please try again.';
-      Alert.alert(isNetworkIssue ? 'Network Error' : 'Sign In Failed', message);
+      showAlert(isNetworkIssue ? 'Network Error' : 'Sign In Failed', message);
     }
   };
 
@@ -126,7 +156,7 @@ const SignInPage = () => {
             </View>
 
             {/* Sign In Form */}
-            <BlurView intensity={20} style={styles.formCard}>
+            <FormCard style={styles.formCard}>
               <View style={styles.formContent}>
                 {/* Email Input */}
                 <View style={styles.inputGroup}>
@@ -221,7 +251,7 @@ const SignInPage = () => {
                   </Pressable>
                 </View>
               </View>
-            </BlurView>
+            </FormCard>
 
             {/* Security Section */}
             <View style={styles.securitySection}>
