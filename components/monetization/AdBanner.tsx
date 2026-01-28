@@ -17,13 +17,6 @@ export const AdBanner: React.FC<AdBannerProps> = ({
   const [adError, setAdError] = useState(false);
   const [lastShown, setLastShown] = useState<Date | null>(null);
 
-  useEffect(() => {
-    loadAd();
-  }, []);
-
-  // Don't show ads if user shouldn't see them or frequency limits
-  if (!shouldShowAds(currentTier) || !canShowBanner(lastShown)) return null;
-
   const loadAd = async () => {
     try {
       // For web platform, we'll show placeholder ads
@@ -54,6 +47,13 @@ export const AdBanner: React.FC<AdBannerProps> = ({
       setAdError(true);
     }
   };
+
+  useEffect(() => {
+    loadAd();
+  }, []);
+
+  // Don't show ads if user shouldn't see them or frequency limits
+  if (!shouldShowAds(currentTier) || !canShowBanner(lastShown)) return null;
 
   const getAdDimensions = () => {
     switch (size) {
