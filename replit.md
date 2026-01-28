@@ -30,6 +30,13 @@ SubTrack Pro is a comprehensive subscription management platform built with Expo
 /utils              # Utility functions
 /assets             # Images, fonts, and static assets
 /scripts            # Build and deployment scripts
+/docs               # Project documentation (organized)
+  /app-store        # App Store submission guides
+  /deployment       # Deployment & build guides
+  /integration      # Third-party integration docs
+  /architecture     # System design documentation
+  /troubleshooting  # Debug & fix guides
+  /archive          # Historical/completed docs
 ```
 
 ## Development
@@ -75,7 +82,37 @@ Uses EAS (Expo Application Services) for iOS and Android builds.
 - Follows Expo and React Native best practices
 - Uses file-based routing via Expo Router
 
+## Demo Mode
+
+The app has a temporary demo mode for development/testing when Supabase is unavailable.
+
+### Toggle Demo Mode
+```bash
+# Check status
+./scripts/toggle-demo-mode.sh status
+
+# Disable for production (REQUIRED before App Store submission)
+./scripts/toggle-demo-mode.sh disable
+
+# Enable for development
+./scripts/toggle-demo-mode.sh enable
+```
+
+## Documentation
+
+All documentation is organized in `/docs`:
+- **Publishing Checklist**: `docs/PUBLISHING_CHECKLIST.md`
+- **App Store guides**: `docs/app-store/`
+- **Deployment guides**: `docs/deployment/`
+
 ## Recent Changes
+- 2026-01-28: Demo mode and documentation organization
+  - Added demo mode toggle script for production builds
+  - Organized 50+ MD files into categorized docs folders
+  - Created App Store publishing checklist
+- 2026-01-28: Guest mode authentication bypass
+  - Added "Continue as Guest" for Supabase maintenance periods
+  - Fixed theme persistence across all pages
 - 2025-01-28: Initial import and Replit environment configuration
   - Configured Expo web to run on port 5000
   - Set up workflow for web development
