@@ -60,7 +60,7 @@ const SignUpPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const { signUp: signUpWithEmail, authLoading } = useAuth();
+  const { signUp: signUpWithEmail, signInAsGuest, authLoading } = useAuth();
 
   const fadeAnim = useSharedValue(0);
   const slideAnim = useSharedValue(30);
@@ -324,6 +324,26 @@ const SignUpPage = () => {
                 </LinearGradient>
               </Pressable>
 
+              {/* TEMPORARY: Demo Mode Button - Remove when Supabase is back online */}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.demoButton,
+                  pressed && { opacity: 0.8 }
+                ]}
+                onPress={async () => {
+                  const result = await signInAsGuest();
+                  if (result.success) {
+                    router.replace('/(tabs)');
+                  }
+                }}
+                disabled={authLoading}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="Continue as Guest"
+              >
+                <Text style={styles.demoButtonText}>Continue as Guest (Demo Mode)</Text>
+              </Pressable>
+
               <View style={styles.signInContainer}>
                 <Text style={styles.signInText}>Already have an account? </Text>
                 <Pressable onPress={() => router.push('/(auth)/signin')}>
@@ -505,6 +525,21 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     marginTop: 8,
+  },
+  demoButton: {
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#F59E0B',
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+  },
+  demoButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#F59E0B',
   },
   signUpButtonDisabled: {
     opacity: 0.7,

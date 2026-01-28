@@ -53,7 +53,7 @@ const SignInPage = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const { signIn, authLoading } = useAuth();
+  const { signIn, signInAsGuest, authLoading } = useAuth();
 
   const fadeAnim = useSharedValue(0);
   const slideAnim = useSharedValue(30);
@@ -244,6 +244,26 @@ const SignInPage = () => {
                   </LinearGradient>
                 </Pressable>
 
+                {/* TEMPORARY: Demo Mode Button - Remove when Supabase is back online */}
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.demoButton,
+                    pressed && { opacity: 0.8 }
+                  ]}
+                  onPress={async () => {
+                    const result = await signInAsGuest();
+                    if (result.success) {
+                      router.replace('/(tabs)');
+                    }
+                  }}
+                  disabled={authLoading}
+                  accessible={true}
+                  accessibilityRole="button"
+                  accessibilityLabel="Continue as Guest"
+                >
+                  <Text style={styles.demoButtonText}>Continue as Guest (Demo Mode)</Text>
+                </Pressable>
+
                 <View style={styles.signUpContainer}>
                   <Text style={styles.signUpText}>Don't have an account? </Text>
                   <Pressable onPress={() => router.push('/(auth)/signup')}>
@@ -400,7 +420,22 @@ const styles = StyleSheet.create({
   signInButton: {
     borderRadius: 12,
     overflow: 'hidden',
+    marginBottom: 12,
+  },
+  demoButton: {
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#F59E0B',
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 20,
+  },
+  demoButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#F59E0B',
   },
   signInButtonLoading: {
     opacity: 0.7,
