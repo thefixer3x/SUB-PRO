@@ -20,6 +20,7 @@ interface AuthContextValue {
   user: User | null;
   isInitializing: boolean;
   authLoading: boolean;
+  isDemoMode: boolean;
   signIn: (
     email: string,
     password: string
@@ -34,6 +35,7 @@ interface AuthContextValue {
     requiresEmailConfirmation?: boolean;
   }>;
   signOut: () => Promise<{ success: boolean; error?: string }>;
+  signInAsGuest: () => Promise<{ success: boolean }>;
   refreshSession: () => Promise<void>;
 }
 
@@ -51,6 +53,10 @@ const forceMockAuthFlag =
   )
     .toString()
     .toLowerCase() === 'true';
+
+// TEMPORARY: Demo mode bypass - allows users to access app without Supabase
+// TODO: Remove this when Supabase is back online
+const DEMO_MODE_ENABLED = true;
 
 const mockDelay = (duration = 450) =>
   new Promise((resolve) => {
@@ -106,6 +112,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   // Only use mock auth if explicitly enabled via EXPO_PUBLIC_ENABLE_MOCK_AUTH=true
   // Never use mock in production, even if Supabase is misconfigured
@@ -337,6 +344,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const refreshSession = useCallback(async () => {
+    // Skip refresh in demo mode
+    if (isDemoMode) return;
+    
     try {
       const { data, error } = await supabase.auth.getSession();
       if (error) {
@@ -349,6 +359,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('Unexpected error refreshing session', error);
     }
+  }, [isDemoMode]);
+
+  // TEMPORARY: Demo mode sign-in - bypasses Supabase authentication
+  // TODO: Remove when Supabase is back online
+  const signInAsGuest = useCallback(async () => {
+    if (!DEMO_MODE_ENABLED) {
+      return { success: false };
+    }
+    
+    setAuthLoading(true);
+    await mockDelay(300);
+    
+    const guestUser = createMockUser('guest@demo.subtrackpro.com', 'Demo User');
+    const guestSession = createMockSession(guestUser);
+    
+    setUser(guestUser);
+    setSession(guestSession);
+    setIsDemoMode(true);
+    setAuthLoading(false);
+    
+    return { success: true };
   }, []);
 
   useEffect(() => {
@@ -374,16 +405,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       user,
       isInitializing,
       authLoading,
+      isDemoMode,
       signIn,
       signUp,
       signOut,
+      signInAsGuest,
       refreshSession,
     }),
     [
       authLoading,
       isInitializing,
+      isDemoMode,
       session,
       signIn,
+      signInAsGuest,
       signOut,
       signUp,
       refreshSession,

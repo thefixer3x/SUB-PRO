@@ -46,7 +46,9 @@ describe('Authentication Screens', () => {
     mockUseAuth.mockReturnValue({
       signIn: jest.fn(),
       signUp: jest.fn(),
+      signInAsGuest: jest.fn().mockResolvedValue({ success: true }),
       authLoading: false,
+      isDemoMode: false,
     });
   });
 
