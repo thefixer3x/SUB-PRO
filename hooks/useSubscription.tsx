@@ -16,7 +16,15 @@ const SubscriptionContext = createContext<SubscriptionContextType | undefined>(u
 export const useSubscription = () => {
   const context = useContext(SubscriptionContext);
   if (!context) {
-    throw new Error('useSubscription must be used within SubscriptionProvider');
+    // Return safe defaults when used outside provider
+    return {
+      currentTier: 'free' as SubscriptionTier,
+      subscription: null,
+      isLoading: false,
+      canAccessFeature: () => true,
+      getRemainingLimit: () => null,
+      upgradeRequired: () => {},
+    };
   }
   return context;
 };
