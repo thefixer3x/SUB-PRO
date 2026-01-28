@@ -193,13 +193,20 @@ const SignInPage = () => {
                 {/* Sign In Button */}
                 <Pressable
                   testID="sign-in-submit"
-                  style={[styles.signInButton, authLoading && styles.signInButtonLoading]}
+                  style={({ pressed }) => [
+                    styles.signInButton,
+                    authLoading && styles.signInButtonLoading,
+                    pressed && { opacity: 0.8 }
+                  ]}
                   onPress={handleSignIn}
                   disabled={authLoading}
+                  accessible={true}
+                  accessibilityRole="button"
+                  accessibilityLabel="Sign In"
                 >
                   <LinearGradient
                     colors={authLoading ? ['#9CA3AF', '#6B7280'] : ['#3B82F6', '#1D4ED8']}
-                    style={styles.signInGradient}
+                    style={[styles.signInGradient, { pointerEvents: 'none' }]}
                   >
                     <Text style={styles.signInText}>
                       {authLoading ? 'Signing In...' : 'Sign In'}
