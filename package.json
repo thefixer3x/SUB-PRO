@@ -5,8 +5,8 @@
   "private": true,
   "packageManager": "npm@9.8.1",
   "scripts": {
-    "dev": "npx expo start",
-    "start": "npx expo start",
+    "dev": "npx expo start --web --port 5000 --host lan",
+    "start": "npx expo start --web --port 5000 --host lan",
     "build:web": "NODE_ENV=production expo export --platform web",
     "prebuild:production": "node scripts/check-env.js",
     "build:production": "npm run prebuild:production && NODE_ENV=production expo export --platform web",
