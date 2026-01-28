@@ -176,6 +176,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
+    if (!isSupabaseEnvConfigured) {
+      return {
+        success: false,
+        error: 'Authentication is not configured. Please contact support or configure Supabase credentials.',
+      };
+    }
+
     setAuthLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -221,6 +228,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       password: string;
       fullName?: string;
     }) => {
+      if (!isSupabaseEnvConfigured) {
+        return {
+          success: false,
+          error: 'Authentication is not configured. Please contact support or configure Supabase credentials.',
+        };
+      }
+
       setAuthLoading(true);
       try {
         const { data, error } = await supabase.auth.signUp({
