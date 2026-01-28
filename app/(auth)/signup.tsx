@@ -7,10 +7,26 @@ import {
   ScrollView,
   Alert,
   StyleSheet,
+  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+
+const FormCard = ({ children, style }: { children: React.ReactNode; style?: any }) => {
+  if (Platform.OS === 'web') {
+    return (
+      <View style={[style, { backgroundColor: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)' }]}>
+        {children}
+      </View>
+    );
+  }
+  return (
+    <BlurView intensity={20} style={style}>
+      {children}
+    </BlurView>
+  );
+};
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -59,32 +75,44 @@ const SignUpPage = () => {
     transform: [{ translateY: slideAnim.value }],
   }));
 
+  const showAlert = (title: string, message: string, onOk?: () => void) => {
+    if (typeof window !== 'undefined' && window.alert) {
+      window.alert(`${title}\n\n${message}`);
+      if (onOk) onOk();
+    } else {
+      Alert.alert(title, message, onOk ? [{ text: 'OK', onPress: onOk }] : undefined);
+    }
+  };
+
   const handleSignUp = async () => {
+    console.log('Sign up button clicked');
     const name = formData.name.trim();
     const email = formData.email.trim().toLowerCase();
     const password = formData.password;
     const confirmPassword = formData.confirmPassword;
 
     if (!name || !email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      showAlert('Error', 'Please fill in all fields');
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      showAlert('Error', 'Passwords do not match');
       return;
     }
 
     const passwordValidation = validatePassword(password);
     if (!passwordValidation.valid) {
-      Alert.alert('Weak Password', passwordValidation.message ?? PASSWORD_REQUIREMENTS);
+      showAlert('Weak Password', passwordValidation.message ?? PASSWORD_REQUIREMENTS);
       return;
     }
 
     if (!acceptedTerms) {
-      Alert.alert('Error', 'Please accept the terms and conditions');
+      showAlert('Error', 'Please accept the terms and conditions');
       return;
     }
+
+    console.log('Attempting sign up for:', email);
 
     try {
       const { success, error, requiresEmailConfirmation } = await signUpWithEmail({
@@ -93,9 +121,11 @@ const SignUpPage = () => {
         fullName: name,
       });
 
+      console.log('Sign up result:', { success, error, requiresEmailConfirmation });
+
       if (!success) {
         const isNetworkIssue = error?.toLowerCase().includes('network');
-        Alert.alert(
+        showAlert(
           isNetworkIssue ? 'Network Error' : 'Sign Up Failed',
           isNetworkIssue
             ? 'We were unable to connect. Please check your internet connection and try again.'
@@ -105,22 +135,23 @@ const SignUpPage = () => {
       }
 
       if (requiresEmailConfirmation) {
-        Alert.alert(
+        showAlert(
           'Confirm Your Email',
           `We sent a confirmation link to ${email}. Please verify your email before signing in.`,
-          [{ text: 'OK', onPress: () => router.replace('/(auth)/signin') }],
+          () => router.replace('/(auth)/signin'),
         );
         return;
       }
 
-      Alert.alert('Success!', 'Account created successfully. Welcome to SubTrack Pro!');
+      showAlert('Success!', 'Account created successfully. Welcome to SubTrack Pro!');
       router.replace('/(tabs)');
     } catch (error) {
+      console.error('Sign up error:', error);
       const isNetworkIssue = error instanceof Error && error.message.toLowerCase().includes('network');
       const message = isNetworkIssue
         ? 'We were unable to connect. Please check your internet connection and try again.'
         : 'Failed to create your account. Please try again.';
-      Alert.alert(isNetworkIssue ? 'Network Error' : 'Sign Up Failed', message);
+      showAlert(isNetworkIssue ? 'Network Error' : 'Sign Up Failed', message);
     }
   };
 
@@ -168,7 +199,7 @@ const SignUpPage = () => {
           </View>
 
           {/* Sign Up Form */}
-          <BlurView intensity={20} style={styles.formContainer}>
+          <FormCard style={styles.formContainer}>
             <View style={styles.formHeader}>
               <Shield size={32} color="#667eea" />
               <Text style={styles.formTitle}>Create Your Account</Text>
@@ -272,13 +303,20 @@ const SignUpPage = () => {
 
               <Pressable
                 testID="sign-up-submit"
-                style={[styles.signUpButton, authLoading && styles.signUpButtonDisabled]}
+                style={({ pressed }) => [
+                  styles.signUpButton,
+                  authLoading && styles.signUpButtonDisabled,
+                  pressed && { opacity: 0.8 }
+                ]}
                 onPress={handleSignUp}
                 disabled={authLoading}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="Start Free Trial"
               >
                 <LinearGradient
                   colors={authLoading ? ['#9CA3AF', '#6B7280'] : ['#F59E0B', '#F97316']}
-                  style={styles.signUpGradient}
+                  style={[styles.signUpGradient, { pointerEvents: 'none' }]}
                 >
                   <Text style={styles.signUpText}>
                     {authLoading ? 'Creating Account...' : 'Start Free Trial'}
@@ -293,7 +331,7 @@ const SignUpPage = () => {
                 </Pressable>
               </View>
             </View>
-          </BlurView>
+          </FormCard>
 
           {/* Trust Indicators */}
           <View style={styles.trustSection}>
