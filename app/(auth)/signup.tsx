@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors } from '@/constants/theme';
 
 const FormCard = ({ children, style }: { children: React.ReactNode; style?: any }) => {
   if (Platform.OS === 'web') {
@@ -51,6 +53,7 @@ import { validatePassword } from '@/utils/auth/validatePassword';
 
 const SignUpPage = () => {
   const insets = useSafeAreaInsets();
+  const { colors, themeName } = useTheme();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -60,7 +63,13 @@ const SignUpPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const { signUp: signUpWithEmail, signInAsGuest, authLoading } = useAuth();
+  const { signUp: signUpWithEmail, signInAsGuest, authLoading, isDemoModeEnabled } = useAuth();
+
+  const gradientColors = useMemo(() => {
+    return themeName === 'dark' 
+      ? [colors.background, colors.backgroundSecondary, colors.card] as const
+      : ['#1E293B', '#334155', '#475569'] as const;
+  }, [themeName, colors]);
 
   const fadeAnim = useSharedValue(0);
   const slideAnim = useSharedValue(30);
@@ -165,25 +174,26 @@ const SignUpPage = () => {
   ];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <LinearGradient
-        colors={['#667eea', '#764ba2']}
-        style={[styles.header, { paddingTop: insets.top + 10 }]}
+        colors={gradientColors}
+        style={styles.fullBackground}
       >
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <ArrowLeft size={24} color="#FFFFFF" />
-        </Pressable>
-        
-        <Text style={styles.headerTitle}>Join SubTrack Pro</Text>
-        <Text style={styles.headerSubtitle}>
-          Start your 14-day free trial today
-        </Text>
-      </LinearGradient>
+        <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+          <Pressable
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <ArrowLeft size={24} color="#FFFFFF" />
+          </Pressable>
+          
+          <Text style={styles.headerTitle}>Join SubTrack Pro</Text>
+          <Text style={styles.headerSubtitle}>
+            Start your 14-day free trial today
+          </Text>
+        </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Animated.View style={[styles.content, animatedStyle]}>
           {/* Benefits Preview */}
           <View style={styles.benefitsSection}>
@@ -324,25 +334,27 @@ const SignUpPage = () => {
                 </LinearGradient>
               </Pressable>
 
-              {/* TEMPORARY: Demo Mode Button - Remove when Supabase is back online */}
-              <Pressable
-                style={({ pressed }) => [
-                  styles.demoButton,
-                  pressed && { opacity: 0.8 }
-                ]}
-                onPress={async () => {
-                  const result = await signInAsGuest();
-                  if (result.success) {
-                    router.replace('/(tabs)');
-                  }
-                }}
-                disabled={authLoading}
-                accessible={true}
-                accessibilityRole="button"
-                accessibilityLabel="Continue as Guest"
-              >
-                <Text style={styles.demoButtonText}>Continue as Guest (Demo Mode)</Text>
-              </Pressable>
+              {/* Demo Mode Button - Only visible when demo mode is enabled */}
+              {isDemoModeEnabled && (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.demoButton,
+                    pressed && { opacity: 0.8 }
+                  ]}
+                  onPress={async () => {
+                    const result = await signInAsGuest();
+                    if (result.success) {
+                      router.replace('/(tabs)');
+                    }
+                  }}
+                  disabled={authLoading}
+                  accessible={true}
+                  accessibilityRole="button"
+                  accessibilityLabel="Continue as Guest"
+                >
+                  <Text style={styles.demoButtonText}>Continue as Guest (Demo Mode)</Text>
+                </Pressable>
+              )}
 
               <View style={styles.signInContainer}>
                 <Text style={styles.signInText}>Already have an account? </Text>
@@ -374,6 +386,7 @@ const SignUpPage = () => {
           </View>
         </Animated.View>
       </ScrollView>
+      </LinearGradient>
     </View>
   );
 };
@@ -381,7 +394,9 @@ const SignUpPage = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+  },
+  fullBackground: {
+    flex: 1,
   },
   header: {
     paddingHorizontal: 20,
@@ -416,7 +431,7 @@ const styles = StyleSheet.create({
   benefitsTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#FFFFFF',
     marginBottom: 16,
     textAlign: 'center',
   },
@@ -426,23 +441,18 @@ const styles = StyleSheet.create({
   benefitItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     padding: 16,
     borderRadius: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   benefitText: {
     fontSize: 16,
-    color: '#374151',
+    color: '#FFFFFF',
     marginLeft: 12,
     fontWeight: '500',
   },
   formContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 20,
     padding: 24,
     marginBottom: 32,
@@ -555,7 +565,7 @@ const styles = StyleSheet.create({
   },
   signInText: {
     fontSize: 16,
-    color: '#6B7280',
+    color: '#CBD5E1',
     textAlign: 'center',
     marginTop: 8,
   },
@@ -566,7 +576,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   signInLink: {
-    color: '#667eea',
+    color: '#3B82F6',
     fontWeight: '500',
   },
   trustSection: {
@@ -575,7 +585,7 @@ const styles = StyleSheet.create({
   trustTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#FFFFFF',
     marginBottom: 16,
   },
   trustIndicators: {
@@ -588,7 +598,7 @@ const styles = StyleSheet.create({
   },
   trustText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#CBD5E1',
     fontWeight: '500',
   },
   partnerCreditContainer: {
