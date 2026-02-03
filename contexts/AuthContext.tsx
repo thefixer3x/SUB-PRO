@@ -21,6 +21,7 @@ interface AuthContextValue {
   isInitializing: boolean;
   authLoading: boolean;
   isDemoMode: boolean;
+  isDemoModeEnabled: boolean;
   signIn: (
     email: string,
     password: string
@@ -55,8 +56,8 @@ const forceMockAuthFlag =
     .toLowerCase() === 'true';
 
 // TEMPORARY: Demo mode bypass - allows users to access app without Supabase
-// TODO: Remove this when Supabase is back online
-const DEMO_MODE_ENABLED = true;
+// Set to false for production/App Store builds
+const DEMO_MODE_ENABLED = false;
 
 const mockDelay = (duration = 450) =>
   new Promise((resolve) => {
@@ -406,6 +407,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isInitializing,
       authLoading,
       isDemoMode,
+      isDemoModeEnabled: DEMO_MODE_ENABLED,
       signIn,
       signUp,
       signOut,

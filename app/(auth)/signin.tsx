@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors } from '@/constants/theme';
 
 const FormCard = ({ children, style }: { children: React.ReactNode; style?: any }) => {
   if (Platform.OS === 'web') {
@@ -47,13 +49,20 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const SignInPage = () => {
   const insets = useSafeAreaInsets();
+  const { colors, themeName } = useTheme();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const { signIn, signInAsGuest, authLoading } = useAuth();
+  const { signIn, signInAsGuest, authLoading, isDemoModeEnabled } = useAuth();
+  
+  const gradientColors = useMemo(() => {
+    return themeName === 'dark' 
+      ? [colors.background, colors.backgroundSecondary, colors.card] as const
+      : ['#1E293B', '#334155', '#475569'] as const;
+  }, [themeName, colors]);
 
   const fadeAnim = useSharedValue(0);
   const slideAnim = useSharedValue(30);
@@ -124,9 +133,9 @@ const SignInPage = () => {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background }]}>
       <LinearGradient
-        colors={['#1E293B', '#334155', '#475569']}
+        colors={gradientColors}
         style={styles.background}
       >
         {/* Header */}
@@ -244,25 +253,27 @@ const SignInPage = () => {
                   </LinearGradient>
                 </Pressable>
 
-                {/* TEMPORARY: Demo Mode Button - Remove when Supabase is back online */}
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.demoButton,
-                    pressed && { opacity: 0.8 }
-                  ]}
-                  onPress={async () => {
-                    const result = await signInAsGuest();
-                    if (result.success) {
-                      router.replace('/(tabs)');
-                    }
-                  }}
-                  disabled={authLoading}
-                  accessible={true}
-                  accessibilityRole="button"
-                  accessibilityLabel="Continue as Guest"
-                >
-                  <Text style={styles.demoButtonText}>Continue as Guest (Demo Mode)</Text>
-                </Pressable>
+                {/* Demo Mode Button - Only visible when demo mode is enabled */}
+                {isDemoModeEnabled && (
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.demoButton,
+                      pressed && { opacity: 0.8 }
+                    ]}
+                    onPress={async () => {
+                      const result = await signInAsGuest();
+                      if (result.success) {
+                        router.replace('/(tabs)');
+                      }
+                    }}
+                    disabled={authLoading}
+                    accessible={true}
+                    accessibilityRole="button"
+                    accessibilityLabel="Continue as Guest"
+                  >
+                    <Text style={styles.demoButtonText}>Continue as Guest (Demo Mode)</Text>
+                  </Pressable>
+                )}
 
                 <View style={styles.signUpContainer}>
                   <Text style={styles.signUpText}>Don't have an account? </Text>
