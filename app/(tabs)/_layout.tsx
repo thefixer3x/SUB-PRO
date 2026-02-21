@@ -19,12 +19,12 @@ export default function TabLayout() {
       <View
         style={{
           flex: 1,
-          backgroundColor: '#F8FAFC',
+          backgroundColor: colors.background,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        <ActivityIndicator size="large" color="#3B82F6" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }

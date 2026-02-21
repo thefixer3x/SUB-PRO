@@ -7,14 +7,18 @@ import { ShareSubscriptionModal } from '@/components/social/ShareSubscriptionMod
 import { SharedGroup } from '@/types/social';
 import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { FeatureGate } from '@/components/monetization/FeatureGate';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors } from '@/constants/theme';
 
 export default function SharedGroupsScreen() {
-  const [userId, setUserId] = useState('user-123'); // In a real app, get from auth context
+  const [userId, setUserId] = useState('user-123');
   const { data: subscriptions = [] } = useSubscriptions();
   const [selectedGroup, setSelectedGroup] = useState<SharedGroup | null>(null);
   const [showGroupDetails, setShowGroupDetails] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [selectedSubscriptionId, setSelectedSubscriptionId] = useState<string | null>(null);
+  const { colors } = useTheme();
+  const dynamicStyles = React.useMemo(() => createStyles(colors), [colors]);
 
   const handleSelectGroup = (group: SharedGroup) => {
     setSelectedGroup(group);
@@ -35,14 +39,14 @@ export default function SharedGroupsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={dynamicStyles.container}>
       <FeatureGate
         feature="smartInsights"
         requiredTier="pro"
         fallback={
-          <View style={styles.featureGate}>
-            <Text style={styles.featureGateTitle}>Pro Feature</Text>
-            <Text style={styles.featureGateText}>
+          <View style={dynamicStyles.featureGate}>
+            <Text style={dynamicStyles.featureGateTitle}>Pro Feature</Text>
+            <Text style={dynamicStyles.featureGateText}>
               Subscription sharing is available on Pro and Team plans.
               Upgrade to share subscriptions with friends, family, or coworkers.
             </Text>
@@ -55,17 +59,16 @@ export default function SharedGroupsScreen() {
           onSelectGroup={handleSelectGroup}
         />
 
-        {/* Group Details Modal */}
         <Modal
           visible={showGroupDetails}
           animationType="slide"
           presentationStyle="pageSheet"
         >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Group Details</Text>
-              <TouchableOpacity style={styles.closeButton} onPress={() => setShowGroupDetails(false)}>
-                <X size={24} color="#64748B" />
+          <View style={dynamicStyles.modalContainer}>
+            <View style={dynamicStyles.modalHeader}>
+              <Text style={dynamicStyles.modalTitle}>Group Details</Text>
+              <TouchableOpacity style={dynamicStyles.closeButton} onPress={() => setShowGroupDetails(false)}>
+                <X size={24} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
             
@@ -80,7 +83,6 @@ export default function SharedGroupsScreen() {
           </View>
         </Modal>
 
-        {/* Share Subscription Modal */}
         {showShareModal && selectedSubscriptionId && (
           <ShareSubscriptionModal
             visible={showShareModal}
@@ -94,10 +96,10 @@ export default function SharedGroupsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.background,
   },
   featureGate: {
     flex: 1,
@@ -108,18 +110,18 @@ const styles = StyleSheet.create({
   featureGateTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1E293B',
+    color: colors.text,
     marginBottom: 12,
   },
   featureGateText: {
     fontSize: 16,
-    color: '#64748B',
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 24,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -128,12 +130,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: colors.borderLight,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1E293B',
+    color: colors.text,
   },
   closeButton: {
     padding: 8,

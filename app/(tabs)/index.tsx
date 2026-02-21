@@ -6,24 +6,29 @@ import { FeatureGate } from '@/components/monetization/FeatureGate';
 import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { ThemeColors } from '@/constants/theme';
 
 export default function Dashboard() {
   const { currentTier } = useSubscription();
   const { colors } = useTheme();
+  const { user } = useAuth();
   const dynamicStyles = React.useMemo(() => createStyles(colors), [colors]);
+
+  const displayName = user?.user_metadata?.full_name
+    || user?.email?.split('@')[0]
+    || 'there';
 
   return (
     <SafeAreaView style={dynamicStyles.container}>
-      <ScrollView style={dynamicStyles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={dynamicStyles.content} showsVerticalScrollIndicator={false} contentContainerStyle={dynamicStyles.scrollContent}>
         <View style={dynamicStyles.header}>
           <Text style={dynamicStyles.title}>Dashboard</Text>
-          <Text style={dynamicStyles.subtitle}>Welcome back! Here's your subscription overview.</Text>
+          <Text style={dynamicStyles.subtitle}>Welcome back, {displayName}!</Text>
         </View>
 
         <UpgradeRibbon />
 
-        {/* Basic Dashboard Content */}
         <View style={dynamicStyles.metricsGrid}>
           <View style={dynamicStyles.metricCard}>
             <Text style={dynamicStyles.metricValue}>12</Text>
@@ -48,7 +53,6 @@ export default function Dashboard() {
 
         <AdBanner placement="home" />
 
-        {/* Recent Activity */}
         <View style={dynamicStyles.section}>
           <Text style={dynamicStyles.sectionTitle}>Recent Activity</Text>
           
@@ -82,7 +86,6 @@ export default function Dashboard() {
           </View>
         </View>
 
-        {/* Smart Insights - Gated Feature */}
         <FeatureGate
           feature="smartInsights"
           requiredTier="pro"
@@ -110,24 +113,24 @@ export default function Dashboard() {
           }
         >
           <View style={dynamicStyles.section}>
-            <Text style={dynamicStyles.sectionTitle}>Smart Insights™</Text>
+            <Text style={dynamicStyles.sectionTitle}>Smart Insights</Text>
             
             <View style={dynamicStyles.insightCard}>
-              <Text style={dynamicStyles.insightTitle}>💡 Optimization Opportunity</Text>
+              <Text style={dynamicStyles.insightTitle}>Optimization Opportunity</Text>
               <Text style={dynamicStyles.insightText}>
                 You have 3 similar streaming services. Consolidating to a family plan could save you $23/month.
               </Text>
             </View>
             
             <View style={dynamicStyles.insightCard}>
-              <Text style={dynamicStyles.insightTitle}>📈 Spending Trend</Text>
+              <Text style={dynamicStyles.insightTitle}>Spending Trend</Text>
               <Text style={dynamicStyles.insightText}>
                 Your subscription spending increased by 15% this month, mainly due to new productivity tools.
               </Text>
             </View>
             
             <View style={dynamicStyles.insightCard}>
-              <Text style={dynamicStyles.insightTitle}>⚠️ Renewal Alert</Text>
+              <Text style={dynamicStyles.insightTitle}>Renewal Alert</Text>
               <Text style={dynamicStyles.insightText}>
                 You have $47.98 in renewals coming up in the next 7 days.
               </Text>
@@ -137,7 +140,6 @@ export default function Dashboard() {
 
         {currentTier === 'free' && <AdBanner placement="home" size="medium-rectangle" />}
 
-        {/* Subtle Branding Credit */}
         <View style={dynamicStyles.brandingSection}>
           <PoweredByLanOnasis variant="minimal" />
         </View>
@@ -146,14 +148,16 @@ export default function Dashboard() {
   );
 }
 
-// Dynamic styles function that responds to theme changes
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.background,
   },
   content: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 100,
   },
   header: {
     paddingHorizontal: 20,
@@ -163,12 +167,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1E293B',
+    color: colors.text,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#64748B',
+    color: colors.textSecondary,
   },
   metricsGrid: {
     flexDirection: 'row',
@@ -180,22 +184,22 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   metricCard: {
     flex: 1,
     minWidth: '47%',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.border,
   },
   metricValue: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1E293B',
+    color: colors.text,
     marginBottom: 4,
   },
   metricLabel: {
     fontSize: 12,
-    color: '#64748B',
+    color: colors.textMuted,
     textAlign: 'center',
   },
   section: {
@@ -205,14 +209,14 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1E293B',
+    color: colors.text,
     marginBottom: 16,
   },
   activityList: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.border,
   },
   activityItem: {
     flexDirection: 'row',
@@ -220,13 +224,13 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: colors.borderLight,
   },
   activityDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#3B82F6',
+    backgroundColor: colors.primary,
     marginRight: 12,
   },
   activityContent: {
@@ -235,26 +239,26 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   activityTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#1E293B',
+    color: colors.text,
     marginBottom: 2,
   },
   activityTime: {
     fontSize: 12,
-    color: '#64748B',
+    color: colors.textMuted,
   },
   activityAmount: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#059669',
+    color: colors.success,
   },
   canceledAmount: {
-    color: '#DC2626',
+    color: colors.error,
   },
   renewalsList: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.border,
   },
   renewalItem: {
     flexDirection: 'row',
@@ -262,41 +266,41 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: colors.borderLight,
   },
   renewalService: {
     flex: 1,
     fontSize: 14,
     fontWeight: '500',
-    color: '#1E293B',
+    color: colors.text,
   },
   renewalDate: {
     fontSize: 12,
-    color: '#64748B',
+    color: colors.textMuted,
     marginRight: 16,
   },
   renewalAmount: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1E293B',
+    color: colors.text,
   },
   insightCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.border,
   },
   insightTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1E293B',
+    color: colors.text,
     marginBottom: 8,
   },
   insightText: {
     fontSize: 14,
-    color: '#64748B',
+    color: colors.textSecondary,
     lineHeight: 20,
   },
   brandingSection: {
