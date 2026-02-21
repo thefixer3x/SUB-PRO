@@ -4,8 +4,8 @@ import { Platform } from 'react-native';
 
 // Supabase configuration
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey =
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const envAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseAnonKey = envAnonKey.length > 150 ? envAnonKey : '***REMOVED-SUPABASE-CREDENTIAL***';
 
 // Check if we have the required environment variables
 const missingEnv = !supabaseUrl || !supabaseAnonKey;
