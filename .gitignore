@@ -6,8 +6,6 @@ node_modules/
 dist/
 web-build/
 expo-env.d.ts
-.expo-shm/
-test-dist/
 
 # native
 *.orig.*
@@ -31,7 +29,6 @@ test-dist/
 npm-debug.*
 yarn-debug.*
 yarn-error.*
-bun.lock
 
 # macos
 .DS_Store
@@ -52,8 +49,3 @@ bun.lock
 google-service-account.json
 credentials.json
 cohesive-mender-459104-c3-abc562777578.json
-.qwen/
-**/.qwen/
-.qwen/
-**/.qwen/
-.cache_ggshield

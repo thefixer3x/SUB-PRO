@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native';
 import { Plus, Search, CreditCard, Bot, ExternalLink, Share2, Brain } from 'lucide-react-native';
 import { useSubscription } from '@/hooks/useSubscription';
-import { useTheme } from '@/contexts/ThemeContext';
-import { ThemeColors } from '@/constants/theme';
 import { AdBanner } from '@/components/monetization/AdBanner';
 import { FeatureGate } from '@/components/monetization/FeatureGate';
 import { VirtualCardManager } from '@/components/embeddedFinance/VirtualCardManager';
@@ -14,12 +12,9 @@ import { SmartNotifications } from '@/components/embeddedFinance/SmartNotificati
 import { affiliateSystemService } from '@/services/affiliateSystem';
 import { ShareSubscriptionModal } from '@/components/social/ShareSubscriptionModal';
 import { ShareButton } from '@/components/social/ShareButton';
-import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
 
 export default function Subscriptions() {
   const { currentTier, canAccessFeature, getRemainingLimit } = useSubscription();
-  const { colors } = useTheme();
-  const dynamicStyles = React.useMemo(() => createStyles(colors), [colors]);
   const [showVirtualCards, setShowVirtualCards] = useState<string | null>(null);
   const [showCancellationBot, setShowCancellationBot] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState<string | null>(null);
@@ -130,44 +125,45 @@ export default function Subscriptions() {
   };
 
   const renderSubscriptionCard = (subscription: any) => (
-    <View key={subscription.id} style={dynamicStyles.subscriptionCard}>
-      <View style={dynamicStyles.subscriptionHeader}>
-        <Text style={dynamicStyles.subscriptionName}>{subscription.name}</Text>
-        <Text style={dynamicStyles.subscriptionCost}>${subscription.cost}</Text>
+    <View key={subscription.id} style={styles.subscriptionCard}>
+      <View style={styles.subscriptionHeader}>
+        <Text style={styles.subscriptionName}>{subscription.name}</Text>
+        <Text style={styles.subscriptionCost}>${subscription.cost}</Text>
       </View>
-      <Text style={dynamicStyles.subscriptionPlan}>{subscription.plan}</Text>
-      <Text style={dynamicStyles.subscriptionBilling}>Next billing: {subscription.nextBilling}</Text>
+      <Text style={styles.subscriptionPlan}>{subscription.plan}</Text>
+      <Text style={styles.subscriptionBilling}>Next billing: {subscription.nextBilling}</Text>
       
       {/* Embedded Finance Section */}
       <FeatureGate
         feature="smartInsights"
         requiredTier="pro"
         fallback={
-          <View style={dynamicStyles.embeddedFinanceSection}>
-            <View style={dynamicStyles.embeddedFinanceHeader}>
-              <Text style={dynamicStyles.embeddedFinanceTitle}>Embedded Finance</Text>
-              <Text style={dynamicStyles.embeddedFinanceSubtitle}>Advanced financial services for your subscriptions</Text>
+          <View style={styles.embeddedFinanceSection}>
+            <View style={styles.embeddedFinanceHeader}>
+              <Text style={styles.embeddedFinanceTitle}>🏦 Embedded Finance</Text>
+              <Text style={styles.embeddedFinanceSubtitle}>Advanced financial services for your subscriptions</Text>
             </View>
-            <View style={dynamicStyles.featureComingSoon}>
-              <Text style={dynamicStyles.comingSoonText}>Virtual Cards for secure payments</Text>
-              <Text style={dynamicStyles.comingSoonText}>Credit services - we pay upfront</Text>
-              <Text style={dynamicStyles.comingSoonText}>Automated cancellation bot</Text>
-              <Text style={dynamicStyles.comingSoonText}>Payment optimization</Text>
-              <Text style={dynamicStyles.upgradePrompt}>Upgrade to Pro to unlock these features</Text>
+            <View style={styles.featureComingSoon}>
+              <Text style={styles.comingSoonText}>• Virtual Cards for secure payments</Text>
+              <Text style={styles.comingSoonText}>• Credit services - we pay upfront</Text>
+              <Text style={styles.comingSoonText}>• Automated cancellation bot</Text>
+              <Text style={styles.comingSoonText}>• Payment optimization</Text>
+              <Text style={styles.upgradePrompt}>Upgrade to Pro to unlock these features</Text>
             </View>
           </View>
         }
       >
-        <View style={dynamicStyles.embeddedFinanceSection}>
-          <View style={dynamicStyles.embeddedFinanceHeader}>
-            <Text style={dynamicStyles.embeddedFinanceTitle}>Embedded Finance</Text>
-            <Text style={dynamicStyles.embeddedFinanceSubtitle}>Advanced financial services for your subscriptions</Text>
+        <View style={styles.embeddedFinanceSection}>
+          <View style={styles.embeddedFinanceHeader}>
+            <Text style={styles.embeddedFinanceTitle}>🏦 Embedded Finance</Text>
+            <Text style={styles.embeddedFinanceSubtitle}>Advanced financial services for your subscriptions</Text>
           </View>
 
+          {/* Virtual Cards Service */}
           <VirtualCardInlineView
             subscriptionId={subscription.id.toString()}
             subscriptionName={subscription.name}
-            userId="current-user-id"
+            userId="current-user-id" // TODO: Get from auth context
             expanded={expandedVirtualCard === subscription.id.toString()}
             onToggle={() => {
               setExpandedVirtualCard(
@@ -178,79 +174,82 @@ export default function Subscriptions() {
             }}
           />
 
-          <View style={dynamicStyles.financeServiceCard}>
-            <View style={dynamicStyles.serviceHeader}>
-              <Text style={dynamicStyles.serviceTitle}>Credit Service</Text>
-              <Text style={dynamicStyles.comingSoonBadge}>Coming Soon</Text>
+          {/* Credit Service - Coming Soon */}
+          <View style={styles.financeServiceCard}>
+            <View style={styles.serviceHeader}>
+              <Text style={styles.serviceTitle}>💳 Credit Service</Text>
+              <Text style={styles.comingSoonBadge}>Coming Soon</Text>
             </View>
-            <Text style={dynamicStyles.serviceDescription}>
+            <Text style={styles.serviceDescription}>
               We pay for this subscription upfront. Settle all payments monthly with flexible terms.
             </Text>
           </View>
 
+          {/* AI Assistant - Future Flag */}
           <FeatureGate
             feature="smartInsights"
             requiredTier="pro"
             fallback={
-              <View style={dynamicStyles.financeServiceCard}>
-                <View style={dynamicStyles.serviceHeader}>
-                  <Text style={dynamicStyles.serviceTitle}>AI Assistant</Text>
-                  <Text style={dynamicStyles.futureFlagBadge}>Premium Feature</Text>
+              <View style={styles.financeServiceCard}>
+                <View style={styles.serviceHeader}>
+                  <Text style={styles.serviceTitle}>🤖 AI Assistant</Text>
+                  <Text style={styles.futureFlagBadge}>Premium Feature</Text>
                 </View>
-                <Text style={dynamicStyles.serviceDescription}>
+                <Text style={styles.serviceDescription}>
                   Get personalized recommendations on which subscriptions to pause, cancel, or optimize based on your usage patterns and spending habits.
                 </Text>
               </View>
             }
           >
-            <View style={dynamicStyles.financeServiceCard}>
-              <View style={dynamicStyles.serviceHeader}>
-                <Text style={dynamicStyles.serviceTitle}>AI Assistant</Text>
-                <Text style={dynamicStyles.activeBadge}>Active</Text>
+            <View style={styles.financeServiceCard}>
+              <View style={styles.serviceHeader}>
+                <Text style={styles.serviceTitle}>🤖 AI Assistant</Text>
+                <Text style={styles.activeBadge}>Active</Text>
               </View>
-              <Text style={dynamicStyles.serviceDescription}>
+              <Text style={styles.serviceDescription}>
                 Your personal subscription optimizer. Get AI-powered insights and recommendations.
               </Text>
               <TouchableOpacity
-                style={dynamicStyles.serviceActionButton}
+                style={styles.serviceActionButton}
                 onPress={() => setShowAIAssistant(true)}
               >
-                <Brain size={16} color={colors.info} />
-                <Text style={dynamicStyles.serviceActionText}>Open AI Assistant</Text>
+                <Brain size={16} color="#8B5CF6" />
+                <Text style={styles.serviceActionText}>Open AI Assistant</Text>
               </TouchableOpacity>
             </View>
           </FeatureGate>
 
-          <View style={dynamicStyles.embeddedFinanceActions}>
+          {/* Action Buttons */}
+          <View style={styles.embeddedFinanceActions}>
             <TouchableOpacity
-              style={dynamicStyles.embeddedAction}
+              style={styles.embeddedAction}
               onPress={() => setShowCancellationBot(subscription.id.toString())}
             >
-              <Bot size={16} color={colors.warning} />
-              <Text style={dynamicStyles.embeddedActionText}>Cancel via Bot</Text>
+              <Bot size={16} color="#F59E0B" />
+              <Text style={styles.embeddedActionText}>Cancel via Bot</Text>
             </TouchableOpacity>
             
             <TouchableOpacity
-              style={dynamicStyles.embeddedAction}
+              style={styles.embeddedAction}
               onPress={() => handleShareSubscription(subscription.id.toString())}
             >
-              <Share2 size={16} color={colors.info} />
-              <Text style={dynamicStyles.embeddedActionText}>Share</Text>
+              <Share2 size={16} color="#8B5CF6" />
+              <Text style={styles.embeddedActionText}>Share</Text>
             </TouchableOpacity>
             
             <TouchableOpacity
-              style={dynamicStyles.embeddedAction}
+              style={styles.embeddedAction}
               onPress={() => handleSwitchPlan(subscription)}
             >
-              <ExternalLink size={16} color={colors.success} />
-              <Text style={dynamicStyles.embeddedActionText}>
+              <ExternalLink size={16} color="#10B981" />
+              <Text style={styles.embeddedActionText}>
                 {subscription.hasAffiliateLink ? 'Switch Plan*' : 'Switch Plan'}
               </Text>
             </TouchableOpacity>
           </View>
           
           {subscription.hasAffiliateLink && (
-            <Text style={dynamicStyles.affiliateNote}>
+            <Text style={styles.affiliateNote}>
               * Affiliate link - we may earn a commission
             </Text>
           )}
@@ -264,97 +263,98 @@ export default function Subscriptions() {
   );
 
   return (
-    <SafeAreaView style={dynamicStyles.container}>
-      <ScrollView style={dynamicStyles.content} showsVerticalScrollIndicator={false} contentContainerStyle={dynamicStyles.scrollContent}>
-        <View style={dynamicStyles.header}>
-          <Text style={dynamicStyles.title}>Subscriptions</Text>
-          <Text style={dynamicStyles.subtitle}>Manage your active subscriptions</Text>
+    <SafeAreaView style={styles.container}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Subscriptions</Text>
+          <Text style={styles.subtitle}>Manage your active subscriptions</Text>
         </View>
 
+        {/* Subscription limit warning for free users */}
         {currentTier === 'free' && remainingSlots !== null && (
           <View style={[
-            dynamicStyles.limitWarning,
-            remainingSlots <= 1 && dynamicStyles.limitWarningUrgent
+            styles.limitWarning,
+            remainingSlots <= 1 && styles.limitWarningUrgent
           ]}>
-            <Text style={dynamicStyles.limitText}>
+            <Text style={styles.limitText}>
               {remainingSlots > 0 
                 ? `${remainingSlots} subscription slots remaining`
                 : 'Subscription limit reached'
               }
             </Text>
             {remainingSlots <= 1 && (
-              <TouchableOpacity style={dynamicStyles.upgradeLink}>
-                <Text style={dynamicStyles.upgradeLinkText}>Upgrade for unlimited</Text>
+              <TouchableOpacity style={styles.upgradeLink}>
+                <Text style={styles.upgradeLinkText}>Upgrade for unlimited</Text>
               </TouchableOpacity>
             )}
           </View>
         )}
 
-        <View style={dynamicStyles.actionBar}>
-          <View style={dynamicStyles.searchContainer}>
-            <Search size={20} color={colors.textMuted} />
-            <Text style={dynamicStyles.searchPlaceholder}>Search subscriptions...</Text>
+        {/* Search and Add Section */}
+        <View style={styles.actionBar}>
+          <View style={styles.searchContainer}>
+            <Search size={20} color="#64748B" />
+            <Text style={styles.searchPlaceholder}>Search subscriptions...</Text>
           </View>
           
           <TouchableOpacity 
             style={[
-              dynamicStyles.addButton,
-              !canAddMore && dynamicStyles.addButtonDisabled
+              styles.addButton,
+              !canAddMore && styles.addButtonDisabled
             ]}
             onPress={handleAddSubscription}
             disabled={!canAddMore}
           >
-            <Plus size={20} color={canAddMore ? "#ffffff" : colors.textMuted} />
+            <Plus size={20} color={canAddMore ? "#ffffff" : "#94A3B8"} />
           </TouchableOpacity>
         </View>
 
         <AdBanner placement="subscriptions" />
 
-        <View style={dynamicStyles.subscriptionsList}>
+        {/* Subscriptions List */}
+        <View style={styles.subscriptionsList}>
           {subscriptions.map(renderSubscriptionCard)}
         </View>
 
+        {/* Bulk Upload Feature Gate */}
         <FeatureGate
           feature="bulkUpload"
           requiredTier="pro"
           fallback={
-            <View style={dynamicStyles.featurePrompt}>
-              <Text style={dynamicStyles.featurePromptTitle}>Bulk Import</Text>
-              <Text style={dynamicStyles.featurePromptText}>
+            <View style={styles.featurePrompt}>
+              <Text style={styles.featurePromptTitle}>Bulk Import</Text>
+              <Text style={styles.featurePromptText}>
                 Import multiple subscriptions at once with CSV upload. Available in Pro plan.
               </Text>
             </View>
           }
         >
-          <TouchableOpacity style={dynamicStyles.bulkUploadButton}>
-            <Text style={dynamicStyles.bulkUploadText}>Import from CSV</Text>
+          <TouchableOpacity style={styles.bulkUploadButton}>
+            <Text style={styles.bulkUploadText}>Import from CSV</Text>
           </TouchableOpacity>
         </FeatureGate>
 
         {currentTier === 'free' && <AdBanner placement="subscriptions" size="medium-rectangle" />}
 
-        <View style={dynamicStyles.summary}>
-          <Text style={dynamicStyles.summaryTitle}>Monthly Summary</Text>
-          <View style={dynamicStyles.summaryRow}>
-            <Text style={dynamicStyles.summaryLabel}>Active subscriptions</Text>
-            <Text style={dynamicStyles.summaryValue}>{subscriptions.length}</Text>
+        {/* Summary */}
+        <View style={styles.summary}>
+          <Text style={styles.summaryTitle}>Monthly Summary</Text>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Active subscriptions</Text>
+            <Text style={styles.summaryValue}>{subscriptions.length}</Text>
           </View>
-          <View style={dynamicStyles.summaryRow}>
-            <Text style={dynamicStyles.summaryLabel}>Total monthly cost</Text>
-            <Text style={dynamicStyles.summaryValue}>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Total monthly cost</Text>
+            <Text style={styles.summaryValue}>
               ${subscriptions.reduce((sum, sub) => sum + sub.cost, 0).toFixed(2)}
             </Text>
           </View>
-          <View style={dynamicStyles.summaryRow}>
-            <Text style={dynamicStyles.summaryLabel}>Annual projection</Text>
-            <Text style={dynamicStyles.summaryValue}>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Annual projection</Text>
+            <Text style={styles.summaryValue}>
               ${(subscriptions.reduce((sum, sub) => sum + sub.cost, 0) * 12).toFixed(2)}
             </Text>
           </View>
-        </View>
-
-        <View style={dynamicStyles.brandingSection}>
-          <PoweredByLanOnasis variant="minimal" />
         </View>
       </ScrollView>
 
@@ -411,16 +411,13 @@ export default function Subscriptions() {
   );
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#f8fafc',
   },
   content: {
     flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 100,
   },
   header: {
     paddingHorizontal: 20,
@@ -430,30 +427,30 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: colors.text,
+    color: '#1E293B',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: colors.textSecondary,
+    color: '#64748B',
   },
   limitWarning: {
-    backgroundColor: colors.selected,
+    backgroundColor: '#EFF6FF',
     marginHorizontal: 20,
     padding: 16,
     borderRadius: 12,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: colors.primary,
+    borderColor: '#3B82F6',
   },
   limitWarningUrgent: {
-    backgroundColor: colors.selected,
-    borderColor: colors.warning,
+    backgroundColor: '#FEF3F2',
+    borderColor: '#F59E0B',
   },
   limitText: {
     fontSize: 14,
     fontWeight: '500',
-    color: colors.text,
+    color: '#1E293B',
     marginBottom: 8,
   },
   upgradeLink: {
@@ -462,7 +459,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   upgradeLinkText: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.primary,
+    color: '#3B82F6',
   },
   actionBar: {
     flexDirection: 'row',
@@ -474,39 +471,39 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.card,
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E2E8F0',
   },
   searchPlaceholder: {
     flex: 1,
     fontSize: 16,
-    color: colors.textMuted,
+    color: '#94A3B8',
     marginLeft: 12,
   },
   addButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#3B82F6',
     borderRadius: 12,
     padding: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   addButtonDisabled: {
-    backgroundColor: colors.border,
+    backgroundColor: '#E2E8F0',
   },
   subscriptionsList: {
     paddingHorizontal: 20,
     gap: 12,
   },
   subscriptionCard: {
-    backgroundColor: colors.card,
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E2E8F0',
   },
   subscriptionHeader: {
     flexDirection: 'row',
@@ -517,21 +514,21 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   subscriptionName: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.text,
+    color: '#1E293B',
   },
   subscriptionCost: {
     fontSize: 18,
     fontWeight: '700',
-    color: colors.success,
+    color: '#059669',
   },
   subscriptionPlan: {
     fontSize: 14,
-    color: colors.textSecondary,
+    color: '#64748B',
     marginBottom: 4,
   },
   subscriptionBilling: {
     fontSize: 12,
-    color: colors.textMuted,
+    color: '#94A3B8',
     marginBottom: 12,
   },
   embeddedFinanceActions: {
@@ -544,45 +541,45 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.cardSecondary,
+    backgroundColor: '#F8FAFC',
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E2E8F0',
     gap: 4,
   },
   embeddedActionText: {
     fontSize: 12,
     fontWeight: '500',
-    color: colors.text,
+    color: '#1E293B',
   },
   affiliateNote: {
     fontSize: 10,
-    color: colors.textMuted,
+    color: '#64748B',
     textAlign: 'center',
     fontStyle: 'italic',
   },
   featureComingSoon: {
-    backgroundColor: colors.cardSecondary,
+    backgroundColor: '#F8FAFC',
     padding: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E2E8F0',
     borderStyle: 'dashed',
     alignItems: 'center',
   },
   comingSoonText: {
     fontSize: 12,
-    color: colors.textMuted,
+    color: '#64748B',
   },
   featurePrompt: {
-    backgroundColor: colors.cardSecondary,
+    backgroundColor: '#F8FAFC',
     marginHorizontal: 20,
     padding: 20,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E2E8F0',
     borderStyle: 'dashed',
     alignItems: 'center',
     marginVertical: 16,
@@ -590,17 +587,17 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   featurePromptTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text,
+    color: '#1E293B',
     marginBottom: 8,
   },
   featurePromptText: {
     fontSize: 14,
-    color: colors.textSecondary,
+    color: '#64748B',
     textAlign: 'center',
     lineHeight: 20,
   },
   bulkUploadButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#3B82F6',
     marginHorizontal: 20,
     paddingVertical: 16,
     borderRadius: 12,
@@ -610,21 +607,21 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   bulkUploadText: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.textInverse,
+    color: '#ffffff',
   },
   summary: {
-    backgroundColor: colors.card,
+    backgroundColor: '#ffffff',
     marginHorizontal: 20,
     marginVertical: 24,
     borderRadius: 12,
     padding: 20,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E2E8F0',
   },
   summaryTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.text,
+    color: '#1E293B',
     marginBottom: 16,
   },
   summaryRow: {
@@ -635,21 +632,21 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 14,
-    color: colors.textSecondary,
+    color: '#64748B',
   },
   summaryValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.text,
+    color: '#1E293B',
   },
   embeddedFinanceSection: {
-    backgroundColor: colors.cardSecondary,
+    backgroundColor: '#F8FAFC',
     marginTop: 16,
     marginBottom: 8,
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E2E8F0',
   },
   embeddedFinanceHeader: {
     marginBottom: 16,
@@ -657,20 +654,20 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   embeddedFinanceTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text,
+    color: '#1E293B',
     marginBottom: 4,
   },
   embeddedFinanceSubtitle: {
     fontSize: 12,
-    color: colors.textMuted,
+    color: '#64748B',
   },
   financeServiceCard: {
-    backgroundColor: colors.card,
+    backgroundColor: '#ffffff',
     padding: 12,
     borderRadius: 8,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E2E8F0',
   },
   serviceHeader: {
     flexDirection: 'row',
@@ -681,12 +678,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   serviceTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: colors.text,
+    color: '#1E293B',
   },
   comingSoonBadge: {
     fontSize: 10,
-    color: colors.warning,
-    backgroundColor: colors.cardSecondary,
+    color: '#F59E0B',
+    backgroundColor: '#FEF3C7',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
@@ -694,20 +691,20 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   serviceDescription: {
     fontSize: 12,
-    color: colors.textSecondary,
+    color: '#64748B',
     lineHeight: 16,
   },
   upgradePrompt: {
     fontSize: 12,
-    color: colors.primary,
+    color: '#3B82F6',
     fontWeight: '500',
     marginTop: 8,
     textAlign: 'center',
   },
   futureFlagBadge: {
     fontSize: 10,
-    color: colors.info,
-    backgroundColor: colors.cardSecondary,
+    color: '#8B5CF6',
+    backgroundColor: '#F3E8FF',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
@@ -715,8 +712,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   activeBadge: {
     fontSize: 10,
-    color: colors.success,
-    backgroundColor: colors.cardSecondary,
+    color: '#059669',
+    backgroundColor: '#D1FAE5',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
@@ -726,23 +723,18 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.cardSecondary,
+    backgroundColor: '#F8FAFC',
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 6,
     marginTop: 8,
     gap: 6,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E2E8F0',
   },
   serviceActionText: {
     fontSize: 12,
     fontWeight: '500',
-    color: colors.text,
-  },
-  brandingSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    alignItems: 'center',
+    color: '#1E293B',
   },
 });

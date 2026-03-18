@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,29 +6,12 @@ import {
   Pressable,
   ScrollView,
   Alert,
-  StyleSheet,
   Platform,
+  StyleSheet,
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { useTheme } from '@/contexts/ThemeContext';
-import { ThemeColors } from '@/constants/theme';
-
-const FormCard = ({ children, style }: { children: React.ReactNode; style?: any }) => {
-  if (Platform.OS === 'web') {
-    return (
-      <View style={[style, { backgroundColor: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)' }]}>
-        {children}
-      </View>
-    );
-  }
-  return (
-    <BlurView intensity={20} style={style}>
-      {children}
-    </BlurView>
-  );
-};
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -45,24 +28,16 @@ import {
   Shield,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAuth } from '@/contexts/AuthContext';
 
 const SignInPage = () => {
   const insets = useSafeAreaInsets();
-  const { colors, themeName } = useTheme();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const { signIn, signInAsGuest, authLoading, isDemoModeEnabled } = useAuth();
-  
-  const gradientColors = useMemo(() => {
-    return themeName === 'dark' 
-      ? [colors.background, colors.backgroundSecondary, colors.card] as const
-      : ['#1E293B', '#334155', '#475569'] as const;
-  }, [themeName, colors]);
 
   const fadeAnim = useSharedValue(0);
   const slideAnim = useSharedValue(30);
@@ -77,50 +52,28 @@ const SignInPage = () => {
     transform: [{ translateY: slideAnim.value }],
   }));
 
-  const showAlert = (title: string, message: string) => {
-    if (typeof window !== 'undefined' && window.alert) {
-      window.alert(`${title}\n\n${message}`);
-    } else {
-      Alert.alert(title, message);
-    }
-  };
-
   const handleSignIn = async () => {
-    console.log('Sign in button clicked');
-    const email = formData.email.trim().toLowerCase();
-    const password = formData.password;
-
-    if (!email || !password) {
-      showAlert('Error', 'Please fill in all fields');
+    if (!formData.email || !formData.password) {
+      Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
-    console.log('Attempting sign in for:', email);
-
+    setIsLoading(true);
+    
     try {
-      const { success, error } = await signIn(email, password);
-      console.log('Sign in result:', { success, error });
-
-      if (!success) {
-        const isNetworkIssue = error?.toLowerCase().includes('network');
-        showAlert(
-          isNetworkIssue ? 'Network Error' : 'Sign In Failed',
-          isNetworkIssue
-            ? 'We were unable to connect. Please check your internet connection and try again.'
-            : error ?? 'Unable to sign in. Please try again.',
-        );
-        return;
-      }
-
-      console.log('Sign in successful, navigating to tabs');
-      router.replace('/(tabs)');
+      // TODO: Implement actual authentication logic with Supabase
+      // For now, just simulate a successful sign in
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      Alert.alert(
+        'Success!', 
+        'Welcome back to SubTrack Pro!',
+        [{ text: 'Continue', onPress: () => router.replace('/(tabs)') }]
+      );
     } catch (error) {
-      console.error('Sign in error:', error);
-      const isNetworkIssue = error instanceof Error && error.message.toLowerCase().includes('network');
-      const message = isNetworkIssue
-        ? 'We were unable to connect. Please check your internet connection and try again.'
-        : 'Failed to sign in. Please try again.';
-      showAlert(isNetworkIssue ? 'Network Error' : 'Sign In Failed', message);
+      Alert.alert('Error', 'Failed to sign in. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -133,9 +86,9 @@ const SignInPage = () => {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background }]}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <LinearGradient
-        colors={gradientColors}
+        colors={['#1E293B', '#334155', '#475569']}
         style={styles.background}
       >
         {/* Header */}
@@ -165,7 +118,7 @@ const SignInPage = () => {
             </View>
 
             {/* Sign In Form */}
-            <FormCard style={styles.formCard}>
+            <BlurView intensity={20} style={styles.formCard}>
               <View style={styles.formContent}>
                 {/* Email Input */}
                 <View style={styles.inputGroup}>
@@ -231,58 +184,28 @@ const SignInPage = () => {
 
                 {/* Sign In Button */}
                 <Pressable
-                  testID="sign-in-submit"
-                  style={({ pressed }) => [
-                    styles.signInButton,
-                    authLoading && styles.signInButtonLoading,
-                    pressed && { opacity: 0.8 }
-                  ]}
+                  style={[styles.signInButton, isLoading && styles.signInButtonLoading]}
                   onPress={handleSignIn}
-                  disabled={authLoading}
-                  accessible={true}
-                  accessibilityRole="button"
-                  accessibilityLabel="Sign In"
+                  disabled={isLoading}
                 >
                   <LinearGradient
-                    colors={authLoading ? ['#9CA3AF', '#6B7280'] : ['#3B82F6', '#1D4ED8']}
-                    style={[styles.signInGradient, { pointerEvents: 'none' }]}
+                    colors={isLoading ? ['#9CA3AF', '#6B7280'] : ['#3B82F6', '#1D4ED8']}
+                    style={styles.signInGradient}
                   >
                     <Text style={styles.signInText}>
-                      {authLoading ? 'Signing In...' : 'Sign In'}
+                      {isLoading ? 'Signing In...' : 'Sign In'}
                     </Text>
                   </LinearGradient>
                 </Pressable>
 
-                {/* Demo Mode Button - Only visible when demo mode is enabled */}
-                {isDemoModeEnabled && (
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.demoButton,
-                      pressed && { opacity: 0.8 }
-                    ]}
-                    onPress={async () => {
-                      const result = await signInAsGuest();
-                      if (result.success) {
-                        router.replace('/(tabs)');
-                      }
-                    }}
-                    disabled={authLoading}
-                    accessible={true}
-                    accessibilityRole="button"
-                    accessibilityLabel="Continue as Guest"
-                  >
-                    <Text style={styles.demoButtonText}>Continue as Guest (Demo Mode)</Text>
-                  </Pressable>
-                )}
-
-                <View style={styles.signUpContainer}>
-                  <Text style={styles.signUpText}>Don't have an account? </Text>
+                <Text style={styles.signUpText}>
+                  Don't have an account?{' '}
                   <Pressable onPress={() => router.push('/(auth)/signup')}>
                     <Text style={styles.signUpLink}>Sign Up</Text>
                   </Pressable>
-                </View>
+                </Text>
               </View>
-            </FormCard>
+            </BlurView>
 
             {/* Security Section */}
             <View style={styles.securitySection}>
@@ -431,22 +354,7 @@ const styles = StyleSheet.create({
   signInButton: {
     borderRadius: 12,
     overflow: 'hidden',
-    marginBottom: 12,
-  },
-  demoButton: {
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#F59E0B',
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 20,
-  },
-  demoButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#F59E0B',
   },
   signInButtonLoading: {
     opacity: 0.7,
@@ -460,11 +368,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
-  },
-  signUpContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   signUpText: {
     fontSize: 14,

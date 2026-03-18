@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,29 +6,12 @@ import {
   Pressable,
   ScrollView,
   Alert,
-  StyleSheet,
   Platform,
+  StyleSheet,
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { useTheme } from '@/contexts/ThemeContext';
-import { ThemeColors } from '@/constants/theme';
-
-const FormCard = ({ children, style }: { children: React.ReactNode; style?: any }) => {
-  if (Platform.OS === 'web') {
-    return (
-      <View style={[style, { backgroundColor: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)' }]}>
-        {children}
-      </View>
-    );
-  }
-  return (
-    <BlurView intensity={20} style={style}>
-      {children}
-    </BlurView>
-  );
-};
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -46,14 +29,9 @@ import {
   Shield,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
-import { useAuth } from '@/contexts/AuthContext';
-import { PASSWORD_REQUIREMENTS } from '@/constants/auth';
-import { validatePassword } from '@/utils/auth/validatePassword';
 
 const SignUpPage = () => {
   const insets = useSafeAreaInsets();
-  const { colors, themeName } = useTheme();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -62,14 +40,8 @@ const SignUpPage = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const { signUp: signUpWithEmail, signInAsGuest, authLoading, isDemoModeEnabled } = useAuth();
-
-  const gradientColors = useMemo(() => {
-    return themeName === 'dark' 
-      ? [colors.background, colors.backgroundSecondary, colors.card] as const
-      : ['#1E293B', '#334155', '#475569'] as const;
-  }, [themeName, colors]);
 
   const fadeAnim = useSharedValue(0);
   const slideAnim = useSharedValue(30);
@@ -84,84 +56,33 @@ const SignUpPage = () => {
     transform: [{ translateY: slideAnim.value }],
   }));
 
-  const showAlert = (title: string, message: string, onOk?: () => void) => {
-    if (typeof window !== 'undefined' && window.alert) {
-      window.alert(`${title}\n\n${message}`);
-      if (onOk) onOk();
-    } else {
-      Alert.alert(title, message, onOk ? [{ text: 'OK', onPress: onOk }] : undefined);
-    }
-  };
-
   const handleSignUp = async () => {
-    console.log('Sign up button clicked');
-    const name = formData.name.trim();
-    const email = formData.email.trim().toLowerCase();
-    const password = formData.password;
-    const confirmPassword = formData.confirmPassword;
-
-    if (!name || !email || !password) {
-      showAlert('Error', 'Please fill in all fields');
+    if (!formData.name || !formData.email || !formData.password) {
+      Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
-    if (password !== confirmPassword) {
-      showAlert('Error', 'Passwords do not match');
-      return;
-    }
-
-    const passwordValidation = validatePassword(password);
-    if (!passwordValidation.valid) {
-      showAlert('Weak Password', passwordValidation.message ?? PASSWORD_REQUIREMENTS);
+    if (formData.password !== formData.confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
       return;
     }
 
     if (!acceptedTerms) {
-      showAlert('Error', 'Please accept the terms and conditions');
+      Alert.alert('Error', 'Please accept the terms and conditions');
       return;
     }
 
-    console.log('Attempting sign up for:', email);
-
-    try {
-      const { success, error, requiresEmailConfirmation } = await signUpWithEmail({
-        email,
-        password,
-        fullName: name,
-      });
-
-      console.log('Sign up result:', { success, error, requiresEmailConfirmation });
-
-      if (!success) {
-        const isNetworkIssue = error?.toLowerCase().includes('network');
-        showAlert(
-          isNetworkIssue ? 'Network Error' : 'Sign Up Failed',
-          isNetworkIssue
-            ? 'We were unable to connect. Please check your internet connection and try again.'
-            : error ?? 'Unable to create your account. Please try again.',
-        );
-        return;
-      }
-
-      if (requiresEmailConfirmation) {
-        showAlert(
-          'Confirm Your Email',
-          `We sent a confirmation link to ${email}. Please verify your email before signing in.`,
-          () => router.replace('/(auth)/signin'),
-        );
-        return;
-      }
-
-      showAlert('Success!', 'Account created successfully. Welcome to SubTrack Pro!');
-      router.replace('/(tabs)');
-    } catch (error) {
-      console.error('Sign up error:', error);
-      const isNetworkIssue = error instanceof Error && error.message.toLowerCase().includes('network');
-      const message = isNetworkIssue
-        ? 'We were unable to connect. Please check your internet connection and try again.'
-        : 'Failed to create your account. Please try again.';
-      showAlert(isNetworkIssue ? 'Network Error' : 'Sign Up Failed', message);
-    }
+    setIsLoading(true);
+    
+    // Simulate API call
+    setTimeout(() => {
+      setIsLoading(false);
+      Alert.alert(
+        'Success!',
+        'Account created successfully. Welcome to SubTrack Pro!',
+        [{ text: 'Get Started', onPress: () => router.replace('/(tabs)') }]
+      );
+    }, 2000);
   };
 
   const benefits = [
@@ -174,26 +95,25 @@ const SignUpPage = () => {
   ];
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={styles.container}>
       <LinearGradient
-        colors={gradientColors}
-        style={styles.fullBackground}
+        colors={['#667eea', '#764ba2']}
+        style={[styles.header, { paddingTop: insets.top + 10 }]}
       >
-        <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-          <Pressable
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <ArrowLeft size={24} color="#FFFFFF" />
-          </Pressable>
-          
-          <Text style={styles.headerTitle}>Join SubTrack Pro</Text>
-          <Text style={styles.headerSubtitle}>
-            Start your 14-day free trial today
-          </Text>
-        </View>
+        <Pressable
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <ArrowLeft size={24} color="#FFFFFF" />
+        </Pressable>
+        
+        <Text style={styles.headerTitle}>Join SubTrack Pro</Text>
+        <Text style={styles.headerSubtitle}>
+          Start your 14-day free trial today
+        </Text>
+      </LinearGradient>
 
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <Animated.View style={[styles.content, animatedStyle]}>
           {/* Benefits Preview */}
           <View style={styles.benefitsSection}>
@@ -209,7 +129,7 @@ const SignUpPage = () => {
           </View>
 
           {/* Sign Up Form */}
-          <FormCard style={styles.formContainer}>
+          <BlurView intensity={20} style={styles.formContainer}>
             <View style={styles.formHeader}>
               <Shield size={32} color="#667eea" />
               <Text style={styles.formTitle}>Create Your Account</Text>
@@ -228,7 +148,7 @@ const SignUpPage = () => {
                   placeholder="Full Name"
                   placeholderTextColor="#9CA3AF"
                   value={formData.name}
-                  onChangeText={(text: string) => setFormData(prev => ({ ...prev, name: text }))}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
                   autoCapitalize="words"
                 />
               </View>
@@ -242,7 +162,7 @@ const SignUpPage = () => {
                   placeholder="Email Address"
                   placeholderTextColor="#9CA3AF"
                   value={formData.email}
-                  onChangeText={(text: string) => setFormData(prev => ({ ...prev, email: text }))}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, email: text }))}
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />
@@ -257,7 +177,7 @@ const SignUpPage = () => {
                   placeholder="Password"
                   placeholderTextColor="#9CA3AF"
                   value={formData.password}
-                  onChangeText={(text: string) => setFormData(prev => ({ ...prev, password: text }))}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, password: text }))}
                   secureTextEntry={!showPassword}
                 />
                 <Pressable
@@ -281,7 +201,7 @@ const SignUpPage = () => {
                   placeholder="Confirm Password"
                   placeholderTextColor="#9CA3AF"
                   value={formData.confirmPassword}
-                  onChangeText={(text: string) => setFormData(prev => ({ ...prev, confirmPassword: text }))}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, confirmPassword: text }))}
                   secureTextEntry={!showConfirmPassword}
                 />
                 <Pressable
@@ -312,58 +232,28 @@ const SignUpPage = () => {
               </Pressable>
 
               <Pressable
-                testID="sign-up-submit"
-                style={({ pressed }) => [
-                  styles.signUpButton,
-                  authLoading && styles.signUpButtonDisabled,
-                  pressed && { opacity: 0.8 }
-                ]}
+                style={[styles.signUpButton, isLoading && styles.signUpButtonDisabled]}
                 onPress={handleSignUp}
-                disabled={authLoading}
-                accessible={true}
-                accessibilityRole="button"
-                accessibilityLabel="Start Free Trial"
+                disabled={isLoading}
               >
                 <LinearGradient
-                  colors={authLoading ? ['#9CA3AF', '#6B7280'] : ['#F59E0B', '#F97316']}
-                  style={[styles.signUpGradient, { pointerEvents: 'none' }]}
+                  colors={isLoading ? ['#9CA3AF', '#6B7280'] : ['#F59E0B', '#F97316']}
+                  style={styles.signUpGradient}
                 >
                   <Text style={styles.signUpText}>
-                    {authLoading ? 'Creating Account...' : 'Start Free Trial'}
+                    {isLoading ? 'Creating Account...' : 'Start Free Trial'}
                   </Text>
                 </LinearGradient>
               </Pressable>
 
-              {/* Demo Mode Button - Only visible when demo mode is enabled */}
-              {isDemoModeEnabled && (
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.demoButton,
-                    pressed && { opacity: 0.8 }
-                  ]}
-                  onPress={async () => {
-                    const result = await signInAsGuest();
-                    if (result.success) {
-                      router.replace('/(tabs)');
-                    }
-                  }}
-                  disabled={authLoading}
-                  accessible={true}
-                  accessibilityRole="button"
-                  accessibilityLabel="Continue as Guest"
-                >
-                  <Text style={styles.demoButtonText}>Continue as Guest (Demo Mode)</Text>
-                </Pressable>
-              )}
-
-              <View style={styles.signInContainer}>
-                <Text style={styles.signInText}>Already have an account? </Text>
+              <Text style={styles.signInText}>
+                Already have an account?{' '}
                 <Pressable onPress={() => router.push('/(auth)/signin')}>
                   <Text style={styles.signInLink}>Sign In</Text>
                 </Pressable>
-              </View>
+              </Text>
             </View>
-          </FormCard>
+          </BlurView>
 
           {/* Trust Indicators */}
           <View style={styles.trustSection}>
@@ -378,15 +268,9 @@ const SignUpPage = () => {
                 <Text style={styles.trustText}>SOC 2 compliant</Text>
               </View>
             </View>
-            
-            {/* Development Partner Credit */}
-            <View style={styles.partnerCreditContainer}>
-              <PoweredByLanOnasis variant="minimal" />
-            </View>
           </View>
         </Animated.View>
       </ScrollView>
-      </LinearGradient>
     </View>
   );
 };
@@ -394,9 +278,7 @@ const SignUpPage = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  fullBackground: {
-    flex: 1,
+    backgroundColor: '#F8FAFC',
   },
   header: {
     paddingHorizontal: 20,
@@ -431,7 +313,7 @@ const styles = StyleSheet.create({
   benefitsTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#1F2937',
     marginBottom: 16,
     textAlign: 'center',
   },
@@ -441,18 +323,23 @@ const styles = StyleSheet.create({
   benefitItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#FFFFFF',
     padding: 16,
     borderRadius: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   benefitText: {
     fontSize: 16,
-    color: '#FFFFFF',
+    color: '#374151',
     marginLeft: 12,
     fontWeight: '500',
   },
   formContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 20,
     padding: 24,
     marginBottom: 32,
@@ -536,21 +423,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginTop: 8,
   },
-  demoButton: {
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#F59E0B',
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-  },
-  demoButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#F59E0B',
-  },
   signUpButtonDisabled: {
     opacity: 0.7,
   },
@@ -565,18 +437,12 @@ const styles = StyleSheet.create({
   },
   signInText: {
     fontSize: 16,
-    color: '#CBD5E1',
+    color: '#6B7280',
     textAlign: 'center',
     marginTop: 8,
   },
-  signInContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 8,
-  },
   signInLink: {
-    color: '#3B82F6',
+    color: '#667eea',
     fontWeight: '500',
   },
   trustSection: {
@@ -585,7 +451,7 @@ const styles = StyleSheet.create({
   trustTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#1F2937',
     marginBottom: 16,
   },
   trustIndicators: {
@@ -598,12 +464,8 @@ const styles = StyleSheet.create({
   },
   trustText: {
     fontSize: 14,
-    color: '#CBD5E1',
+    color: '#6B7280',
     fontWeight: '500',
-  },
-  partnerCreditContainer: {
-    marginTop: 24,
-    alignItems: 'center',
   },
 });
 

@@ -1,11 +1,11 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '../lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+import { Database } from '@/lib/supabase';
 
 // Server-side database service for webhook handlers
 // This maintains the existing security model by only accessing server-side environment variables
 
 class DatabaseService {
-  private supabase: SupabaseClient<Database>;
+  private supabase;
 
   constructor() {
     const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -16,18 +16,12 @@ class DatabaseService {
     }
 
     // Use service role key for server-side operations
-    this.supabase = createClient<Database, 'public'>(supabaseUrl, serviceRoleKey, {
+    this.supabase = createClient<Database>(supabaseUrl, serviceRoleKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
       },
     });
-  }
-
-  // Temporary helper until Supabase generated types are added to the project
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private from(table: keyof Database['public']['Tables']) {
-    return this.supabase.from(table as any) as any;
   }
 
   // Update user's subscription tier based on Stripe subscription
@@ -45,9 +39,9 @@ class DatabaseService {
 
       // Only update if subscription is active
       if (status === 'active') {
-        const { data, error } = await this
+        const { data, error } = await this.supabase
           .from('profiles')
-          .update({
+          .update({ 
             subscription_tier: tier,
             updated_at: new Date().toISOString()
           })
@@ -62,9 +56,9 @@ class DatabaseService {
         return true;
       } else if (status === 'canceled' || status === 'unpaid') {
         // Downgrade to free tier
-        const { data, error } = await this
+        const { data, error } = await this.supabase
           .from('profiles')
-          .update({
+          .update({ 
             subscription_tier: 'free',
             updated_at: new Date().toISOString()
           })
@@ -104,7 +98,7 @@ class DatabaseService {
       }
 
       // Store only non-sensitive card metadata
-      const { data: cardRef, error: cardError } = await this
+      const { data: cardRef, error: cardError } = await this.supabase
         .from('virtual_cards')
         .insert({
           user_id: userId,
@@ -115,7 +109,7 @@ class DatabaseService {
           subscription_id: cardData.subscription_id,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        } as any);
+        });
 
       if (cardError) {
         console.error('Error storing virtual card reference:', cardError);
@@ -144,7 +138,7 @@ class DatabaseService {
       console.log('Storing card authorization:', { authId: authData.authorization_id, amount: authData.amount });
 
       // Store authorization for spending tracking
-      const { data, error } = await this
+      const { data, error } = await this.supabase
         .from('card_authorizations')
         .insert({
           stripe_authorization_id: authData.authorization_id,
@@ -156,7 +150,7 @@ class DatabaseService {
           approved: authData.approved,
           transaction_date: authData.created.toISOString(),
           created_at: new Date().toISOString(),
-        } as any);
+        });
 
       if (error) {
         console.error('Error storing card authorization:', error);
@@ -175,7 +169,7 @@ class DatabaseService {
   async findUserByStripeCustomerId(stripeCustomerId: string): Promise<string | null> {
     try {
       // Look for user with this stripe customer ID in metadata or profile
-      const { data, error } = await this
+      const { data, error } = await this.supabase
         .from('profiles')
         .select('id')
         .eq('stripe_customer_id', stripeCustomerId)
@@ -186,7 +180,7 @@ class DatabaseService {
         return null;
       }
 
-      return (data as { id: string }).id;
+      return data.id;
     } catch (error) {
       console.error('Error finding user by Stripe customer ID:', error);
       return null;
@@ -204,18 +198,18 @@ class DatabaseService {
     subscription_id?: string;
   }) {
     try {
-      console.log('Storing payment record:', {
-        userId: paymentData.user_id,
-        amount: paymentData.amount,
-        status: paymentData.status
+      console.log('Storing payment record:', { 
+        userId: paymentData.user_id, 
+        amount: paymentData.amount, 
+        status: paymentData.status 
       });
 
-      const { data, error } = await this
+      const { data, error } = await this.supabase
         .from('payment_records')
         .insert({
           ...paymentData,
           created_at: new Date().toISOString(),
-        } as any);
+        });
 
       if (error) {
         console.error('Error storing payment record:', error);

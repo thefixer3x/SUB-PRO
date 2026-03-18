@@ -1,17 +1,22 @@
 {
-  "version": 2,
-  "buildCommand": "npx expo export -p web --output-dir dist",
-  "outputDirectory": "dist",
-  "framework": null,
-  "trailingSlash": false,
-  "rewrites": [
+  "builds": [
     {
-      "source": "/api/create-checkout-session",
-      "destination": "https://subtrack-pro.lanonasis.com/.netlify/functions/create-checkout-session"
-    },
-    {
-      "source": "/((?!_expo|static|favicon.ico|manifest.json|service-worker.js).*)",
-      "destination": "/index.html"
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": { 
+        "distDir": "dist" 
+      }
     }
-  ]
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  "build": {
+    "env": {
+      "NODE_ENV": "production"
+    }
+  }
 }

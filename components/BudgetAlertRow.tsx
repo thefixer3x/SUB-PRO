@@ -112,25 +112,17 @@ export const BudgetAlertRow: React.FC<BudgetAlertRowProps> = ({
   };
 
   const handleInputChange = (text: string) => {
-    // Allow numbers, optional leading negative, and decimal point
-    const filteredText = text.replace(/[^0-9.-]/g, '');
-
-    const decimalParts = filteredText.split('.');
-    if (decimalParts.length > 2) {
+    // Allow only numbers and decimal point
+    const filteredText = text.replace(/[^0-9.]/g, '');
+    
+    // Prevent multiple decimal points
+    const parts = filteredText.split('.');
+    if (parts.length > 2) {
       return;
     }
-
-    const negativeCount = (filteredText.match(/-/g) ?? []).length;
-    if (negativeCount > 1) {
-      return;
-    }
-
-    if (filteredText.includes('-') && filteredText.indexOf('-') > 0) {
-      return;
-    }
-
+    
     setInputValue(filteredText);
-
+    
     // Clear error when user starts typing
     if (inputError) {
       setInputError(null);
@@ -155,7 +147,6 @@ export const BudgetAlertRow: React.FC<BudgetAlertRowProps> = ({
           </View>
         </View>
         <Switch
-          testID="budget-alert-switch"
           value={enabled}
           onValueChange={handleToggle}
           trackColor={{ false: '#E5E7EB', true: '#3B82F6' }}
