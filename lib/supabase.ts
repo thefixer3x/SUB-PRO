@@ -1,38 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 // Supabase configuration
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const envAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabaseAnonKey = envAnonKey.length > 150 ? envAnonKey : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14dHNkZ2t3emp6bHR0cG90b2xlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxMDUyNTksImV4cCI6MjA2MjY4MTI1OX0.2KM8JxBEsqQidSvjhuLs8HCX-7g-q6YNswedQ5ZYq3g';
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 
-// Check if we have the required environment variables
-const missingEnv = !supabaseUrl || !supabaseAnonKey;
-const isValidUrl = (url: string) => {
-  try {
-    new URL(url);
-    return true;
-  } catch {
-    return false;
-  }
-};
-const isUrlValid = supabaseUrl ? isValidUrl(supabaseUrl) : false;
-
-export const isSupabaseEnvConfigured = !missingEnv && isUrlValid;
-
-const FALLBACK_SUPABASE_URL = 'https://placeholder.supabase.co';
-const FALLBACK_SUPABASE_ANON_KEY = 'public-anon-key-placeholder';
-
-const effectiveSupabaseUrl = isSupabaseEnvConfigured ? supabaseUrl : FALLBACK_SUPABASE_URL;
-const effectiveSupabaseAnonKey = isSupabaseEnvConfigured
-  ? supabaseAnonKey
-  : FALLBACK_SUPABASE_ANON_KEY;
-
-if (!isSupabaseEnvConfigured) {
-  console.warn(
-    'Supabase environment variables are missing or invalid. Features depending on Supabase will be disabled until EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY are configured.',
-  );
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables. Please check your .env file.');
 }
 
 // Platform-specific storage adapter
@@ -64,7 +40,7 @@ const createStorageAdapter = () => {
 };
 
 // Create Supabase client with proper storage
-export const supabase = createClient<Database, 'public'>(effectiveSupabaseUrl, effectiveSupabaseAnonKey, {
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: createStorageAdapter(),
     autoRefreshToken: true,

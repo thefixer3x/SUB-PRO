@@ -96,6 +96,9 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({
       {showLabels && (
         <>
           <Text style={styles.sectionTitle}>Appearance</Text>
+          <Text style={styles.betaNote}>
+            🚧 Currently applies to settings page only. Full app theming coming in next update.
+          </Text>
         </>
       )}
       <View style={styles.optionsContainer}>

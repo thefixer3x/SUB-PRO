@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { ChevronDown, ArrowRight, CheckCircle as CheckCircle } from 'lucide-react-native';
+import { ChevronDown, ArrowRight, CircleCheck as CheckCircle } from 'lucide-react-native';
 
 interface FieldMappingComponentProps {
   headers: string[];
@@ -34,7 +34,7 @@ export const FieldMappingComponent: React.FC<FieldMappingComponentProps> = ({
     const autoMapping: Record<string, number | null> = {};
     
     SUBSCRIPTION_FIELDS.forEach(field => {
-      const matchingHeaderIndex = headers.findIndex((header: string) => {
+      const matchingHeaderIndex = headers.findIndex(header => {
         const normalizedHeader = header.toLowerCase().replace(/[^a-z]/g, '');
         const normalizedField = field.key.toLowerCase().replace(/[^a-z]/g, '');
         const normalizedLabel = field.label.toLowerCase().replace(/[^a-z]/g, '');
@@ -51,14 +51,14 @@ export const FieldMappingComponent: React.FC<FieldMappingComponentProps> = ({
   }, [headers]);
 
   const handleFieldMapping = useCallback((fieldKey: string, headerIndex: number | null) => {
-    setMapping((prev: Record<string, number | null>) => ({ ...prev, [fieldKey]: headerIndex }));
+    setMapping(prev => ({ ...prev, [fieldKey]: headerIndex }));
     setExpandedDropdown(null);
   }, []);
 
   const handleContinue = useCallback(() => {
     const finalMapping: Record<string, number> = {};
     
-    Object.entries(mapping).forEach(([key, index]: [string, number | null]) => {
+    Object.entries(mapping).forEach(([key, index]) => {
       if (index !== null) {
         finalMapping[key] = index;
       }
@@ -75,10 +75,6 @@ export const FieldMappingComponent: React.FC<FieldMappingComponentProps> = ({
     const isExpanded = expandedDropdown === field.key;
     const selectedIndex = mapping[field.key];
     const selectedHeader = selectedIndex !== null ? headers[selectedIndex] : null;
-    const chevronContainerStyle = StyleSheet.flatten([
-      styles.chevron,
-      isExpanded ? styles.chevronRotated : undefined,
-    ]);
 
     return (
       <View key={field.key} style={styles.mappingRow}>
@@ -108,9 +104,11 @@ export const FieldMappingComponent: React.FC<FieldMappingComponentProps> = ({
           ]}>
             {selectedHeader || 'Select column...'}
           </Text>
-          <View style={chevronContainerStyle}>
-            <ChevronDown size={16} color="#64748B" />
-          </View>
+          <ChevronDown 
+            size={16} 
+            color="#64748B" 
+            style={[styles.chevron, isExpanded && styles.chevronRotated]} 
+          />
         </TouchableOpacity>
 
         {isExpanded && (
@@ -121,7 +119,7 @@ export const FieldMappingComponent: React.FC<FieldMappingComponentProps> = ({
             >
               <Text style={styles.dropdownOptionText}>Don't map</Text>
             </TouchableOpacity>
-            {headers.map((header: string, index: number) => (
+            {headers.map((header, index) => (
               <TouchableOpacity
                 key={index}
                 style={[
@@ -161,7 +159,7 @@ export const FieldMappingComponent: React.FC<FieldMappingComponentProps> = ({
       <View style={styles.footer}>
         <View style={styles.summary}>
           <Text style={styles.summaryText}>
-            {Object.values(mapping).filter((v: number | null) => v !== null).length} of {SUBSCRIPTION_FIELDS.length} fields mapped
+            {Object.values(mapping).filter(v => v !== null).length} of {SUBSCRIPTION_FIELDS.length} fields mapped
           </Text>
           {!canContinue && (
             <Text style={styles.warningText}>

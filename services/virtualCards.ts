@@ -1,7 +1,5 @@
-import { Platform } from 'react-native';
 import { VirtualCard, VirtualCardTransaction } from '@/types/embeddedFinance';
-import { EMBEDDED_FINANCE_CONFIG } from '@/config/embeddedFinance';
-import { buildApiBases, buildUrl, requestWithFallback } from '@/lib/apiClient';
+import { EMBEDDED_FINANCE_CONFIG, ENCRYPTION_CONFIG } from '@/config/embeddedFinance';
 
 export interface CreateVirtualCardParams {
   subscriptionId: string;
@@ -19,34 +17,6 @@ export interface UpdateVirtualCardParams {
 
 class VirtualCardService {
   private config = EMBEDDED_FINANCE_CONFIG.virtualCards;
-  private readonly apiBases: string[];
-
-  constructor() {
-    this.apiBases = buildApiBases(
-      [
-        process.env.EXPO_PUBLIC_EMBEDDED_FINANCE_API_BASE_URL,
-        process.env.EXPO_PUBLIC_EMBEDDED_FINANCE_API_FALLBACK_URL,
-        process.env.EXPO_PUBLIC_API_BASE_URL,
-        process.env.EXPO_PUBLIC_API_FALLBACK_URL,
-      ],
-      { includeRelative: false }
-    );
-  }
-
-  private shouldAllowRelative() {
-    return Platform.OS === 'web' && typeof window !== 'undefined';
-  }
-
-  private async request<T>(path: string, init?: RequestInit): Promise<T> {
-    const allowRelative = this.shouldAllowRelative();
-    const directUrls = allowRelative ? [buildUrl('/api', path)] : [];
-
-    return requestWithFallback<T>(path, init, {
-      bases: this.apiBases,
-      urls: directUrls,
-      allowRelative,
-    });
-  }
 
   async createVirtualCard(params: CreateVirtualCardParams): Promise<VirtualCard> {
     try {
@@ -62,7 +32,7 @@ class VirtualCardService {
   }
 
   private async createStripeIssuingCard(params: CreateVirtualCardParams): Promise<VirtualCard> {
-    return this.request<VirtualCard>('/embedded-finance/virtual-cards/create', {
+    const response = await fetch('/api/embedded-finance/virtual-cards/create', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -75,10 +45,16 @@ class VirtualCardService {
         merchantCategory: params.merchantCategory,
       }),
     });
+
+    if (!response.ok) {
+      throw new Error('Failed to create Stripe Issuing card');
+    }
+
+    return await response.json();
   }
 
   private async createWeavrCard(params: CreateVirtualCardParams): Promise<VirtualCard> {
-    return this.request<VirtualCard>('/embedded-finance/virtual-cards/create', {
+    const response = await fetch('/api/embedded-finance/virtual-cards/create', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -91,14 +67,26 @@ class VirtualCardService {
         merchantCategory: params.merchantCategory,
       }),
     });
+
+    if (!response.ok) {
+      throw new Error('Failed to create Weavr card');
+    }
+
+    return await response.json();
   }
 
   async getVirtualCard(cardId: string): Promise<VirtualCard> {
-    return this.request<VirtualCard>(`/embedded-finance/virtual-cards/${encodeURIComponent(cardId)}`);
+    const response = await fetch(`/api/embedded-finance/virtual-cards/${cardId}`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch virtual card');
+    }
+
+    return await response.json();
   }
 
   async updateVirtualCard(params: UpdateVirtualCardParams): Promise<VirtualCard> {
-    return this.request<VirtualCard>(`/embedded-finance/virtual-cards/${encodeURIComponent(params.cardId)}`, {
+    const response = await fetch(`/api/embedded-finance/virtual-cards/${params.cardId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -108,6 +96,12 @@ class VirtualCardService {
         status: params.status,
       }),
     });
+
+    if (!response.ok) {
+      throw new Error('Failed to update virtual card');
+    }
+
+    return await response.json();
   }
 
   async blockVirtualCard(cardId: string): Promise<void> {
@@ -125,29 +119,45 @@ class VirtualCardService {
   }
 
   async getCardsByUser(userId: string): Promise<VirtualCard[]> {
-    return this.request<VirtualCard[]>(
-      `/embedded-finance/virtual-cards/user/${encodeURIComponent(userId)}`
-    );
+    const response = await fetch(`/api/embedded-finance/virtual-cards/user/${userId}`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch user virtual cards');
+    }
+
+    return await response.json();
   }
 
   async getCardsBySubscription(subscriptionId: string): Promise<VirtualCard[]> {
-    return this.request<VirtualCard[]>(
-      `/embedded-finance/virtual-cards/subscription/${encodeURIComponent(subscriptionId)}`
-    );
+    const response = await fetch(`/api/embedded-finance/virtual-cards/subscription/${subscriptionId}`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch subscription virtual cards');
+    }
+
+    return await response.json();
   }
 
   // Secure card data retrieval (for display purposes)
   async getCardDetails(cardId: string): Promise<{ last4: string; expiryMonth: number; expiryYear: number }> {
-    return this.request<{ last4: string; expiryMonth: number; expiryYear: number }>(
-      `/embedded-finance/virtual-cards/${encodeURIComponent(cardId)}/details`
-    );
+    const response = await fetch(`/api/embedded-finance/virtual-cards/${cardId}/details`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch card details');
+    }
+
+    return await response.json();
   }
 
   // Get transactions for a specific card
   async getCardTransactions(cardId: string): Promise<VirtualCardTransaction[]> {
-    return this.request<VirtualCardTransaction[]>(
-      `/embedded-finance/virtual-cards/${encodeURIComponent(cardId)}/transactions`
-    );
+    const response = await fetch(`/api/embedded-finance/virtual-cards/${cardId}/transactions`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch card transactions');
+    }
+
+    return await response.json();
   }
 
   // Temporary card reveal (for one-time use)
@@ -157,18 +167,19 @@ class VirtualCardService {
     expiryMonth: number;
     expiryYear: number;
   }> {
-    return this.request<{
-      cardNumber: string;
-      cvv: string;
-      expiryMonth: number;
-      expiryYear: number;
-    }>(`/embedded-finance/virtual-cards/${encodeURIComponent(cardId)}/reveal`, {
+    const response = await fetch(`/api/embedded-finance/virtual-cards/${cardId}/reveal`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ purpose }),
     });
+
+    if (!response.ok) {
+      throw new Error('Failed to reveal card details');
+    }
+
+    return await response.json();
   }
 }
 

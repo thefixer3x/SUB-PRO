@@ -1,0 +1,36 @@
+build_and_submit:
+  name: Build and Submit
+  on:
+    workflow_dispatch: {}
+  jobs:
+    build_and_submit_ios:
+      name: Build and Submit iOS
+      runs-on: macos-latest
+      steps:
+        - name: Check out repository
+          uses: actions/checkout@v4
+        - name: Setup Expo and EAS
+          uses: expo/expo-github-action@v8
+          with:
+            eas-version: latest
+            token: ${{ secrets.EXPO_TOKEN }}
+        - name: Build iOS
+          run: eas build --platform ios --profile production --non-interactive
+        - name: Submit to App Store
+          run: eas submit --platform ios --profile production --non-interactive
+    
+    build_and_submit_android:
+      name: Build and Submit Android
+      runs-on: ubuntu-latest
+      steps:
+        - name: Check out repository
+          uses: actions/checkout@v4
+        - name: Setup Expo and EAS
+          uses: expo/expo-github-action@v8
+          with:
+            eas-version: latest
+            token: ${{ secrets.EXPO_TOKEN }}
+        - name: Build Android
+          run: eas build --platform android --profile production --non-interactive
+        - name: Submit to Play Store
+          run: eas submit --platform android --profile production --non-interactive

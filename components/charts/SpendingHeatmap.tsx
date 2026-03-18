@@ -139,7 +139,7 @@ export const SpendingHeatmap: React.FC<SpendingHeatmapProps> = ({
               dataKey={category}
               stackId="heatmap"
               fill={`hsl(${(index * 360) / categories.length}, 70%, 60%)`}
-              color="#ffffff"
+              stroke="#ffffff"
               strokeWidth={1}
             />
           ))}

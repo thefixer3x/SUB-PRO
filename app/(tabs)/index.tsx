@@ -3,32 +3,26 @@ import { View, Text, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
 import { UpgradeRibbon } from '@/components/monetization/UpgradeRibbon';
 import { AdBanner } from '@/components/monetization/AdBanner';
 import { FeatureGate } from '@/components/monetization/FeatureGate';
-import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useAuth } from '@/contexts/AuthContext';
 import { ThemeColors } from '@/constants/theme';
 
 export default function Dashboard() {
   const { currentTier } = useSubscription();
   const { colors } = useTheme();
-  const { user } = useAuth();
   const dynamicStyles = React.useMemo(() => createStyles(colors), [colors]);
-
-  const displayName = user?.user_metadata?.full_name
-    || user?.email?.split('@')[0]
-    || 'there';
 
   return (
     <SafeAreaView style={dynamicStyles.container}>
-      <ScrollView style={dynamicStyles.content} showsVerticalScrollIndicator={false} contentContainerStyle={dynamicStyles.scrollContent}>
+      <ScrollView style={dynamicStyles.content} showsVerticalScrollIndicator={false}>
         <View style={dynamicStyles.header}>
           <Text style={dynamicStyles.title}>Dashboard</Text>
-          <Text style={dynamicStyles.subtitle}>Welcome back, {displayName}!</Text>
+          <Text style={dynamicStyles.subtitle}>Welcome back! Here's your subscription overview.</Text>
         </View>
 
         <UpgradeRibbon />
 
+        {/* Basic Dashboard Content */}
         <View style={dynamicStyles.metricsGrid}>
           <View style={dynamicStyles.metricCard}>
             <Text style={dynamicStyles.metricValue}>12</Text>
@@ -53,6 +47,7 @@ export default function Dashboard() {
 
         <AdBanner placement="home" />
 
+        {/* Recent Activity */}
         <View style={dynamicStyles.section}>
           <Text style={dynamicStyles.sectionTitle}>Recent Activity</Text>
           
@@ -86,6 +81,7 @@ export default function Dashboard() {
           </View>
         </View>
 
+        {/* Smart Insights - Gated Feature */}
         <FeatureGate
           feature="smartInsights"
           requiredTier="pro"
@@ -113,24 +109,24 @@ export default function Dashboard() {
           }
         >
           <View style={dynamicStyles.section}>
-            <Text style={dynamicStyles.sectionTitle}>Smart Insights</Text>
+            <Text style={dynamicStyles.sectionTitle}>Smart Insights™</Text>
             
             <View style={dynamicStyles.insightCard}>
-              <Text style={dynamicStyles.insightTitle}>Optimization Opportunity</Text>
+              <Text style={dynamicStyles.insightTitle}>💡 Optimization Opportunity</Text>
               <Text style={dynamicStyles.insightText}>
                 You have 3 similar streaming services. Consolidating to a family plan could save you $23/month.
               </Text>
             </View>
             
             <View style={dynamicStyles.insightCard}>
-              <Text style={dynamicStyles.insightTitle}>Spending Trend</Text>
+              <Text style={dynamicStyles.insightTitle}>📈 Spending Trend</Text>
               <Text style={dynamicStyles.insightText}>
                 Your subscription spending increased by 15% this month, mainly due to new productivity tools.
               </Text>
             </View>
             
             <View style={dynamicStyles.insightCard}>
-              <Text style={dynamicStyles.insightTitle}>Renewal Alert</Text>
+              <Text style={dynamicStyles.insightTitle}>⚠️ Renewal Alert</Text>
               <Text style={dynamicStyles.insightText}>
                 You have $47.98 in renewals coming up in the next 7 days.
               </Text>
@@ -139,25 +135,19 @@ export default function Dashboard() {
         </FeatureGate>
 
         {currentTier === 'free' && <AdBanner placement="home" size="medium-rectangle" />}
-
-        <View style={dynamicStyles.brandingSection}>
-          <PoweredByLanOnasis variant="minimal" />
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+// Dynamic styles function that responds to theme changes
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#f8fafc',
   },
   content: {
     flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 100,
   },
   header: {
     paddingHorizontal: 20,
@@ -167,12 +157,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: colors.text,
+    color: '#1E293B',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: colors.textSecondary,
+    color: '#64748B',
   },
   metricsGrid: {
     flexDirection: 'row',
@@ -184,22 +174,22 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   metricCard: {
     flex: 1,
     minWidth: '47%',
-    backgroundColor: colors.card,
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E2E8F0',
   },
   metricValue: {
     fontSize: 24,
     fontWeight: '700',
-    color: colors.text,
+    color: '#1E293B',
     marginBottom: 4,
   },
   metricLabel: {
     fontSize: 12,
-    color: colors.textMuted,
+    color: '#64748B',
     textAlign: 'center',
   },
   section: {
@@ -209,14 +199,14 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: colors.text,
+    color: '#1E293B',
     marginBottom: 16,
   },
   activityList: {
-    backgroundColor: colors.card,
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E2E8F0',
   },
   activityItem: {
     flexDirection: 'row',
@@ -224,13 +214,13 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    borderBottomColor: '#F1F5F9',
   },
   activityDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.primary,
+    backgroundColor: '#3B82F6',
     marginRight: 12,
   },
   activityContent: {
@@ -239,26 +229,26 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   activityTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: colors.text,
+    color: '#1E293B',
     marginBottom: 2,
   },
   activityTime: {
     fontSize: 12,
-    color: colors.textMuted,
+    color: '#64748B',
   },
   activityAmount: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.success,
+    color: '#059669',
   },
   canceledAmount: {
-    color: colors.error,
+    color: '#DC2626',
   },
   renewalsList: {
-    backgroundColor: colors.card,
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E2E8F0',
   },
   renewalItem: {
     flexDirection: 'row',
@@ -266,46 +256,41 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    borderBottomColor: '#F1F5F9',
   },
   renewalService: {
     flex: 1,
     fontSize: 14,
     fontWeight: '500',
-    color: colors.text,
+    color: '#1E293B',
   },
   renewalDate: {
     fontSize: 12,
-    color: colors.textMuted,
+    color: '#64748B',
     marginRight: 16,
   },
   renewalAmount: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.text,
+    color: '#1E293B',
   },
   insightCard: {
-    backgroundColor: colors.card,
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E2E8F0',
   },
   insightTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text,
+    color: '#1E293B',
     marginBottom: 8,
   },
   insightText: {
     fontSize: 14,
-    color: colors.textSecondary,
+    color: '#64748B',
     lineHeight: 20,
-  },
-  brandingSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    alignItems: 'center',
   },
 });
