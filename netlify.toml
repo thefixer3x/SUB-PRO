@@ -7,6 +7,12 @@
   node_bundler = "esbuild"
 
 [[redirects]]
+  from = "/api/banking/proxy"
+  to = "/.netlify/functions/banking-proxy"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/embedded-finance/virtual-cards"
   to = "/.netlify/functions/embedded-finance-virtual-cards"
   status = 200
