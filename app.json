@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "subtrack",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "owner": "thefixer3x",
     "description": "The ultimate subscription management app with AI-powered insights, virtual cards, and smart spending analytics.",
     "primaryColor": "#3B82F6",
