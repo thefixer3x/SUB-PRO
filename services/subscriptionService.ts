@@ -6,29 +6,29 @@ type SmSubscriptionRow = Database['public']['Tables']['sm_subscriptions']['Row']
 type SmSubscriptionInsert = Database['public']['Tables']['sm_subscriptions']['Insert'];
 type SmSubscriptionUpdate = Database['public']['Tables']['sm_subscriptions']['Update'];
 
-// Map DB row (snake_case) → client model (camelCase)
+/** Map DB row (snake_case) to client model (camelCase). */
 function toSubscription(row: SmSubscriptionRow): Subscription {
   return {
     id: row.id,
     name: row.name,
     category: row.category as Subscription['category'],
-    status: row.status,
+    status: row.status as Subscription['status'],
     planName: row.plan_name,
     monthlyCost: Number(row.monthly_cost),
     currency: row.currency,
-    billingCycle: row.billing_cycle,
+    billingCycle: row.billing_cycle as Subscription['billingCycle'],
     renewalDate: new Date(row.renewal_date),
     paymentMethod: row.payment_method,
     notes: row.notes ?? undefined,
     lastUsed: row.last_used ? new Date(row.last_used) : undefined,
-    priority: row.priority,
+    priority: row.priority as Subscription['priority'],
     deactivationDate: row.deactivation_date ? new Date(row.deactivation_date) : undefined,
     logoUrl: row.logo_url ?? undefined,
     color: row.color ?? undefined,
   };
 }
 
-// Map client model → DB insert
+/** Map client model to DB insert row. */
 function toInsertRow(sub: Omit<Subscription, 'id'>, userId: string): SmSubscriptionInsert {
   return {
     user_id: userId,
@@ -57,7 +57,7 @@ export async function fetchUserSubscriptions(userId: string): Promise<Subscripti
   }
 
   const { data, error } = await supabase
-    .from('sm_subscriptions' as any)
+    .from('sm_subscriptions')
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
@@ -67,7 +67,7 @@ export async function fetchUserSubscriptions(userId: string): Promise<Subscripti
     throw new Error(error.message);
   }
 
-  return (data ?? []).map((row: any) => toSubscription(row as SmSubscriptionRow));
+  return (data ?? []).map((row) => toSubscription(row as SmSubscriptionRow));
 }
 
 export async function createSubscription(
@@ -81,8 +81,8 @@ export async function createSubscription(
   const row = toInsertRow(sub, userId);
 
   const { data, error } = await supabase
-    .from('sm_subscriptions' as any)
-    .insert(row as any)
+    .from('sm_subscriptions')
+    .insert(row)
     .select()
     .single();
 
@@ -91,7 +91,7 @@ export async function createSubscription(
     throw new Error(error.message);
   }
 
-  return toSubscription(data as unknown as SmSubscriptionRow);
+  return toSubscription(data as SmSubscriptionRow);
 }
 
 export async function updateSubscription(
@@ -119,8 +119,8 @@ export async function updateSubscription(
   if (updates.logoUrl !== undefined) dbUpdates.logo_url = updates.logoUrl ?? null;
   if (updates.color !== undefined) dbUpdates.color = updates.color ?? null;
 
-  const { data, error } = await (supabase
-    .from('sm_subscriptions' as any) as any)
+  const { data, error } = await supabase
+    .from('sm_subscriptions')
     .update(dbUpdates)
     .eq('id', subscriptionId)
     .select()
@@ -131,7 +131,7 @@ export async function updateSubscription(
     throw new Error(error.message);
   }
 
-  return toSubscription(data as unknown as SmSubscriptionRow);
+  return toSubscription(data as SmSubscriptionRow);
 }
 
 export async function deleteSubscription(subscriptionId: string): Promise<void> {
@@ -140,7 +140,7 @@ export async function deleteSubscription(subscriptionId: string): Promise<void> 
   }
 
   const { error } = await supabase
-    .from('sm_subscriptions' as any)
+    .from('sm_subscriptions')
     .delete()
     .eq('id', subscriptionId);
 

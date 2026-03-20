@@ -1,16 +1,12 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Animated, StyleSheet, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { 
-  MoreVertical, 
-  Calendar, 
-  CreditCard, 
-  Pause, 
-  Play, 
-  X, 
-  ExternalLink,
-  TrendingUp,
-  TrendingDown,
+import {
+  MoreVertical,
+  Calendar,
+  CreditCard,
+  Pause,
+  Play,
   AlertTriangle,
   Trash2
 } from 'lucide-react-native';
@@ -27,9 +23,10 @@ interface Subscription {
   status: 'active' | 'paused' | 'cancelled';
   category: string;
   logo?: string;
-  color: string[];
-  trend?: 'up' | 'down' | 'stable';
-  trendPercentage?: number;
+  color: [string, string, ...string[]];
+  iconLibrary?: 'MaterialCommunityIcons' | 'FontAwesome';
+  iconName?: string;
+  hasMCPIntegration?: boolean;
 }
 
 interface ModernSubscriptionCardProps {
@@ -73,15 +70,8 @@ export const ModernSubscriptionCard: React.FC<ModernSubscriptionCardProps> = ({
     }
   };
 
-  const getTrendIcon = () => {
-    if (!subscription.trend) return null;
-    
-    switch (subscription.trend) {
-      case 'up': return <TrendingUp size={16} color="#EF4444" />;
-      case 'down': return <TrendingDown size={16} color="#10B981" />;
-      default: return null;
-    }
-  };
+  // Trend display removed — historical delta computation not yet implemented.
+  // Showing fabricated trend data is misleading per PR review.
 
   const renderServiceIcon = () => {
     if (!subscription.iconLibrary || !subscription.iconName) return null;
@@ -164,7 +154,6 @@ export const ModernSubscriptionCard: React.FC<ModernSubscriptionCardProps> = ({
               <Text style={styles.currency}>$</Text>
               <Text style={styles.amount}>{subscription.cost.toFixed(2)}</Text>
               <Text style={styles.period}>/mo</Text>
-              {getTrendIcon()}
             </View>
             
             <View style={[styles.statusBadge, { backgroundColor: getStatusColor() }]}>
@@ -184,11 +173,6 @@ export const ModernSubscriptionCard: React.FC<ModernSubscriptionCardProps> = ({
               )}
             </View>
             
-            {subscription.trendPercentage && (
-              <Text style={styles.trendText}>
-                {subscription.trend === 'up' ? '+' : '-'}{subscription.trendPercentage}% vs last month
-              </Text>
-            )}
           </View>
 
           {/* Action Buttons */}
@@ -258,6 +242,26 @@ const styles = StyleSheet.create({
   titleSection: {
     flex: 1,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  titleText: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  mcpBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 8,
+  },
+  mcpText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'white',
+  },
   serviceName: {
     fontSize: 20,
     fontWeight: '700',
@@ -324,11 +328,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.9)',
     marginLeft: 8,
     fontWeight: '500',
-  },
-  trendText: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontStyle: 'italic',
   },
   actionsContainer: {
     flexDirection: 'row',

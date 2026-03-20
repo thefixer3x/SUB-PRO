@@ -139,17 +139,17 @@ export const TransactionAnalyzer: React.FC<TransactionAnalyzerProps> = ({
     setIsAnalyzing(true);
     
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
       if (onAnalyzeTransactions) {
         const result = await onAnalyzeTransactions();
         setTransactions(result);
+        // Only show real insights when real data is available.
+        // Mock insights after a real analysis is misleading (PR review).
+        setInsights([]);
       } else {
+        // Demo mode — show mock data with a clear label
         setTransactions(mockTransactions);
+        setInsights(mockInsights);
       }
-      
-      setInsights(mockInsights);
       setAnalysisComplete(true);
     } catch (error) {
       console.error('Analysis failed:', error);
