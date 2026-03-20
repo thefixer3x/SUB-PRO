@@ -110,6 +110,7 @@ export type Database = {
         Row: {
           id: string;
           user_id: string;
+          detection_key: string | null;
           name: string;
           category: string;
           status: 'Active' | 'Inactive' | 'Paused' | 'Trial' | 'Expired';
@@ -131,6 +132,7 @@ export type Database = {
         Insert: {
           id?: string;
           user_id: string;
+          detection_key?: string | null;
           name: string;
           category: string;
           status?: 'Active' | 'Inactive' | 'Paused' | 'Trial' | 'Expired';
@@ -152,6 +154,7 @@ export type Database = {
         Update: {
           id?: string;
           user_id?: string;
+          detection_key?: string | null;
           name?: string;
           category?: string;
           status?: 'Active' | 'Inactive' | 'Paused' | 'Trial' | 'Expired';
@@ -167,6 +170,47 @@ export type Database = {
           deactivation_date?: string | null;
           logo_url?: string | null;
           color?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      bank_accounts: {
+        Row: {
+          id: string;
+          user_id: string;
+          bank_name: string;
+          account_type: string;
+          account_number: string | null;
+          balance: number;
+          currency: string;
+          is_connected: boolean;
+          last_sync: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          user_id: string;
+          bank_name: string;
+          account_type: string;
+          account_number?: string | null;
+          balance?: number;
+          currency?: string;
+          is_connected?: boolean;
+          last_sync?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          bank_name?: string;
+          account_type?: string;
+          account_number?: string | null;
+          balance?: number;
+          currency?: string;
+          is_connected?: boolean;
+          last_sync?: string;
           created_at?: string;
           updated_at?: string;
         };

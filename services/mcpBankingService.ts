@@ -47,17 +47,24 @@ interface MCPBankingConfig {
   proxyUrls: string[];
 }
 
+type BankAccountRow = Database['public']['Tables']['bank_accounts']['Row'];
+type BankAccountInsert = Database['public']['Tables']['bank_accounts']['Insert'];
+type BankAccountUpdate = Database['public']['Tables']['bank_accounts']['Update'];
 type SubscriptionInsert = Database['public']['Tables']['subscriptions']['Insert'];
 type SubscriptionUpdate = Database['public']['Tables']['subscriptions']['Update'];
 
+const BANK_ACCOUNTS_TABLE: keyof Database['public']['Tables'] = 'bank_accounts';
 const SUBSCRIPTIONS_TABLE: keyof Database['public']['Tables'] = 'subscriptions';
-const SUBSCRIPTION_IDENTITY_COLUMNS =
-  'user_id,name,monthly_cost,billing_cycle,category';
+const SUBSCRIPTION_CONFLICT_COLUMNS = 'user_id,detection_key';
 const RELATIVE_BANKING_PROXY_URL = '/api/banking/proxy';
 const NETLIFY_BANKING_PROXY_PATH = '/banking-proxy';
 
 const unique = <T,>(values: T[]): T[] =>
   values.filter((value, index) => values.indexOf(value) === index);
+
+const normalizeKeyPart = (value: string): string => {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
+};
 
 const toBillingCycle = (
   frequency: SubscriptionDetection['frequency'],
@@ -91,6 +98,64 @@ const normalizeToMonthlyAmount = (
       return roundCurrency(amount);
   }
 };
+
+const buildSubscriptionDetectionKey = (
+  accountId: string,
+  detection: SubscriptionDetection,
+  monthlyCost: number,
+  billingCycle: SubscriptionInsert['billing_cycle'],
+): string => {
+  const transactionAnchor = [...detection.transactions]
+    .filter(
+      (transaction): transaction is Transaction & { id: string } =>
+        typeof transaction.id === 'string' && Boolean(transaction.id.trim()),
+    )
+    .sort((left, right) => {
+      const leftTime = new Date(left.date).getTime();
+      const rightTime = new Date(right.date).getTime();
+
+      if (leftTime !== rightTime) {
+        return leftTime - rightTime;
+      }
+
+      return left.id.localeCompare(right.id);
+    })[0]?.id.trim();
+
+  return [
+    normalizeKeyPart(accountId),
+    normalizeKeyPart(detection.merchant),
+    monthlyCost.toFixed(2),
+    normalizeKeyPart(billingCycle),
+    normalizeKeyPart(detection.category),
+    transactionAnchor || detection.nextBilling,
+  ].join('::');
+};
+
+const mapBankAccountRow = (row: BankAccountRow): BankAccount => ({
+  id: row.id,
+  bankName: row.bank_name,
+  accountType: row.account_type,
+  accountNumber: row.account_number ?? undefined,
+  balance: row.balance,
+  currency: row.currency,
+  isConnected: row.is_connected,
+  lastSync: row.last_sync,
+});
+
+const buildBankAccountInsert = (
+  userId: string,
+  account: BankAccount,
+): BankAccountInsert => ({
+  id: account.id,
+  user_id: userId,
+  bank_name: account.bankName,
+  account_type: account.accountType,
+  account_number: account.accountNumber ?? null,
+  balance: account.balance,
+  currency: account.currency,
+  is_connected: account.isConnected,
+  last_sync: account.lastSync,
+});
 
 const extractProxyError = async (response: Response): Promise<string | null> => {
   const contentType = response.headers.get('content-type') ?? '';
@@ -133,7 +198,7 @@ const buildBankingProxyUrls = (): string[] => {
   );
 
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    urls.unshift(RELATIVE_BANKING_PROXY_URL);
+    urls.push(RELATIVE_BANKING_PROXY_URL);
   }
 
   return unique(urls.filter((url) => Boolean(url.trim())));
@@ -232,9 +297,20 @@ export class MCPBankingService {
     );
 
     if (isSupabaseEnvConfigured) {
-      const result = await supabase.from(SUBSCRIPTIONS_TABLE).select('id').limit(0);
-      // bank_accounts table does not exist yet — skip persistence until created
-      void result;
+      const accountInsert = buildBankAccountInsert(this.userId, bankAccount);
+
+      const writeResult = await (
+        supabase.from(BANK_ACCOUNTS_TABLE) as unknown as {
+          upsert: (
+            values: BankAccountInsert,
+            options: { onConflict: string },
+          ) => Promise<{ error: { message: string } | null }>;
+        }
+      ).upsert(accountInsert, {
+        onConflict: 'id',
+      });
+
+      this.assertSupabaseWrite(writeResult, 'persist connected bank account');
     }
 
     return bankAccount;
@@ -276,9 +352,16 @@ export class MCPBankingService {
         if (d.confidence < 0.8) continue; // only high-confidence
         const monthlyCost = normalizeToMonthlyAmount(d.amount, d.frequency);
         const billingCycle = toBillingCycle(d.frequency);
+        const detectionKey = buildSubscriptionDetectionKey(
+          accountId,
+          d,
+          monthlyCost,
+          billingCycle,
+        );
 
         const subscriptionInsert = {
           user_id: this.userId,
+          detection_key: detectionKey,
           name: d.merchant,
           category: d.category,
           status: 'Active',
@@ -298,7 +381,7 @@ export class MCPBankingService {
             ) => Promise<{ error: { message: string } | null }>;
           }
         ).upsert(subscriptionInsert, {
-          onConflict: SUBSCRIPTION_IDENTITY_COLUMNS,
+          onConflict: SUBSCRIPTION_CONFLICT_COLUMNS,
         });
 
         this.assertSupabaseWrite(
@@ -354,18 +437,62 @@ export class MCPBankingService {
   }
 
   async getConnectedAccounts(): Promise<BankAccount[]> {
-    // bank_accounts table does not exist yet.
-    // Return empty until the table is created.
     if (!isSupabaseEnvConfigured) return [];
-    return [];
+
+    const result = await supabase
+      .from(BANK_ACCOUNTS_TABLE)
+      .select(
+        'id, bank_name, account_type, account_number, balance, currency, is_connected, last_sync',
+      )
+      .eq('user_id', this.userId)
+      .eq('is_connected', true)
+      .order('last_sync', { ascending: false });
+
+    this.assertSupabaseWrite(result, 'load bank accounts');
+
+    return ((result.data ?? []) as BankAccountRow[]).map(mapBankAccountRow);
   }
 
   async syncAccount(accountId: string): Promise<void> {
     await this.proxyFetch('/banking/sync', { accountId });
+
+    if (!isSupabaseEnvConfigured) {
+      return;
+    }
+
+    const update = {
+      is_connected: true,
+      last_sync: new Date().toISOString(),
+    } satisfies BankAccountUpdate;
+
+    const writeResult = await supabase
+      .from(BANK_ACCOUNTS_TABLE)
+      .update(update as never)
+      .eq('id', accountId)
+      .eq('user_id', this.userId);
+
+    this.assertSupabaseWrite(writeResult, 'sync bank account');
   }
 
   async disconnectAccount(accountId: string): Promise<void> {
     await this.proxyFetch('/banking/disconnect', { accountId });
+
+    if (!isSupabaseEnvConfigured) {
+      return;
+    }
+
+    const update = {
+      is_connected: false,
+      last_sync: new Date().toISOString(),
+    } satisfies BankAccountUpdate;
+
+    const writeResult = await supabase
+      .from(BANK_ACCOUNTS_TABLE)
+      .update(update as never)
+      .eq('id', accountId)
+      .eq('user_id', this.userId);
+
+    this.assertSupabaseWrite(writeResult, 'disconnect bank account');
   }
 }
 
