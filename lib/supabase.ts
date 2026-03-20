@@ -171,6 +171,71 @@ export type Database = {
           updated_at?: string;
         };
       };
+      sm_subscriptions: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          category: string;
+          status: string;
+          plan_name: string;
+          monthly_cost: number;
+          currency: string;
+          billing_cycle: string;
+          renewal_date: string;
+          payment_method: string;
+          notes: string | null;
+          last_used: string | null;
+          priority: string;
+          deactivation_date: string | null;
+          logo_url: string | null;
+          color: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          category: string;
+          status?: string;
+          plan_name: string;
+          monthly_cost: number;
+          currency?: string;
+          billing_cycle?: string;
+          renewal_date: string;
+          payment_method: string;
+          notes?: string | null;
+          last_used?: string | null;
+          priority?: string;
+          deactivation_date?: string | null;
+          logo_url?: string | null;
+          color?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          category?: string;
+          status?: string;
+          plan_name?: string;
+          monthly_cost?: number;
+          currency?: string;
+          billing_cycle?: string;
+          renewal_date?: string;
+          payment_method?: string;
+          notes?: string | null;
+          last_used?: string | null;
+          priority?: string;
+          deactivation_date?: string | null;
+          logo_url?: string | null;
+          color?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       sm_feature_flags: {
         Row: {
           id: string;

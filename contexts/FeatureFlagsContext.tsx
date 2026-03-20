@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, ReactNode } from 'react';
 import { FEATURE_FLAGS as DEFAULT_FLAGS } from '@/config/featureFlags';
+import { useSupabaseFeatureFlags, type FeatureFlagMap } from '@/hooks/useFeatureFlags';
 
-type FeatureFlags = Record<string, boolean>;
+type FeatureFlags = FeatureFlagMap;
 
 interface FeatureFlagsContextType {
   featureFlags: FeatureFlags;
@@ -22,28 +23,20 @@ const FeatureFlagsContext = createContext<FeatureFlagsContextType>({
 export const useFeatureFlags = () => useContext(FeatureFlagsContext);
 
 export const FeatureFlagsProvider = ({ children }: { children: ReactNode }) => {
-  const [featureFlags, setFeatureFlags] = useState<FeatureFlags>(DEFAULT_FLAGS);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const {
+    flags,
+    isEnabled,
+    isLoading,
+    error,
+    refetch,
+  } = useSupabaseFeatureFlags();
 
   const refresh = async () => {
-    // Simplified: Just use default flags for now
-    // TODO: Re-enable Supabase integration later
-    setIsLoading(false);
-    setError(null);
-    setFeatureFlags(DEFAULT_FLAGS);
+    await refetch();
   };
-
-  useEffect(() => {
-    // Initialize with default flags immediately
-    setFeatureFlags(DEFAULT_FLAGS);
-    setIsLoading(false);
-    setError(null);
-  }, []);
-
-  const isFeatureEnabled = (feature: string): boolean => {
-    return Boolean(featureFlags[feature]);
-  };
+  const featureFlags = flags;
+  const isFeatureEnabled = (feature: string): boolean =>
+    isEnabled(feature);
 
   return (
     <FeatureFlagsContext.Provider
