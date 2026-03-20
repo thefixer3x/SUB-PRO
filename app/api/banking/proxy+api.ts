@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { posix as pathPosix } from 'node:path';
+import { validateBankingProxyRequestBody } from '@/lib/bankingProxy';
 
 /**
  * Server-side proxy for MCP Banking API.
@@ -19,56 +19,6 @@ const SUPABASE_ANON_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
   '';
 const UPSTREAM_TIMEOUT_MS = 10_000;
-
-// Allowed path prefixes the client may request
-const ALLOWED_PATHS = [
-  '/banking/connect',
-  '/banking/transactions',
-  '/banking/sync',
-  '/banking/disconnect',
-  '/ai/detect-subscriptions',
-  '/ai/spending-insights',
-  '/subscriptions/cancel',
-];
-
-function normalizeProxyPath(rawPath: string): string | null {
-  if (!rawPath || !rawPath.startsWith('/')) {
-    return null;
-  }
-
-  const [rawPathname, rawSearch = ''] = rawPath.split('?');
-
-  let decodedPathname: string;
-  try {
-    decodedPathname = decodeURIComponent(rawPathname);
-  } catch {
-    return null;
-  }
-
-  const normalizedPathname = pathPosix.normalize(decodedPathname);
-  if (
-    !normalizedPathname.startsWith('/') ||
-    normalizedPathname.includes('..')
-  ) {
-    return null;
-  }
-
-  return rawSearch ? `${normalizedPathname}?${rawSearch}` : normalizedPathname;
-}
-
-function isAllowedPath(path: string): string | null {
-  const normalizedPath = normalizeProxyPath(path);
-  if (!normalizedPath) {
-    return null;
-  }
-
-  const pathname = normalizedPath.split('?')[0];
-  const isAllowed = ALLOWED_PATHS.some((allowedPath) => {
-    return pathname === allowedPath || pathname.startsWith(`${allowedPath}/`);
-  });
-
-  return isAllowed ? normalizedPath : null;
-}
 
 async function getAuthenticatedUserId(request: Request): Promise<string | null> {
   const authHeader = request.headers.get('authorization');
@@ -123,20 +73,20 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { path, payload, method } = body as {
-      path: string;
-      payload?: Record<string, unknown>;
-      method?: 'GET' | 'POST';
-    };
-
-    const normalizedPath = isAllowedPath(path);
-    if (!normalizedPath) {
-      return Response.json({ error: 'Invalid path' }, { status: 400 });
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: 'Invalid JSON' }, { status: 400 });
     }
 
-    const resolvedMethod = method === 'GET' ? 'GET' : 'POST';
-    const url = `${MCP_BASE_URL}${normalizedPath}`;
+    const validation = validateBankingProxyRequestBody(body);
+    if (!validation.ok) {
+      return Response.json({ error: validation.error }, { status: 400 });
+    }
+
+    const { path, payload, method } = validation.value;
+    const url = `${MCP_BASE_URL}${path}`;
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -147,7 +97,7 @@ export async function POST(request: Request): Promise<Response> {
     let upstream: Response;
     try {
       upstream = await fetch(url, {
-        method: resolvedMethod,
+        method,
         headers,
         ...(payload ? { body: JSON.stringify(payload) } : {}),
         signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
