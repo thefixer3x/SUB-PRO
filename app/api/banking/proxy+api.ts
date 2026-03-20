@@ -1,3 +1,6 @@
+import { createClient } from '@supabase/supabase-js';
+import { posix as pathPosix } from 'node:path';
+
 /**
  * Server-side proxy for MCP Banking API.
  *
@@ -9,6 +12,13 @@
 const MCP_API_KEY = process.env.MCP_API_KEY ?? '';
 const MCP_BASE_URL =
   process.env.MCP_BASE_URL ?? 'https://api.onasis-gateway.com';
+const SUPABASE_URL =
+  process.env.EXPO_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+const SUPABASE_ANON_KEY =
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+  '';
+const UPSTREAM_TIMEOUT_MS = 10_000;
 
 // Allowed path prefixes the client may request
 const ALLOWED_PATHS = [
@@ -21,8 +31,75 @@ const ALLOWED_PATHS = [
   '/subscriptions/cancel',
 ];
 
-function isAllowedPath(path: string): boolean {
-  return ALLOWED_PATHS.some((p) => path.startsWith(p));
+function normalizeProxyPath(rawPath: string): string | null {
+  if (!rawPath || !rawPath.startsWith('/')) {
+    return null;
+  }
+
+  const [rawPathname, rawSearch = ''] = rawPath.split('?');
+
+  let decodedPathname: string;
+  try {
+    decodedPathname = decodeURIComponent(rawPathname);
+  } catch {
+    return null;
+  }
+
+  const normalizedPathname = pathPosix.normalize(decodedPathname);
+  if (
+    !normalizedPathname.startsWith('/') ||
+    normalizedPathname.includes('..')
+  ) {
+    return null;
+  }
+
+  return rawSearch ? `${normalizedPathname}?${rawSearch}` : normalizedPathname;
+}
+
+function isAllowedPath(path: string): string | null {
+  const normalizedPath = normalizeProxyPath(path);
+  if (!normalizedPath) {
+    return null;
+  }
+
+  const pathname = normalizedPath.split('?')[0];
+  const isAllowed = ALLOWED_PATHS.some((allowedPath) => {
+    return pathname === allowedPath || pathname.startsWith(`${allowedPath}/`);
+  });
+
+  return isAllowed ? normalizedPath : null;
+}
+
+async function getAuthenticatedUserId(request: Request): Promise<string | null> {
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return null;
+  }
+
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    console.error('[banking/proxy] Supabase auth env missing for token validation');
+    return null;
+  }
+
+  const accessToken = authHeader.slice('Bearer '.length).trim();
+  if (!accessToken) {
+    return null;
+  }
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+
+  const { data, error } = await supabase.auth.getUser(accessToken);
+  if (error || !data.user) {
+    console.warn('[banking/proxy] Invalid user token', error);
+    return null;
+  }
+
+  return data.user.id;
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -33,36 +110,63 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    return Response.json(
+      { error: 'Authentication service not configured' },
+      { status: 503 },
+    );
+  }
+
   try {
+    const authenticatedUserId = await getAuthenticatedUserId(request);
+    if (!authenticatedUserId) {
+      return Response.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
     const body = await request.json();
-    const { path, payload, userId } = body as {
+    const { path, payload, method } = body as {
       path: string;
       payload?: Record<string, unknown>;
-      userId?: string;
+      method?: 'GET' | 'POST';
     };
 
-    if (!path || !isAllowedPath(path)) {
+    const normalizedPath = isAllowedPath(path);
+    if (!normalizedPath) {
       return Response.json({ error: 'Invalid path' }, { status: 400 });
     }
 
-    const isGet = !payload && path.includes('?');
-    const url = `${MCP_BASE_URL}${path}`;
+    const resolvedMethod = method === 'GET' ? 'GET' : 'POST';
+    const url = `${MCP_BASE_URL}${normalizedPath}`;
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${MCP_API_KEY}`,
+      'X-User-ID': authenticatedUserId,
     };
-    if (userId) {
-      headers['X-User-ID'] = userId;
+
+    let upstream: Response;
+    try {
+      upstream = await fetch(url, {
+        method: resolvedMethod,
+        headers,
+        ...(payload ? { body: JSON.stringify(payload) } : {}),
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+      });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        (error.name === 'AbortError' || error.name === 'TimeoutError')
+      ) {
+        return Response.json(
+          { error: 'Upstream banking service timed out' },
+          { status: 504 },
+        );
+      }
+
+      throw error;
     }
 
-    const upstream = await fetch(url, {
-      method: isGet ? 'GET' : 'POST',
-      headers,
-      ...(payload ? { body: JSON.stringify(payload) } : {}),
-    });
-
-    const data = await upstream.json();
+    const data = await upstream.json().catch(() => ({}));
 
     if (!upstream.ok) {
       return Response.json(data, { status: upstream.status });

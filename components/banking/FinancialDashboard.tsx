@@ -1,9 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { TrendingUp, TrendingDown, DollarSign, CreditCard, PieChart, BarChart3 } from 'lucide-react-native';
-
-const { width } = Dimensions.get('window');
 
 interface FinancialMetric {
   id: string;
@@ -28,6 +26,9 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
   activeSubscriptions = 12,
   potentialSavings = 89.99
 }) => {
+  const { width } = useWindowDimensions();
+  const cardWidth = (width - 60) / 2;
+
   // Change values are left blank until real historical comparison
   // data is available.  Fabricating trends is misleading (PR review).
   const metrics: FinancialMetric[] = [
@@ -74,7 +75,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
     const TrendIcon = metric.changeType === 'positive' ? TrendingUp : TrendingDown;
     
     return (
-      <View key={metric.id} style={styles.metricCard}>
+      <View key={metric.id} style={[styles.metricCard, { width: cardWidth }]}>
         <LinearGradient
           colors={metric.color}
           start={{ x: 0, y: 0 }}
@@ -130,11 +131,11 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
         >
           <View style={styles.insightsHeader}>
             <BarChart3 size={24} color="white" />
-            <Text style={styles.insightsTitle}>AI Insights</Text>
+            <Text style={styles.insightsTitle}>Savings Tip</Text>
           </View>
           <Text style={styles.insightsText}>
-            You could save ${potentialSavings.toFixed(2)}/month by optimizing your subscriptions. 
-            Consider canceling unused services or switching to annual plans.
+            Based on your current recurring spend, you may be able to save ${potentialSavings.toFixed(2)}
+            /month by removing unused services or switching eligible plans to annual billing.
           </Text>
         </LinearGradient>
       </View>
@@ -169,7 +170,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   metricCard: {
-    width: (width - 60) / 2,
     marginBottom: 16,
   },
   gradientCard: {

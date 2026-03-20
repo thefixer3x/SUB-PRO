@@ -2,12 +2,14 @@ import { supabase, isSupabaseEnvConfigured } from '@/lib/supabase';
 import type { Database } from '@/lib/supabase';
 import type { Subscription } from '@/types/subscription';
 
-type SmSubscriptionRow = Database['public']['Tables']['sm_subscriptions']['Row'];
-type SmSubscriptionInsert = Database['public']['Tables']['sm_subscriptions']['Insert'];
-type SmSubscriptionUpdate = Database['public']['Tables']['sm_subscriptions']['Update'];
+type SubscriptionRow = Database['public']['Tables']['subscriptions']['Row'];
+type SubscriptionInsert = Database['public']['Tables']['subscriptions']['Insert'];
+type SubscriptionUpdate = Database['public']['Tables']['subscriptions']['Update'];
+
+const SUBSCRIPTIONS_TABLE: keyof Database['public']['Tables'] = 'subscriptions';
 
 /** Map DB row (snake_case) to client model (camelCase). */
-function toSubscription(row: SmSubscriptionRow): Subscription {
+function toSubscription(row: SubscriptionRow): Subscription {
   return {
     id: row.id,
     name: row.name,
@@ -29,7 +31,7 @@ function toSubscription(row: SmSubscriptionRow): Subscription {
 }
 
 /** Map client model to DB insert row. */
-function toInsertRow(sub: Omit<Subscription, 'id'>, userId: string): SmSubscriptionInsert {
+function toInsertRow(sub: Omit<Subscription, 'id'>, userId: string): SubscriptionInsert {
   return {
     user_id: userId,
     name: sub.name,
@@ -57,7 +59,7 @@ export async function fetchUserSubscriptions(userId: string): Promise<Subscripti
   }
 
   const { data, error } = await supabase
-    .from('sm_subscriptions')
+    .from(SUBSCRIPTIONS_TABLE)
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
@@ -67,7 +69,7 @@ export async function fetchUserSubscriptions(userId: string): Promise<Subscripti
     throw new Error(error.message);
   }
 
-  return (data ?? []).map((row) => toSubscription(row as SmSubscriptionRow));
+  return (data ?? []).map((row) => toSubscription(row as SubscriptionRow));
 }
 
 export async function createSubscription(
@@ -80,8 +82,18 @@ export async function createSubscription(
 
   const row = toInsertRow(sub, userId);
 
-  const { data, error } = await supabase
-    .from('sm_subscriptions')
+  const { data, error } = await (
+    supabase.from(SUBSCRIPTIONS_TABLE) as unknown as {
+      insert: (values: SubscriptionInsert) => {
+        select: () => {
+          single: () => Promise<{
+            data: SubscriptionRow | null;
+            error: { message: string } | null;
+          }>;
+        };
+      };
+    }
+  )
     .insert(row)
     .select()
     .single();
@@ -91,7 +103,7 @@ export async function createSubscription(
     throw new Error(error.message);
   }
 
-  return toSubscription(data as SmSubscriptionRow);
+  return toSubscription(data as SubscriptionRow);
 }
 
 export async function updateSubscription(
@@ -102,7 +114,7 @@ export async function updateSubscription(
     throw new Error('Supabase not configured');
   }
 
-  const dbUpdates: SmSubscriptionUpdate = {};
+  const dbUpdates: SubscriptionUpdate = {};
   if (updates.name !== undefined) dbUpdates.name = updates.name;
   if (updates.category !== undefined) dbUpdates.category = updates.category;
   if (updates.status !== undefined) dbUpdates.status = updates.status;
@@ -119,8 +131,20 @@ export async function updateSubscription(
   if (updates.logoUrl !== undefined) dbUpdates.logo_url = updates.logoUrl ?? null;
   if (updates.color !== undefined) dbUpdates.color = updates.color ?? null;
 
-  const { data, error } = await supabase
-    .from('sm_subscriptions')
+  const { data, error } = await (
+    supabase.from(SUBSCRIPTIONS_TABLE) as unknown as {
+      update: (values: SubscriptionUpdate) => {
+        eq: (column: string, value: string) => {
+          select: () => {
+            single: () => Promise<{
+              data: SubscriptionRow | null;
+              error: { message: string } | null;
+            }>;
+          };
+        };
+      };
+    }
+  )
     .update(dbUpdates)
     .eq('id', subscriptionId)
     .select()
@@ -131,7 +155,7 @@ export async function updateSubscription(
     throw new Error(error.message);
   }
 
-  return toSubscription(data as SmSubscriptionRow);
+  return toSubscription(data as SubscriptionRow);
 }
 
 export async function deleteSubscription(subscriptionId: string): Promise<void> {
@@ -140,7 +164,7 @@ export async function deleteSubscription(subscriptionId: string): Promise<void> 
   }
 
   const { error } = await supabase
-    .from('sm_subscriptions')
+    .from(SUBSCRIPTIONS_TABLE)
     .delete()
     .eq('id', subscriptionId);
 

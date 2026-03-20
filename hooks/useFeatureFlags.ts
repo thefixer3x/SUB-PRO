@@ -38,7 +38,7 @@ async function fetchFeatureFlags(): Promise<FeatureFlagMap> {
  * **Important:** The `error` field is exposed so callers can surface
  * fetch failures in observability tooling rather than silently degrading.
  */
-export const useFeatureFlags = () => {
+export const useSupabaseFeatureFlags = () => {
   const query = useQuery({
     queryKey: ['feature-flags'],
     queryFn: fetchFeatureFlags,
@@ -46,10 +46,10 @@ export const useFeatureFlags = () => {
     refetchOnWindowFocus: false,
   });
 
-  const flags = query.data ?? HARDCODED_FLAGS;
+  const flags: FeatureFlagMap = query.data ?? { ...HARDCODED_FLAGS };
 
   const isEnabled = (flag: string): boolean => {
-    return flags[flag] ?? false;
+    return (flags as Record<string, boolean>)[flag] ?? false;
   };
 
   return {
@@ -57,6 +57,7 @@ export const useFeatureFlags = () => {
     isEnabled,
     isLoading: query.isLoading,
     error: query.error,
+    isError: query.isError,
     refetch: query.refetch,
   };
 };

@@ -1,4 +1,5 @@
 import { supabase, isSupabaseEnvConfigured } from '@/lib/supabase';
+import type { Database } from '@/lib/supabase';
 
 export interface BankAccount {
   id: string;
@@ -39,6 +40,11 @@ interface MCPBankingConfig {
   proxyBaseUrl: string;
 }
 
+type SubscriptionInsert = Database['public']['Tables']['subscriptions']['Insert'];
+type SubscriptionUpdate = Database['public']['Tables']['subscriptions']['Update'];
+
+const SUBSCRIPTIONS_TABLE: keyof Database['public']['Tables'] = 'subscriptions';
+
 /**
  * Client-side banking service.
  *
@@ -61,11 +67,22 @@ export class MCPBankingService {
   private async proxyFetch<T = unknown>(
     path: string,
     payload?: Record<string, unknown>,
+    method: 'GET' | 'POST' = 'POST',
   ): Promise<T> {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+
+    if (!accessToken) {
+      throw new Error('You must be signed in to use banking services.');
+    }
+
     const res = await fetch(`${this.config.proxyBaseUrl}/api/banking/proxy`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path, payload, userId: this.userId }),
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ path, payload, method }),
     });
 
     if (!res.ok) {
@@ -101,7 +118,7 @@ export class MCPBankingService {
     );
 
     if (isSupabaseEnvConfigured) {
-      const result = await supabase.from('sm_subscriptions').select('id').limit(0);
+      const result = await supabase.from(SUBSCRIPTIONS_TABLE).select('id').limit(0);
       // bank_accounts table does not exist yet — skip persistence until created
       void result;
     }
@@ -120,6 +137,8 @@ export class MCPBankingService {
 
     const transactions = await this.proxyFetch<Transaction[]>(
       `/banking/transactions?${params}`,
+      undefined,
+      'GET',
     );
 
     // Persistence is deferred until the transactions table schema
@@ -136,36 +155,104 @@ export class MCPBankingService {
       { accountId, analysisDepth: 'deep', lookbackMonths: 12 },
     );
 
-    // Store confirmed detections in sm_subscriptions so the rest of the
-    // app sees them.  Mapping follows the sm_subscriptions contract.
+    // Store confirmed detections in the canonical subscriptions table so the
+    // rest of the app sees the same persisted contract as fresh installs.
     if (isSupabaseEnvConfigured) {
       for (const d of detections) {
         if (d.confidence < 0.8) continue; // only high-confidence
 
-        const result = await supabase
-          .from('sm_subscriptions')
-          .upsert(
-            {
-              user_id: this.userId,
-              name: d.merchant,
-              category: d.category,
-              status: 'Active',
-              plan_name: d.frequency,
-              monthly_cost: d.amount,
-              currency: 'USD',
-              billing_cycle:
-                d.frequency === 'monthly'
-                  ? 'Monthly'
-                  : d.frequency === 'yearly'
-                    ? 'Annually'
-                    : 'Weekly',
-              renewal_date: d.nextBilling,
-              payment_method: 'Bank detected',
-            } as Record<string, unknown>,
-            { onConflict: 'user_id,name' },
-          );
+        const subscriptionInsert = {
+          user_id: this.userId,
+          name: d.merchant,
+          category: d.category,
+          status: 'Active',
+          plan_name: d.frequency,
+          monthly_cost: d.amount,
+          currency: 'USD',
+          billing_cycle:
+            d.frequency === 'monthly'
+              ? 'Monthly'
+              : d.frequency === 'yearly'
+                ? 'Annually'
+                : 'Weekly',
+          renewal_date: d.nextBilling,
+          payment_method: 'Bank detected',
+        } satisfies SubscriptionInsert;
 
-        this.assertSupabaseWrite(result, 'upsert detected subscription');
+        const { data: existingSubscription, error: existingError } = await (
+          supabase.from(SUBSCRIPTIONS_TABLE) as unknown as {
+            select: (columns: string) => {
+              eq: (column: string, value: string) => {
+                eq: (nestedColumn: string, nestedValue: string) => {
+                  limit: (count: number) => {
+                    maybeSingle: () => Promise<{
+                      data: { id: string } | null;
+                      error: { message: string } | null;
+                    }>;
+                  };
+                };
+              };
+            };
+          }
+        )
+          .select('id')
+          .eq('user_id', this.userId)
+          .eq('name', d.merchant)
+          .limit(1)
+          .maybeSingle();
+
+        if (existingError) {
+          throw new Error(
+            `Supabase load detected subscription failed: ${existingError.message}`,
+          );
+        }
+
+        if (existingSubscription?.id) {
+          const subscriptionUpdate = {
+            category: subscriptionInsert.category,
+            status: subscriptionInsert.status,
+            plan_name: subscriptionInsert.plan_name,
+            monthly_cost: subscriptionInsert.monthly_cost,
+            currency: subscriptionInsert.currency,
+            billing_cycle: subscriptionInsert.billing_cycle,
+            renewal_date: subscriptionInsert.renewal_date,
+            payment_method: subscriptionInsert.payment_method,
+          } satisfies SubscriptionUpdate;
+
+          const updateResult = await (
+            supabase.from(SUBSCRIPTIONS_TABLE) as unknown as {
+              update: (values: SubscriptionUpdate) => {
+                eq: (column: string, value: string) => {
+                  eq: (
+                    nestedColumn: string,
+                    nestedValue: string,
+                  ) => Promise<{ error: { message: string } | null }>;
+                };
+              };
+            }
+          )
+            .update(subscriptionUpdate)
+            .eq('id', existingSubscription.id)
+            .eq('user_id', this.userId);
+
+          this.assertSupabaseWrite(
+            updateResult,
+            'update detected subscription',
+          );
+        } else {
+          const insertResult = await (
+            supabase.from(SUBSCRIPTIONS_TABLE) as unknown as {
+              insert: (
+                values: SubscriptionInsert,
+              ) => Promise<{ error: { message: string } | null }>;
+            }
+          ).insert(subscriptionInsert);
+
+          this.assertSupabaseWrite(
+            insertResult,
+            'insert detected subscription',
+          );
+        }
       }
     }
 
@@ -189,16 +276,18 @@ export class MCPBankingService {
       { subscriptionId, reason, requestCancellation: true },
     );
 
-    // Update the canonical sm_subscriptions table, not a non-existent
-    // 'subscriptions' table, and use deactivation_date (our column name).
+    // Update the canonical subscriptions table and use deactivation_date
+    // for cancellation timestamps.
     if (isSupabaseEnvConfigured) {
+      const subscriptionUpdate = {
+        status: 'Inactive',
+        deactivation_date: new Date().toISOString(),
+        notes: reason ? `Cancelled: ${reason}` : 'Cancelled via MCP',
+      } satisfies SubscriptionUpdate;
+
       const writeResult = await supabase
-        .from('sm_subscriptions')
-        .update({
-          status: 'Inactive',
-          deactivation_date: new Date().toISOString(),
-          notes: reason ? `Cancelled: ${reason}` : 'Cancelled via MCP',
-        } as Record<string, unknown>)
+        .from(SUBSCRIPTIONS_TABLE)
+        .update(subscriptionUpdate as never)
         .eq('id', subscriptionId)
         .eq('user_id', this.userId);
 
@@ -235,5 +324,12 @@ export const createMCPBankingService = (userId: string): MCPBankingService => {
       ? window.location.origin
       : (process.env.EXPO_PUBLIC_API_URL ?? '');
 
-  return new MCPBankingService({ proxyBaseUrl }, userId);
+  const normalizedProxyBaseUrl = proxyBaseUrl.replace(/\/+$/, '');
+  if (!normalizedProxyBaseUrl) {
+    throw new Error(
+      'EXPO_PUBLIC_API_URL or window.location.origin must be set',
+    );
+  }
+
+  return new MCPBankingService({ proxyBaseUrl: normalizedProxyBaseUrl }, userId);
 };
