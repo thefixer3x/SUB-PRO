@@ -70,7 +70,7 @@ export const BankAccountConnector: React.FC<BankAccountConnectorProps> = ({
     }
   }, [visible]);
 
-  const availableBanks: Bank[] = [
+  const bankCatalog: Bank[] = [
     {
       id: 'chase',
       name: 'Chase',
@@ -119,14 +119,18 @@ export const BankAccountConnector: React.FC<BankAccountConnectorProps> = ({
       supportedAuth: ['openbanking', 'credentials'],
       isPopular: false
     }
-  ]
-    .map((bank) => ({
-      ...bank,
-      supportedAuth: bank.supportedAuth.filter((method) =>
+  ];
+
+  const availableBanks: Bank[] = bankCatalog.flatMap((bank) => {
+    const supportedAuth = bank.supportedAuth.filter(
+      (
+        method,
+      ): method is Bank['supportedAuth'][number] =>
         IMPLEMENTED_AUTH_METHODS.includes(method),
-      ),
-    }))
-    .filter((bank) => bank.supportedAuth.length > 0);
+    );
+
+    return supportedAuth.length ? [{ ...bank, supportedAuth }] : [];
+  });
 
   const handleBankSelection = (bank: Bank) => {
     setSelectedBank(bank);
