@@ -6,10 +6,6 @@
   "trailingSlash": false,
   "rewrites": [
     {
-      "source": "/api/banking/proxy",
-      "destination": "https://subtrack-pro.lanonasis.com/.netlify/functions/banking-proxy"
-    },
-    {
       "source": "/api/create-checkout-session",
       "destination": "https://subtrack-pro.lanonasis.com/.netlify/functions/create-checkout-session"
     },
