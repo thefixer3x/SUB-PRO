@@ -43,6 +43,8 @@ jobs:
       should-build: ${{ steps.check.outputs.should-build }}
       platform: ${{ steps.check.outputs.platform }}
       profile: ${{ steps.check.outputs.profile }}
+      submit-profile: ${{ steps.check.outputs.submit-profile }}
+      auto-submit: ${{ steps.check.outputs.auto-submit }}
       skip-tests: ${{ steps.check.outputs.skip-tests }}
     
     steps:
@@ -78,18 +80,24 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "platform=${{ github.event.inputs.platform }}" >> $GITHUB_OUTPUT
             echo "profile=${{ github.event.inputs.profile }}" >> $GITHUB_OUTPUT
+            echo "submit-profile=production" >> $GITHUB_OUTPUT
+            echo "auto-submit=false" >> $GITHUB_OUTPUT
             echo "skip-tests=${{ github.event.inputs.skip_tests }}" >> $GITHUB_OUTPUT
             echo "should-build=true" >> $GITHUB_OUTPUT
             echo "✅ Manual workflow trigger detected"
           elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "platform=all" >> $GITHUB_OUTPUT
             echo "profile=production" >> $GITHUB_OUTPUT
+            echo "submit-profile=store-submission" >> $GITHUB_OUTPUT
+            echo "auto-submit=true" >> $GITHUB_OUTPUT
             echo "skip-tests=false" >> $GITHUB_OUTPUT
             echo "should-build=true" >> $GITHUB_OUTPUT
             echo "✅ Main branch push detected"
           else
             echo "platform=android" >> $GITHUB_OUTPUT
             echo "profile=preview" >> $GITHUB_OUTPUT
+            echo "submit-profile=production" >> $GITHUB_OUTPUT
+            echo "auto-submit=false" >> $GITHUB_OUTPUT
             echo "skip-tests=false" >> $GITHUB_OUTPUT
             echo "should-build=false" >> $GITHUB_OUTPUT
             echo "ℹ️ PR or branch push - skipping build"
@@ -328,7 +336,7 @@ jobs:
     runs-on: ubuntu-latest
     name: App Store Submission
     needs: [validate, build]
-    if: success() && needs.validate.outputs.profile == 'store-submission' && github.ref == 'refs/heads/main'
+    if: success() && needs.validate.outputs.auto-submit == 'true' && github.ref == 'refs/heads/main'
     
     strategy:
       matrix:
@@ -371,9 +379,9 @@ jobs:
         run: |
           echo "🚀 Submitting ${{ matrix.platform }} build to app store..."
           if [ "${{ matrix.platform }}" = "android" ] && [ -f "google-service-account.json" ]; then
-            eas submit --platform ${{ matrix.platform }} --latest --non-interactive
+            eas submit --platform ${{ matrix.platform }} --profile ${{ needs.validate.outputs.submit-profile }} --latest --non-interactive
           elif [ "${{ matrix.platform }}" = "ios" ]; then
-            eas submit --platform ${{ matrix.platform }} --latest --non-interactive
+            eas submit --platform ${{ matrix.platform }} --profile ${{ needs.validate.outputs.submit-profile }} --latest --non-interactive
           else
             echo "⚠️ Cannot submit - missing required files"
             exit 1
