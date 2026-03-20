@@ -1,8 +1,9 @@
+import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase, isSupabaseEnvConfigured } from '@/lib/supabase';
 import { FEATURE_FLAGS as HARDCODED_FLAGS } from '@/config/featureFlags';
 
-type FeatureFlagMap = Record<string, boolean>;
+export type FeatureFlagMap = Record<string, boolean>;
 
 async function fetchFeatureFlags(): Promise<FeatureFlagMap> {
   if (!isSupabaseEnvConfigured) {
@@ -39,17 +40,26 @@ async function fetchFeatureFlags(): Promise<FeatureFlagMap> {
  * fetch failures in observability tooling rather than silently degrading.
  */
 export const useSupabaseFeatureFlags = () => {
-  const query = useQuery({
+  const lastSuccessfulFlags = useRef<FeatureFlagMap | null>(null);
+
+  const query = useQuery<FeatureFlagMap, Error>({
     queryKey: ['feature-flags'],
     queryFn: fetchFeatureFlags,
     staleTime: 1000 * 60 * 10, // 10 minutes — flags don't change often
     refetchOnWindowFocus: false,
   });
 
-  const flags: FeatureFlagMap = query.data ?? { ...HARDCODED_FLAGS };
+  useEffect(() => {
+    if (query.data) {
+      lastSuccessfulFlags.current = query.data;
+    }
+  }, [query.data]);
+
+  const flags: FeatureFlagMap =
+    query.data ?? lastSuccessfulFlags.current ?? {};
 
   const isEnabled = (flag: string): boolean => {
-    return (flags as Record<string, boolean>)[flag] ?? false;
+    return flags[flag] ?? false;
   };
 
   return {

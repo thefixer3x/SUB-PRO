@@ -1,5 +1,12 @@
+import { Platform } from 'react-native';
 import { supabase, isSupabaseEnvConfigured } from '@/lib/supabase';
 import type { Database } from '@/lib/supabase';
+import {
+  buildApiBases,
+  buildUrl,
+  DEFAULT_API_TIMEOUT_MS,
+  fetchWithTimeout,
+} from '@/lib/apiClient';
 
 export interface BankAccount {
   id: string;
@@ -36,14 +43,101 @@ export interface SubscriptionDetection {
 }
 
 interface MCPBankingConfig {
-  /** Base URL of our own server-side proxy (NOT the external API). */
-  proxyBaseUrl: string;
+  /** Candidate URLs for our own server-side banking proxy. */
+  proxyUrls: string[];
 }
 
 type SubscriptionInsert = Database['public']['Tables']['subscriptions']['Insert'];
 type SubscriptionUpdate = Database['public']['Tables']['subscriptions']['Update'];
 
 const SUBSCRIPTIONS_TABLE: keyof Database['public']['Tables'] = 'subscriptions';
+const SUBSCRIPTION_IDENTITY_COLUMNS =
+  'user_id,name,monthly_cost,billing_cycle,category';
+const RELATIVE_BANKING_PROXY_URL = '/api/banking/proxy';
+const NETLIFY_BANKING_PROXY_PATH = '/banking-proxy';
+
+const unique = <T,>(values: T[]): T[] =>
+  values.filter((value, index) => values.indexOf(value) === index);
+
+const toBillingCycle = (
+  frequency: SubscriptionDetection['frequency'],
+): SubscriptionInsert['billing_cycle'] => {
+  switch (frequency) {
+    case 'yearly':
+      return 'Annually';
+    case 'weekly':
+      return 'Weekly';
+    case 'monthly':
+    default:
+      return 'Monthly';
+  }
+};
+
+const roundCurrency = (value: number): number => {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+};
+
+const normalizeToMonthlyAmount = (
+  amount: number,
+  frequency: SubscriptionDetection['frequency'],
+): number => {
+  switch (frequency) {
+    case 'yearly':
+      return roundCurrency(amount / 12);
+    case 'weekly':
+      return roundCurrency((amount * 52) / 12);
+    case 'monthly':
+    default:
+      return roundCurrency(amount);
+  }
+};
+
+const extractProxyError = async (response: Response): Promise<string | null> => {
+  const contentType = response.headers.get('content-type') ?? '';
+
+  try {
+    if (contentType.includes('application/json')) {
+      const data = await response.json();
+      if (
+        data &&
+        typeof data === 'object' &&
+        'error' in data &&
+        typeof data.error === 'string'
+      ) {
+        return data.error;
+      }
+
+      return JSON.stringify(data);
+    }
+
+    const text = await response.text();
+    return text.trim() || null;
+  } catch {
+    return null;
+  }
+};
+
+const buildBankingProxyUrls = (): string[] => {
+  const functionBases = buildApiBases(
+    [
+      process.env.EXPO_PUBLIC_EMBEDDED_FINANCE_API_BASE_URL,
+      process.env.EXPO_PUBLIC_EMBEDDED_FINANCE_API_FALLBACK_URL,
+      process.env.EXPO_PUBLIC_API_BASE_URL,
+      process.env.EXPO_PUBLIC_API_FALLBACK_URL,
+    ],
+    { includeRelative: false },
+  );
+
+  const urls = functionBases.map((base) =>
+    buildUrl(base, NETLIFY_BANKING_PROXY_PATH),
+  );
+
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    urls.unshift(RELATIVE_BANKING_PROXY_URL);
+  }
+
+  return unique(urls.filter((url) => Boolean(url.trim())));
+};
 
 /**
  * Client-side banking service.
@@ -76,24 +170,44 @@ export class MCPBankingService {
       throw new Error('You must be signed in to use banking services.');
     }
 
-    const res = await fetch(`${this.config.proxyBaseUrl}/api/banking/proxy`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({ path, payload, method }),
-    });
+    const requestBody = JSON.stringify({ path, payload, method });
+    const requestHeaders = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    };
+    const errors: string[] = [];
 
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(
-        (body as Record<string, string>).error ??
-          `Banking proxy error (${res.status})`,
-      );
+    for (const proxyUrl of this.config.proxyUrls) {
+      try {
+        const res = await fetchWithTimeout(
+          proxyUrl,
+          {
+            method: 'POST',
+            headers: requestHeaders,
+            body: requestBody,
+          },
+          DEFAULT_API_TIMEOUT_MS,
+        );
+
+        if (!res.ok) {
+          const message = await extractProxyError(res);
+          errors.push(
+            `${res.status} ${res.statusText} for ${proxyUrl}${
+              message ? `: ${message}` : ''
+            }`,
+          );
+          continue;
+        }
+
+        return (await res.json()) as T;
+      } catch (error) {
+        const reason =
+          error instanceof Error ? error.message : 'Unknown error';
+        errors.push(`Request to ${proxyUrl} failed: ${reason}`);
+      }
     }
 
-    return res.json() as Promise<T>;
+    throw new Error(errors.join('; ') || 'Banking proxy request failed');
   }
 
   /** Throw if a Supabase write fails instead of swallowing the error. */
@@ -160,6 +274,8 @@ export class MCPBankingService {
     if (isSupabaseEnvConfigured) {
       for (const d of detections) {
         if (d.confidence < 0.8) continue; // only high-confidence
+        const monthlyCost = normalizeToMonthlyAmount(d.amount, d.frequency);
+        const billingCycle = toBillingCycle(d.frequency);
 
         const subscriptionInsert = {
           user_id: this.userId,
@@ -167,92 +283,28 @@ export class MCPBankingService {
           category: d.category,
           status: 'Active',
           plan_name: d.frequency,
-          monthly_cost: d.amount,
+          monthly_cost: monthlyCost,
           currency: 'USD',
-          billing_cycle:
-            d.frequency === 'monthly'
-              ? 'Monthly'
-              : d.frequency === 'yearly'
-                ? 'Annually'
-                : 'Weekly',
+          billing_cycle: billingCycle,
           renewal_date: d.nextBilling,
           payment_method: 'Bank detected',
         } satisfies SubscriptionInsert;
 
-        const { data: existingSubscription, error: existingError } = await (
+        const upsertResult = await (
           supabase.from(SUBSCRIPTIONS_TABLE) as unknown as {
-            select: (columns: string) => {
-              eq: (column: string, value: string) => {
-                eq: (nestedColumn: string, nestedValue: string) => {
-                  limit: (count: number) => {
-                    maybeSingle: () => Promise<{
-                      data: { id: string } | null;
-                      error: { message: string } | null;
-                    }>;
-                  };
-                };
-              };
-            };
+            upsert: (
+              values: SubscriptionInsert,
+              options: { onConflict: string },
+            ) => Promise<{ error: { message: string } | null }>;
           }
-        )
-          .select('id')
-          .eq('user_id', this.userId)
-          .eq('name', d.merchant)
-          .limit(1)
-          .maybeSingle();
+        ).upsert(subscriptionInsert, {
+          onConflict: SUBSCRIPTION_IDENTITY_COLUMNS,
+        });
 
-        if (existingError) {
-          throw new Error(
-            `Supabase load detected subscription failed: ${existingError.message}`,
-          );
-        }
-
-        if (existingSubscription?.id) {
-          const subscriptionUpdate = {
-            category: subscriptionInsert.category,
-            status: subscriptionInsert.status,
-            plan_name: subscriptionInsert.plan_name,
-            monthly_cost: subscriptionInsert.monthly_cost,
-            currency: subscriptionInsert.currency,
-            billing_cycle: subscriptionInsert.billing_cycle,
-            renewal_date: subscriptionInsert.renewal_date,
-            payment_method: subscriptionInsert.payment_method,
-          } satisfies SubscriptionUpdate;
-
-          const updateResult = await (
-            supabase.from(SUBSCRIPTIONS_TABLE) as unknown as {
-              update: (values: SubscriptionUpdate) => {
-                eq: (column: string, value: string) => {
-                  eq: (
-                    nestedColumn: string,
-                    nestedValue: string,
-                  ) => Promise<{ error: { message: string } | null }>;
-                };
-              };
-            }
-          )
-            .update(subscriptionUpdate)
-            .eq('id', existingSubscription.id)
-            .eq('user_id', this.userId);
-
-          this.assertSupabaseWrite(
-            updateResult,
-            'update detected subscription',
-          );
-        } else {
-          const insertResult = await (
-            supabase.from(SUBSCRIPTIONS_TABLE) as unknown as {
-              insert: (
-                values: SubscriptionInsert,
-              ) => Promise<{ error: { message: string } | null }>;
-            }
-          ).insert(subscriptionInsert);
-
-          this.assertSupabaseWrite(
-            insertResult,
-            'insert detected subscription',
-          );
-        }
+        this.assertSupabaseWrite(
+          upsertResult,
+          'upsert detected subscription',
+        );
       }
     }
 
@@ -275,6 +327,10 @@ export class MCPBankingService {
       '/subscriptions/cancel',
       { subscriptionId, reason, requestCancellation: true },
     );
+
+    if (!result.success) {
+      return false;
+    }
 
     // Update the canonical subscriptions table and use deactivation_date
     // for cancellation timestamps.
@@ -316,20 +372,13 @@ export class MCPBankingService {
 // ── factory ──────────────────────────────────────────────────
 
 export const createMCPBankingService = (userId: string): MCPBankingService => {
-  // proxyBaseUrl is the origin of the running app — API routes live
-  // under /api/banking/*.  On web this is window.location.origin;
-  // on native it falls back to the EXPO_PUBLIC_API_URL env var.
-  const proxyBaseUrl =
-    typeof window !== 'undefined' && window.location?.origin
-      ? window.location.origin
-      : (process.env.EXPO_PUBLIC_API_URL ?? '');
+  const proxyUrls = buildBankingProxyUrls();
 
-  const normalizedProxyBaseUrl = proxyBaseUrl.replace(/\/+$/, '');
-  if (!normalizedProxyBaseUrl) {
+  if (!proxyUrls.length) {
     throw new Error(
-      'EXPO_PUBLIC_API_URL or window.location.origin must be set',
+      'Configure EXPO_PUBLIC_API_BASE_URL/EXPO_PUBLIC_EMBEDDED_FINANCE_API_BASE_URL or serve /api/banking/proxy on the current origin.',
     );
   }
 
-  return new MCPBankingService({ proxyBaseUrl: normalizedProxyBaseUrl }, userId);
+  return new MCPBankingService({ proxyUrls }, userId);
 };

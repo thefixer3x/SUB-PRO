@@ -2,6 +2,35 @@
 -- This version is replay-safe: it skips missing relations and missing policies
 -- instead of aborting fresh environments during `supabase db reset`.
 
+CREATE SCHEMA IF NOT EXISTS private;
+
+DO $$
+BEGIN
+  IF to_regclass('public.team_members') IS NULL THEN
+    RAISE NOTICE 'Skipping private.is_team_member helper because public.team_members is missing';
+    RETURN;
+  END IF;
+
+  EXECUTE $fn$
+    CREATE OR REPLACE FUNCTION private.is_team_member(member_user_id uuid, member_team_id uuid)
+    RETURNS boolean
+    LANGUAGE sql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $$
+      SELECT EXISTS (
+        SELECT 1
+        FROM public.team_members
+        WHERE user_id = member_user_id
+          AND team_id = member_team_id
+      )
+    $$;
+  $fn$;
+
+  REVOKE ALL ON FUNCTION private.is_team_member(uuid, uuid) FROM PUBLIC;
+  GRANT EXECUTE ON FUNCTION private.is_team_member(uuid, uuid) TO anon, authenticated, service_role;
+END $$;
+
 DO $$
 DECLARE
   policy_change RECORD;
@@ -23,10 +52,10 @@ BEGIN
         ('public', 'screenshot_memories', 'Users can manage screenshot memories for their memories', 'USING ((EXISTS (SELECT 1 FROM memory_entries WHERE memory_entries.id = screenshot_memories.memory_id AND memory_entries.user_id = (SELECT auth.uid()))))'),
         ('public', 'smart_recall_history', 'Users can view their own recall history', 'USING (((SELECT auth.uid()) = user_id))'),
         ('public', 'smart_recall_schedule', 'Users can manage their own recall schedule', 'USING (((SELECT auth.uid()) = user_id))'),
-        ('public', 'team_members', 'Team members can view their team', 'USING ((EXISTS (SELECT 1 FROM team_members tm WHERE tm.team_id = team_members.team_id AND tm.user_id = (SELECT auth.uid()))))'),
-        ('public', 'team_shared_memories', 'Team members can view shared memories', 'USING ((EXISTS (SELECT 1 FROM team_members WHERE team_members.team_id = team_shared_memories.team_id AND team_members.user_id = (SELECT auth.uid()))))'),
+        ('public', 'team_members', 'Team members can view their team', 'USING ((private.is_team_member((SELECT auth.uid()), team_members.team_id)))'),
+        ('public', 'team_shared_memories', 'Team members can view shared memories', 'USING ((private.is_team_member((SELECT auth.uid()), team_shared_memories.team_id)))'),
         ('public', 'teams', 'Team owners can update teams', 'USING (((SELECT auth.uid()) = owner_id))'),
-        ('public', 'teams', 'Teams are readable by members', 'USING ((EXISTS (SELECT 1 FROM team_members WHERE team_members.team_id = teams.id AND team_members.user_id = (SELECT auth.uid()))))'),
+        ('public', 'teams', 'Teams are readable by members', 'USING ((private.is_team_member((SELECT auth.uid()), teams.id)))'),
         ('public', 'user_config', 'Service role full access to user_config', 'USING (((SELECT auth.role()) = ''service_role''))'),
         ('public', 'user_config', 'Users can manage own config', 'USING ((user_id = (SELECT auth.uid()))) WITH CHECK ((user_id = (SELECT auth.uid())))'),
         ('public', 'user_subscriptions', 'Users can update their own subscription', 'USING (((SELECT auth.uid()) = user_id))'),

@@ -41,6 +41,8 @@ interface BankAccountConnectorProps {
   visible?: boolean;
 }
 
+const IMPLEMENTED_AUTH_METHODS: Bank['supportedAuth'] = ['credentials'];
+
 export const BankAccountConnector: React.FC<BankAccountConnectorProps> = ({
   userId,
   onAccountConnected,
@@ -68,7 +70,7 @@ export const BankAccountConnector: React.FC<BankAccountConnectorProps> = ({
     }
   }, [visible]);
 
-  const popularBanks: Bank[] = [
+  const availableBanks: Bank[] = [
     {
       id: 'chase',
       name: 'Chase',
@@ -117,10 +119,18 @@ export const BankAccountConnector: React.FC<BankAccountConnectorProps> = ({
       supportedAuth: ['openbanking', 'credentials'],
       isPopular: false
     }
-  ];
+  ]
+    .map((bank) => ({
+      ...bank,
+      supportedAuth: bank.supportedAuth.filter((method) =>
+        IMPLEMENTED_AUTH_METHODS.includes(method),
+      ),
+    }))
+    .filter((bank) => bank.supportedAuth.length > 0);
 
   const handleBankSelection = (bank: Bank) => {
     setSelectedBank(bank);
+    setAuthMethod(bank.supportedAuth[0]);
     setStep('auth');
   };
 
@@ -132,7 +142,16 @@ export const BankAccountConnector: React.FC<BankAccountConnectorProps> = ({
 
     try {
       const bankingService = createMCPBankingService(userId);
-      
+
+      if (!selectedBank.supportedAuth.includes(authMethod)) {
+        Alert.alert(
+          'Unavailable',
+          'That connection method is not available for this bank yet.',
+          [{ text: 'OK', onPress: () => setStep('auth') }],
+        );
+        return;
+      }
+
       if (authMethod !== 'credentials') {
         // OAuth and Open Banking require a real consent/redirect flow
         // that is not yet implemented.  Surface this to the user instead
@@ -191,7 +210,7 @@ export const BankAccountConnector: React.FC<BankAccountConnectorProps> = ({
       </View>
 
       <Text style={styles.sectionTitle}>Popular Banks</Text>
-      {popularBanks.filter(bank => bank.isPopular).map((bank) => (
+      {availableBanks.filter(bank => bank.isPopular).map((bank) => (
         <TouchableOpacity
           key={bank.id}
           style={styles.bankCard}
@@ -213,7 +232,7 @@ export const BankAccountConnector: React.FC<BankAccountConnectorProps> = ({
       ))}
 
       <Text style={styles.sectionTitle}>Other Banks</Text>
-      {popularBanks.filter(bank => !bank.isPopular).map((bank) => (
+      {availableBanks.filter(bank => !bank.isPopular).map((bank) => (
         <TouchableOpacity
           key={bank.id}
           style={styles.bankCard}

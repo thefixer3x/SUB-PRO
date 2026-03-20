@@ -203,6 +203,8 @@ END $$;
 DO $$
 DECLARE
   index_change RECORD;
+  index_schema_name text;
+  index_table_name text;
 BEGIN
   FOR index_change IN
     SELECT *
@@ -222,6 +224,28 @@ BEGIN
     IF to_regclass(index_change.table_name) IS NULL THEN
       RAISE NOTICE 'Skipping index % because relation % is missing',
         index_change.index_name,
+        index_change.table_name;
+      CONTINUE;
+    END IF;
+
+    index_schema_name := split_part(index_change.table_name, '.', 1);
+    index_table_name := split_part(index_change.table_name, '.', 2);
+
+    IF index_table_name = '' THEN
+      index_schema_name := 'public';
+      index_table_name := index_change.table_name;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = index_schema_name
+        AND table_name = index_table_name
+        AND column_name = index_change.column_name
+    ) THEN
+      RAISE NOTICE 'Skipping index % because column % on % is missing',
+        index_change.index_name,
+        index_change.column_name,
         index_change.table_name;
       CONTINUE;
     END IF;

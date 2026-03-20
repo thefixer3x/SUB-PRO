@@ -18,13 +18,13 @@ export const parseCSVFile = (file: File): Promise<ParsedData> => {
     Papa.parse(file, {
       header: false,
       skipEmptyLines: true,
-      complete: (results: { errors: Array<{ message: string }>; data: unknown }) => {
+      complete: (results: Papa.ParseResult<string[]>) => {
         if (results.errors.length > 0) {
           reject(new Error(`CSV parsing error: ${results.errors[0].message}`));
           return;
         }
 
-        const data = results.data as string[][];
+        const data = results.data;
         if (data.length === 0) {
           reject(new Error('File is empty'));
           return;
@@ -39,7 +39,7 @@ export const parseCSVFile = (file: File): Promise<ParsedData> => {
           totalRows: rows.length,
         });
       },
-      error: (error: { message: string }) => {
+      error: (error: Papa.ParseError | Error) => {
         reject(new Error(`Failed to parse CSV: ${error.message}`));
       },
     });
@@ -64,7 +64,7 @@ export const parseExcelFile = (file: File): Promise<ParsedData> => {
         }
 
         const rows: any[][] = [];
-        worksheet.eachRow((row: { values?: unknown }) => {
+        worksheet.eachRow((row: ExcelJS.Row) => {
           const rowValues = row.values;
           rows.push(Array.isArray(rowValues) ? rowValues.slice(1) : []);
         });
