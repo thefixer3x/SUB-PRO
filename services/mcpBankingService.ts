@@ -1,17 +1,17 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseEnvConfigured } from '@/lib/supabase';
 
-interface BankAccount {
+export interface BankAccount {
   id: string;
   bankName: string;
   accountType: string;
-  accountNumber: string;
+  accountNumber?: string;
   balance: number;
   currency: string;
   isConnected: boolean;
   lastSync: string;
 }
 
-interface Transaction {
+export interface Transaction {
   id: string;
   accountId: string;
   amount: number;
@@ -24,7 +24,7 @@ interface Transaction {
   subscriptionId?: string;
 }
 
-interface SubscriptionDetection {
+export interface SubscriptionDetection {
   merchant: string;
   amount: number;
   frequency: 'monthly' | 'yearly' | 'weekly';
@@ -35,11 +35,17 @@ interface SubscriptionDetection {
 }
 
 interface MCPBankingConfig {
-  apiKey: string;
-  baseUrl: string;
-  webhookUrl?: string;
+  /** Base URL of our own server-side proxy (NOT the external API). */
+  proxyBaseUrl: string;
 }
 
+/**
+ * Client-side banking service.
+ *
+ * All external MCP/Onasis API calls are routed through
+ * `app/api/banking/proxy+api.ts` so the bearer token never
+ * reaches the client bundle.
+ */
 export class MCPBankingService {
   private config: MCPBankingConfig;
   private userId: string;
@@ -49,337 +55,185 @@ export class MCPBankingService {
     this.userId = userId;
   }
 
-  /**
-   * Connect to a bank account using Open Banking API
-   */
-  async connectBankAccount(bankCode: string, credentials: any): Promise<BankAccount> {
-    try {
-      const response = await fetch(`${this.config.baseUrl}/banking/connect`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.apiKey}`,
-          'X-User-ID': this.userId,
-        },
-        body: JSON.stringify({
-          bankCode,
-          credentials,
-          webhookUrl: this.config.webhookUrl,
-        }),
-      });
+  // ── helpers ────────────────────────────────────────────────
 
-      if (!response.ok) {
-        throw new Error(`Failed to connect bank account: ${response.statusText}`);
-      }
+  /** Call the server-side proxy which forwards to the MCP API. */
+  private async proxyFetch<T = unknown>(
+    path: string,
+    payload?: Record<string, unknown>,
+  ): Promise<T> {
+    const res = await fetch(`${this.config.proxyBaseUrl}/api/banking/proxy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path, payload, userId: this.userId }),
+    });
 
-      const bankAccount = await response.json();
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(
+        (body as Record<string, string>).error ??
+          `Banking proxy error (${res.status})`,
+      );
+    }
 
-      // Store in Supabase
-      await supabase
-        .from('bank_accounts')
-        .insert({
-          id: bankAccount.id,
-          user_id: this.userId,
-          bank_name: bankAccount.bankName,
-          account_type: bankAccount.accountType,
-          account_number: bankAccount.accountNumber,
-          balance: bankAccount.balance,
-          currency: bankAccount.currency,
-          is_connected: true,
-          last_sync: new Date().toISOString(),
-        });
+    return res.json() as Promise<T>;
+  }
 
-      return bankAccount;
-    } catch (error) {
-      console.error('Error connecting bank account:', error);
-      throw error;
+  /** Throw if a Supabase write fails instead of swallowing the error. */
+  private assertSupabaseWrite(
+    result: { error: { message: string } | null },
+    context: string,
+  ) {
+    if (result.error) {
+      throw new Error(`Supabase ${context}: ${result.error.message}`);
     }
   }
 
-  /**
-   * Fetch transactions from connected bank accounts
-   */
-  async fetchTransactions(accountId: string, fromDate?: string, toDate?: string): Promise<Transaction[]> {
-    try {
-      const params = new URLSearchParams({
-        accountId,
-        ...(fromDate && { fromDate }),
-        ...(toDate && { toDate }),
-      });
+  // ── public API ─────────────────────────────────────────────
 
-      const response = await fetch(`${this.config.baseUrl}/banking/transactions?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${this.config.apiKey}`,
-          'X-User-ID': this.userId,
-        },
-      });
+  async connectBankAccount(
+    bankCode: string,
+    credentials: Record<string, unknown>,
+  ): Promise<BankAccount> {
+    const bankAccount = await this.proxyFetch<BankAccount>(
+      '/banking/connect',
+      { bankCode, credentials },
+    );
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch transactions: ${response.statusText}`);
-      }
-
-      const transactions = await response.json();
-
-      // Store transactions in Supabase
-      for (const transaction of transactions) {
-        await supabase
-          .from('transactions')
-          .upsert({
-            id: transaction.id,
-            user_id: this.userId,
-            account_id: transaction.accountId,
-            amount: transaction.amount,
-            currency: transaction.currency,
-            description: transaction.description,
-            merchant: transaction.merchant,
-            category: transaction.category,
-            date: transaction.date,
-            is_recurring: transaction.isRecurring,
-            subscription_id: transaction.subscriptionId,
-          });
-      }
-
-      return transactions;
-    } catch (error) {
-      console.error('Error fetching transactions:', error);
-      throw error;
+    if (isSupabaseEnvConfigured) {
+      const result = await supabase.from('sm_subscriptions').select('id').limit(0);
+      // bank_accounts table does not exist yet — skip persistence until created
+      void result;
     }
+
+    return bankAccount;
   }
 
-  /**
-   * Analyze transactions to detect subscriptions using AI
-   */
-  async detectSubscriptions(accountId: string): Promise<SubscriptionDetection[]> {
-    try {
-      const response = await fetch(`${this.config.baseUrl}/ai/detect-subscriptions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.apiKey}`,
-          'X-User-ID': this.userId,
-        },
-        body: JSON.stringify({
-          accountId,
-          analysisDepth: 'deep', // Use AI for pattern recognition
-          lookbackMonths: 12,
-        }),
-      });
+  async fetchTransactions(
+    accountId: string,
+    fromDate?: string,
+    toDate?: string,
+  ): Promise<Transaction[]> {
+    const params = new URLSearchParams({ accountId });
+    if (fromDate) params.set('fromDate', fromDate);
+    if (toDate) params.set('toDate', toDate);
 
-      if (!response.ok) {
-        throw new Error(`Failed to detect subscriptions: ${response.statusText}`);
-      }
+    const transactions = await this.proxyFetch<Transaction[]>(
+      `/banking/transactions?${params}`,
+    );
 
-      const detections = await response.json();
+    // Persistence is deferred until the transactions table schema
+    // matches the banking contract (currently it's a wallet-service table).
 
-      // Store detected subscriptions
-      for (const detection of detections) {
-        await supabase
-          .from('detected_subscriptions')
-          .upsert({
-            user_id: this.userId,
-            merchant: detection.merchant,
-            amount: detection.amount,
-            frequency: detection.frequency,
-            confidence: detection.confidence,
-            category: detection.category,
-            next_billing: detection.nextBilling,
-            is_confirmed: false,
-            created_at: new Date().toISOString(),
-          });
-      }
-
-      return detections;
-    } catch (error) {
-      console.error('Error detecting subscriptions:', error);
-      throw error;
-    }
+    return transactions;
   }
 
-  /**
-   * Get AI-powered spending insights
-   */
-  async getSpendingInsights(accountId: string): Promise<any> {
-    try {
-      const response = await fetch(`${this.config.baseUrl}/ai/spending-insights`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.apiKey}`,
-          'X-User-ID': this.userId,
-        },
-        body: JSON.stringify({
-          accountId,
-          analysisType: 'comprehensive',
-          includeRecommendations: true,
-        }),
-      });
+  async detectSubscriptions(
+    accountId: string,
+  ): Promise<SubscriptionDetection[]> {
+    const detections = await this.proxyFetch<SubscriptionDetection[]>(
+      '/ai/detect-subscriptions',
+      { accountId, analysisDepth: 'deep', lookbackMonths: 12 },
+    );
 
-      if (!response.ok) {
-        throw new Error(`Failed to get spending insights: ${response.statusText}`);
+    // Store confirmed detections in sm_subscriptions so the rest of the
+    // app sees them.  Mapping follows the sm_subscriptions contract.
+    if (isSupabaseEnvConfigured) {
+      for (const d of detections) {
+        if (d.confidence < 0.8) continue; // only high-confidence
+
+        const result = await supabase
+          .from('sm_subscriptions')
+          .upsert(
+            {
+              user_id: this.userId,
+              name: d.merchant,
+              category: d.category,
+              status: 'Active',
+              plan_name: d.frequency,
+              monthly_cost: d.amount,
+              currency: 'USD',
+              billing_cycle:
+                d.frequency === 'monthly'
+                  ? 'Monthly'
+                  : d.frequency === 'yearly'
+                    ? 'Annually'
+                    : 'Weekly',
+              renewal_date: d.nextBilling,
+              payment_method: 'Bank detected',
+            } as Record<string, unknown>,
+            { onConflict: 'user_id,name' },
+          );
+
+        this.assertSupabaseWrite(result, 'upsert detected subscription');
       }
-
-      const insights = await response.json();
-
-      // Store insights
-      await supabase
-        .from('spending_insights')
-        .insert({
-          user_id: this.userId,
-          account_id: accountId,
-          insights: insights,
-          generated_at: new Date().toISOString(),
-        });
-
-      return insights;
-    } catch (error) {
-      console.error('Error getting spending insights:', error);
-      throw error;
     }
+
+    return detections;
   }
 
-  /**
-   * Cancel a subscription through the service provider
-   */
-  async cancelSubscription(subscriptionId: string, reason?: string): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.config.baseUrl}/subscriptions/cancel`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.apiKey}`,
-          'X-User-ID': this.userId,
-        },
-        body: JSON.stringify({
-          subscriptionId,
-          reason,
-          requestCancellation: true,
-        }),
-      });
+  async getSpendingInsights(accountId: string): Promise<unknown> {
+    return this.proxyFetch('/ai/spending-insights', {
+      accountId,
+      analysisType: 'comprehensive',
+      includeRecommendations: true,
+    });
+  }
 
-      if (!response.ok) {
-        throw new Error(`Failed to cancel subscription: ${response.statusText}`);
-      }
+  async cancelSubscription(
+    subscriptionId: string,
+    reason?: string,
+  ): Promise<boolean> {
+    const result = await this.proxyFetch<{ success: boolean }>(
+      '/subscriptions/cancel',
+      { subscriptionId, reason, requestCancellation: true },
+    );
 
-      const result = await response.json();
-
-      // Update subscription status
-      await supabase
-        .from('subscriptions')
+    // Update the canonical sm_subscriptions table, not a non-existent
+    // 'subscriptions' table, and use deactivation_date (our column name).
+    if (isSupabaseEnvConfigured) {
+      const writeResult = await supabase
+        .from('sm_subscriptions')
         .update({
-          status: 'cancelled',
-          cancelled_at: new Date().toISOString(),
-          cancellation_reason: reason,
-        })
+          status: 'Inactive',
+          deactivation_date: new Date().toISOString(),
+          notes: reason ? `Cancelled: ${reason}` : 'Cancelled via MCP',
+        } as Record<string, unknown>)
         .eq('id', subscriptionId)
         .eq('user_id', this.userId);
 
-      return result.success;
-    } catch (error) {
-      console.error('Error cancelling subscription:', error);
-      throw error;
+      this.assertSupabaseWrite(writeResult, 'cancel subscription');
     }
+
+    return result.success;
   }
 
-  /**
-   * Get connected bank accounts
-   */
   async getConnectedAccounts(): Promise<BankAccount[]> {
-    try {
-      const { data, error } = await supabase
-        .from('bank_accounts')
-        .select('*')
-        .eq('user_id', this.userId)
-        .eq('is_connected', true);
-
-      if (error) throw error;
-
-      return data || [];
-    } catch (error) {
-      console.error('Error getting connected accounts:', error);
-      throw error;
-    }
+    // bank_accounts table does not exist yet.
+    // Return empty until the table is created.
+    if (!isSupabaseEnvConfigured) return [];
+    return [];
   }
 
-  /**
-   * Sync account data
-   */
   async syncAccount(accountId: string): Promise<void> {
-    try {
-      const response = await fetch(`${this.config.baseUrl}/banking/sync`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.apiKey}`,
-          'X-User-ID': this.userId,
-        },
-        body: JSON.stringify({ accountId }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to sync account: ${response.statusText}`);
-      }
-
-      // Update last sync time
-      await supabase
-        .from('bank_accounts')
-        .update({ last_sync: new Date().toISOString() })
-        .eq('id', accountId)
-        .eq('user_id', this.userId);
-
-    } catch (error) {
-      console.error('Error syncing account:', error);
-      throw error;
-    }
+    await this.proxyFetch('/banking/sync', { accountId });
   }
 
-  /**
-   * Disconnect a bank account
-   */
   async disconnectAccount(accountId: string): Promise<void> {
-    try {
-      const response = await fetch(`${this.config.baseUrl}/banking/disconnect`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.apiKey}`,
-          'X-User-ID': this.userId,
-        },
-        body: JSON.stringify({ accountId }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to disconnect account: ${response.statusText}`);
-      }
-
-      // Update connection status
-      await supabase
-        .from('bank_accounts')
-        .update({ is_connected: false })
-        .eq('id', accountId)
-        .eq('user_id', this.userId);
-
-    } catch (error) {
-      console.error('Error disconnecting account:', error);
-      throw error;
-    }
+    await this.proxyFetch('/banking/disconnect', { accountId });
   }
 }
 
-// Factory function to create MCP Banking Service
+// ── factory ──────────────────────────────────────────────────
+
 export const createMCPBankingService = (userId: string): MCPBankingService => {
-  const config: MCPBankingConfig = {
-    apiKey: process.env.EXPO_PUBLIC_MCP_API_KEY || '',
-    baseUrl: process.env.EXPO_PUBLIC_MCP_BASE_URL || 'https://api.onasis-gateway.com',
-    webhookUrl: process.env.EXPO_PUBLIC_WEBHOOK_URL,
-  };
+  // proxyBaseUrl is the origin of the running app — API routes live
+  // under /api/banking/*.  On web this is window.location.origin;
+  // on native it falls back to the EXPO_PUBLIC_API_URL env var.
+  const proxyBaseUrl =
+    typeof window !== 'undefined' && window.location?.origin
+      ? window.location.origin
+      : (process.env.EXPO_PUBLIC_API_URL ?? '');
 
-  return new MCPBankingService(config, userId);
-};
-
-// Export types
-export type {
-  BankAccount,
-  Transaction,
-  SubscriptionDetection,
-  MCPBankingConfig,
+  return new MCPBankingService({ proxyBaseUrl }, userId);
 };

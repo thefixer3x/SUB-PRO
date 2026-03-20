@@ -1,6 +1,12 @@
 -- Migration: security hardening and performance cleanup
 -- Applied via MCP: sets security_invoker on views, pins function search_path,
 -- enables RLS on intelligence_cost_reference, and adds FK indexes.
+--
+-- WARNING: This migration references tables/views that may not exist on a
+-- clean database (e.g. user_subscriptions, subscription_tiers in billing
+-- schema).  It was applied manually on 2025-07-01 and is kept here for
+-- reference.  To make it replayable, guard each statement with IF EXISTS
+-- checks or wrap in exception-handling DO blocks.
 
 -- 1) Create private schema for sensitive joins
 CREATE SCHEMA IF NOT EXISTS private;

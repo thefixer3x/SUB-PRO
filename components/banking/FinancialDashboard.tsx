@@ -12,7 +12,7 @@ interface FinancialMetric {
   change: string;
   changeType: 'positive' | 'negative';
   icon: React.ComponentType<any>;
-  color: string[];
+  color: [string, string, ...string[]];
 }
 
 interface FinancialDashboardProps {
@@ -28,13 +28,15 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
   activeSubscriptions = 12,
   potentialSavings = 89.99
 }) => {
+  // Change values are left blank until real historical comparison
+  // data is available.  Fabricating trends is misleading (PR review).
   const metrics: FinancialMetric[] = [
     {
       id: 'total-spent',
       title: 'Total Spent',
       value: `$${totalSpent.toLocaleString()}`,
-      change: '+12.5%',
-      changeType: 'negative',
+      change: '',
+      changeType: 'positive',
       icon: DollarSign,
       color: ['#667eea', '#764ba2']
     },
@@ -42,8 +44,8 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
       id: 'monthly-recurring',
       title: 'Monthly Recurring',
       value: `$${monthlyRecurring.toFixed(2)}`,
-      change: '+3.2%',
-      changeType: 'negative',
+      change: '',
+      changeType: 'positive',
       icon: CreditCard,
       color: ['#f093fb', '#f5576c']
     },
@@ -51,7 +53,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
       id: 'active-subs',
       title: 'Active Subscriptions',
       value: activeSubscriptions.toString(),
-      change: '+2',
+      change: '',
       changeType: 'positive',
       icon: PieChart,
       color: ['#4facfe', '#00f2fe']
@@ -60,7 +62,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
       id: 'potential-savings',
       title: 'Potential Savings',
       value: `$${potentialSavings.toFixed(2)}`,
-      change: '+15.8%',
+      change: '',
       changeType: 'positive',
       icon: TrendingUp,
       color: ['#43e97b', '#38f9d7']
@@ -83,18 +85,20 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
             <View style={styles.iconContainer}>
               <IconComponent size={24} color="white" />
             </View>
-            <View style={styles.changeContainer}>
-              <TrendIcon 
-                size={16} 
-                color={metric.changeType === 'positive' ? '#10B981' : '#EF4444'} 
-              />
-              <Text style={[
-                styles.changeText,
-                { color: metric.changeType === 'positive' ? '#10B981' : '#EF4444' }
-              ]}>
-                {metric.change}
-              </Text>
-            </View>
+            {metric.change ? (
+              <View style={styles.changeContainer}>
+                <TrendIcon
+                  size={16}
+                  color={metric.changeType === 'positive' ? '#10B981' : '#EF4444'}
+                />
+                <Text style={[
+                  styles.changeText,
+                  { color: metric.changeType === 'positive' ? '#10B981' : '#EF4444' }
+                ]}>
+                  {metric.change}
+                </Text>
+              </View>
+            ) : null}
           </View>
           
           <View style={styles.cardContent}>

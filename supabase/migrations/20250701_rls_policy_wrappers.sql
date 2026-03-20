@@ -1,4 +1,10 @@
 -- Migration: wrap auth.* calls in RLS policies to avoid per-row re-evaluation
+--
+-- WARNING: This migration uses ALTER POLICY which requires the policies to
+-- already exist.  It is NOT replayable on a clean database.  It was applied
+-- manually via the Supabase MCP tool on 2025-07-01 and is kept here for
+-- reference only.  To make it replayable, wrap each ALTER in a DO $$ block
+-- that checks pg_policies first.
 
 -- api_marketplace_products
 ALTER POLICY "Developers can manage their own products" ON public.api_marketplace_products USING (((SELECT auth.uid()) = developer_id));

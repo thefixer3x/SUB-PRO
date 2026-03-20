@@ -29,7 +29,7 @@ interface Bank {
   id: string;
   name: string;
   logo: string;
-  color: string[];
+  color: [string, string, ...string[]];
   supportedAuth: ('credentials' | 'oauth' | 'openbanking')[];
   isPopular: boolean;
 }
@@ -54,6 +54,19 @@ export const BankAccountConnector: React.FC<BankAccountConnectorProps> = ({
   const [isConnecting, setIsConnecting] = useState(false);
   const [step, setStep] = useState<'select' | 'auth' | 'connecting' | 'success'>('select');
   const [connectedAccount, setConnectedAccount] = useState<BankAccount | null>(null);
+
+  // Reset all state when the modal re-opens
+  useEffect(() => {
+    if (visible) {
+      setSelectedBank(null);
+      setAuthMethod('openbanking');
+      setCredentials({ username: '', password: '' });
+      setShowPassword(false);
+      setIsConnecting(false);
+      setStep('select');
+      setConnectedAccount(null);
+    }
+  }, [visible]);
 
   const popularBanks: Bank[] = [
     {
@@ -120,18 +133,27 @@ export const BankAccountConnector: React.FC<BankAccountConnectorProps> = ({
     try {
       const bankingService = createMCPBankingService(userId);
       
-      let authData;
-      if (authMethod === 'credentials') {
-        authData = credentials;
-      } else if (authMethod === 'oauth') {
-        // OAuth flow would be handled differently
-        authData = { redirectUrl: 'subpro://oauth-callback' };
-      } else {
-        // Open Banking
-        authData = { consentId: 'generated-consent-id' };
+      if (authMethod !== 'credentials') {
+        // OAuth and Open Banking require a real consent/redirect flow
+        // that is not yet implemented.  Surface this to the user instead
+        // of silently sending placeholder data to the API.
+        Alert.alert(
+          'Coming Soon',
+          `${authMethod === 'oauth' ? 'OAuth' : 'Open Banking'} integration is under development. Please use bank credentials for now.`,
+          [{ text: 'OK', onPress: () => setStep('auth') }],
+        );
+        return;
       }
 
-      const account = await bankingService.connectBankAccount(selectedBank.id, authData);
+      const account = await bankingService.connectBankAccount(selectedBank.id, {
+        username: credentials.username,
+        // Password is forwarded to the server-side proxy which talks to
+        // the MCP API over TLS. Clear local state immediately after.
+        password: credentials.password,
+      });
+
+      // Clear sensitive credential state as soon as we're done.
+      setCredentials({ username: '', password: '' });
       
       setConnectedAccount(account);
       setStep('success');
@@ -163,7 +185,7 @@ export const BankAccountConnector: React.FC<BankAccountConnectorProps> = ({
         <View style={styles.securityText}>
           <Text style={styles.securityTitle}>Bank-Level Security</Text>
           <Text style={styles.securityDescription}>
-            256-bit encryption • Read-only access • No data stored
+            256-bit encryption • Read-only access • Data encrypted at rest
           </Text>
         </View>
       </View>
@@ -330,7 +352,7 @@ export const BankAccountConnector: React.FC<BankAccountConnectorProps> = ({
       <CheckCircle size={64} color="#10B981" />
       <Text style={styles.successTitle}>Account Connected!</Text>
       <Text style={styles.successSubtitle}>
-        {connectedAccount?.bankName} account ending in {connectedAccount?.accountNumber.slice(-4)} is now connected.
+        {connectedAccount?.bankName} account ending in {connectedAccount?.accountNumber?.slice(-4) ?? '****'} is now connected.
       </Text>
       <TouchableOpacity style={styles.doneButton} onPress={onClose}>
         <Text style={styles.doneButtonText}>Done</Text>

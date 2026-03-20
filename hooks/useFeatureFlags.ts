@@ -10,11 +10,15 @@ async function fetchFeatureFlags(): Promise<FeatureFlagMap> {
   }
 
   const { data, error } = await supabase
-    .from('sm_feature_flags' as any)
+    .from('sm_feature_flags')
     .select('name, enabled');
 
-  if (error || !data) {
-    console.warn('Failed to fetch feature flags from DB, using hardcoded:', error?.message);
+  if (error) {
+    // Re-throw so React Query surfaces the error to callers.
+    throw new Error(`Feature flag fetch failed: ${error.message}`);
+  }
+
+  if (!data) {
     return { ...HARDCODED_FLAGS };
   }
 
@@ -28,8 +32,11 @@ async function fetchFeatureFlags(): Promise<FeatureFlagMap> {
 }
 
 /**
- * Feature flags sourced from sm_feature_flags table.
- * Falls back to config/featureFlags.ts when Supabase is unavailable.
+ * Feature flags sourced from the `sm_feature_flags` table.
+ * Falls back to `config/featureFlags.ts` when Supabase is unavailable.
+ *
+ * **Important:** The `error` field is exposed so callers can surface
+ * fetch failures in observability tooling rather than silently degrading.
  */
 export const useFeatureFlags = () => {
   const query = useQuery({
@@ -49,6 +56,7 @@ export const useFeatureFlags = () => {
     flags,
     isEnabled,
     isLoading: query.isLoading,
+    error: query.error,
     refetch: query.refetch,
   };
 };
