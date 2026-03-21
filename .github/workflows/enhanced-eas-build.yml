@@ -213,6 +213,13 @@ jobs:
           echo "Creating Google Service Account file for Android builds..."
           echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > google-service-account.json
           echo "✅ Created google-service-account.json"
+
+      - name: Create App Store Connect API Key File
+        if: matrix.platform == 'ios'
+        run: |
+          echo "Creating App Store Connect API key file for iOS submissions..."
+          echo '${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}' > asc-api-key.p8
+          echo "✅ Created asc-api-key.p8"
           
       - name: Show project info
         run: |
