@@ -115,7 +115,10 @@
       "ios": {
         "appleId": "sosnipez@yahoo.com",
         "ascAppId": "6748663048",
-        "appleTeamId": "5D9V25DXPB"
+        "appleTeamId": "5D9V25DXPB",
+        "ascApiKeyPath": "./asc-api-key.p8",
+        "ascApiKeyIssuerId": "c63babaa-12b6-4399-b0ff-d5fd3a04f404",
+        "ascApiKeyId": "2F2UYP8DDP"
       }
     },
     "store-submission": {
@@ -128,7 +131,10 @@
       "ios": {
         "appleId": "sosnipez@yahoo.com",
         "ascAppId": "6748663048",
-        "appleTeamId": "5D9V25DXPB"
+        "appleTeamId": "5D9V25DXPB",
+        "ascApiKeyPath": "./asc-api-key.p8",
+        "ascApiKeyIssuerId": "c63babaa-12b6-4399-b0ff-d5fd3a04f404",
+        "ascApiKeyId": "2F2UYP8DDP"
       }
     }
   }
