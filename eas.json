@@ -107,27 +107,27 @@
   "submit": {
     "production": {
       "android": {
-        "serviceAccountKeyPath": "./cohesive-mender-459104-c3-abc562777578.json",
+        "serviceAccountKeyPath": "./google-service-account.json",
         "track": "internal",
         "changesNotSentForReview": false,
         "releaseStatus": "draft"
       },
       "ios": {
         "appleId": "sosnipez@yahoo.com",
-        "ascAppId": "1234567890",
+        "ascAppId": "6748663048",
         "appleTeamId": "5D9V25DXPB"
       }
     },
     "store-submission": {
       "android": {
-        "serviceAccountKeyPath": "./cohesive-mender-459104-c3-abc562777578.json",
+        "serviceAccountKeyPath": "./google-service-account.json",
         "track": "production",
         "changesNotSentForReview": false,
         "releaseStatus": "completed"
       },
       "ios": {
         "appleId": "sosnipez@yahoo.com",
-        "ascAppId": "1234567890",
+        "ascAppId": "6748663048",
         "appleTeamId": "5D9V25DXPB"
       }
     }
