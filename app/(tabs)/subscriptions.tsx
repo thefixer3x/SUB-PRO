@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native';
+import { SubscriptionLogo } from '@/components/SubscriptionLogo';
 import { Plus, Search, CreditCard, Bot, ExternalLink, Share2, Brain } from 'lucide-react-native';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -132,7 +133,15 @@ export default function Subscriptions() {
   const renderSubscriptionCard = (subscription: any) => (
     <View key={subscription.id} style={dynamicStyles.subscriptionCard}>
       <View style={dynamicStyles.subscriptionHeader}>
-        <Text style={dynamicStyles.subscriptionName}>{subscription.name}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <SubscriptionLogo
+            name={subscription.name}
+            logoUrl={subscription.logo}
+            color={subscription.brandColor}
+            size={36}
+          />
+          <Text style={[dynamicStyles.subscriptionName, { marginLeft: 10 }]}>{subscription.name}</Text>
+        </View>
         <Text style={dynamicStyles.subscriptionCost}>${subscription.cost}</Text>
       </View>
       <Text style={dynamicStyles.subscriptionPlan}>{subscription.plan}</Text>

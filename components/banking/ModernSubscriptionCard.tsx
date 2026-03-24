@@ -11,6 +11,7 @@ import {
   Trash2
 } from 'lucide-react-native';
 import { MaterialCommunityIcons, FontAwesome } from '@expo/vector-icons';
+import { SubscriptionLogo } from '@/components/SubscriptionLogo';
 
 const { width } = Dimensions.get('window');
 
@@ -22,11 +23,14 @@ interface Subscription {
   nextBilling: string;
   status: 'active' | 'paused' | 'cancelled';
   category: string;
+  /** Explicit logo URL – if provided, used directly; otherwise auto-fetched by name */
   logo?: string;
   color: [string, string, ...string[]];
   iconLibrary?: 'MaterialCommunityIcons' | 'FontAwesome';
   iconName?: string;
   hasMCPIntegration?: boolean;
+  /** Brand accent color for the fallback initial avatar */
+  brandColor?: string;
 }
 
 interface ModernSubscriptionCardProps {
@@ -74,21 +78,16 @@ export const ModernSubscriptionCard: React.FC<ModernSubscriptionCardProps> = ({
   // Showing fabricated trend data is misleading per PR review.
 
   const renderServiceIcon = () => {
-    if (!subscription.iconLibrary || !subscription.iconName) return null;
-    
-    const iconProps = {
-      size: 24,
-      color: 'rgba(255, 255, 255, 0.9)'
-    };
-    
-    switch (subscription.iconLibrary) {
-      case 'MaterialCommunityIcons':
-        return <MaterialCommunityIcons name={subscription.iconName as any} {...iconProps} />;
-      case 'FontAwesome':
-        return <FontAwesome name={subscription.iconName as any} {...iconProps} />;
-      default:
-        return null;
-    }
+    // Prefer SubscriptionLogo (auto-fetches brand logo by name/domain)
+    return (
+      <SubscriptionLogo
+        name={subscription.name}
+        logoUrl={subscription.logo}
+        color={subscription.brandColor ?? 'rgba(255,255,255,0.3)'}
+        size={40}
+        borderRadius={10}
+      />
+    );
   };
 
   const formatNextBilling = (dateString: string) => {
