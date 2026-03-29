@@ -17,6 +17,21 @@ import { ShareSubscriptionModal } from '@/components/social/ShareSubscriptionMod
 import { ShareButton } from '@/components/social/ShareButton';
 import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
 
+interface SubscriptionItem {
+  id: number;
+  name: string;
+  plan: string;
+  cost: number;
+  nextBilling: string;
+  status: 'active' | 'paused' | 'cancelled';
+  vendorUrl: string;
+  hasAffiliateLink: boolean;
+  affiliateUrl: string | null;
+  category: string;
+  logo?: string;
+  brandColor?: string;
+}
+
 export default function Subscriptions() {
   const { currentTier, canAccessFeature, getRemainingLimit } = useSubscription();
   const { colors } = useTheme();
@@ -130,7 +145,7 @@ export default function Subscriptions() {
     }
   };
 
-  const renderSubscriptionCard = (subscription: any) => (
+  const renderSubscriptionCard = (subscription: SubscriptionItem) => (
     <View key={subscription.id} style={dynamicStyles.subscriptionCard}>
       <View style={dynamicStyles.subscriptionHeader}>
         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>

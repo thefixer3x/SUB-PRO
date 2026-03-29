@@ -161,8 +161,9 @@ const DOMAIN_MAP: Record<string, string> = {
  * logo.dev (21st.dev) – Requires API token from https://logo.dev
  * Set EXPO_PUBLIC_LOGO_DEV_TOKEN in your .env file.
  */
-function getLogoDevUrl(domain: string, size = 128): string {
-  const token = process.env.EXPO_PUBLIC_LOGO_DEV_TOKEN ?? '';
+function getLogoDevUrl(domain: string, size = 128): string | null {
+  const token = process.env.EXPO_PUBLIC_LOGO_DEV_TOKEN;
+  if (!token) return null; // Skip logo.dev if token not configured
   return `https://img.logo.dev/${domain}?token=${token}&size=${size}&format=png`;
 }
 
@@ -225,8 +226,9 @@ export function getLogoUrls(nameOrUrl: string, size = 128): LogoUrls | null {
   const domain = resolveDomain(nameOrUrl);
   if (!domain) return null;
 
+  const logoDevUrl = getLogoDevUrl(domain, size);
   return {
-    primary: getLogoDevUrl(domain, size),
+    primary: logoDevUrl ?? getClearbitUrl(domain, size), // Use Clearbit as primary if logo.dev unavailable
     secondary: getClearbitUrl(domain, size),
     fallback: getGoogleFaviconUrl(domain, Math.min(size, 64)),
   };
@@ -262,8 +264,11 @@ export async function fetchBestLogoUrl(nameOrUrl: string, size = 128): Promise<s
         logoCache.set(domain, url);
         return url;
       }
-    } catch {
+    } catch (error) {
       // try next
+      if (__DEV__) {
+        console.warn(`[logoService] Failed to fetch HEAD for ${url}`, error);
+      }
     }
   }
 

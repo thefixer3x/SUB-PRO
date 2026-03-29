@@ -10,7 +10,6 @@ import {
   AlertTriangle,
   Trash2
 } from 'lucide-react-native';
-import { MaterialCommunityIcons, FontAwesome } from '@expo/vector-icons';
 import { SubscriptionLogo } from '@/components/SubscriptionLogo';
 
 const { width } = Dimensions.get('window');
@@ -83,7 +82,7 @@ export const ModernSubscriptionCard: React.FC<ModernSubscriptionCardProps> = ({
       <SubscriptionLogo
         name={subscription.name}
         logoUrl={subscription.logo}
-        color={subscription.brandColor ?? 'rgba(255,255,255,0.3)'}
+        color={subscription.brandColor ?? '#6B7280'}
         size={40}
         borderRadius={10}
       />
