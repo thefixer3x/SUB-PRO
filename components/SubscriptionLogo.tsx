@@ -3,8 +3,8 @@
  * Displays a brand logo fetched via logoService with graceful fallback chain:
  *   logo.dev  →  Clearbit  →  Google Favicon  →  colored initial avatar
  */
-import React, { useState } from 'react';
-import { Image, View, Text, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { Image, View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { getLogoUrls } from '@/services/logoService';
 
 interface SubscriptionLogoProps {
@@ -18,7 +18,7 @@ interface SubscriptionLogoProps {
   size?: number;
   /** Border radius (default: size / 4) */
   borderRadius?: number;
-  style?: object;
+  style?: StyleProp<ViewStyle>;
 }
 
 export const SubscriptionLogo: React.FC<SubscriptionLogoProps> = ({
@@ -30,7 +30,7 @@ export const SubscriptionLogo: React.FC<SubscriptionLogoProps> = ({
   style,
 }) => {
   const radius = borderRadius ?? Math.round(size / 4);
-  const urls = logoUrl ? null : getLogoUrls(name, size * 2); // 2× for high-DPI
+  const urls = getLogoUrls(name, size * 2); // 2× for high-DPI
 
   // Track which source we're on: 0 = explicit/primary, 1 = secondary, 2 = fallback, 3 = initials
   const sources: string[] = [];
@@ -40,6 +40,11 @@ export const SubscriptionLogo: React.FC<SubscriptionLogoProps> = ({
   }
 
   const [sourceIndex, setSourceIndex] = useState(0);
+
+  // Reset sourceIndex when props change to retry from first source
+  useEffect(() => {
+    setSourceIndex(0);
+  }, [name, logoUrl]);
 
   const handleError = () => {
     setSourceIndex((prev) => prev + 1);
