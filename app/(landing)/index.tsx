@@ -1018,7 +1018,6 @@ const PricingCard = ({
         tier.popular
           ? {
               transform: [{ scale: Platform.OS === 'web' ? 1.02 : 1.01 }],
-              zIndex: 2, // Keep popular tier visually on top without clipping
             }
           : null,
       ]}
@@ -1031,7 +1030,6 @@ const PricingCard = ({
             left: 0,
             right: 0,
             alignItems: 'center',
-            zIndex: 10, // Ensure badge is above other elements
             backgroundColor: colors.primary,
             paddingHorizontal: 16,
             paddingVertical: 6,
@@ -1691,13 +1689,16 @@ const createStyles = (colors: ThemeColors, themeName: string) => {
       paddingHorizontal: 20,
       paddingVertical: 80, // Increased padding to prevent overlap
       alignItems: 'center',
-      marginBottom: 20, // Add bottom margin for extra spacing
+      marginBottom: 40, // Increased bottom margin for proper section separation
+      position: 'relative',
     },
     featuresSection: {
       paddingHorizontal: 20,
       paddingVertical: 80, // Increased padding to prevent overlap
       alignItems: 'center',
-      marginTop: 20, // Add top margin for extra spacing
+      marginTop: 40, // Increased top margin for extra spacing after pricing cards
+      position: 'relative',
+      zIndex: 1, // Ensure features section renders above pricing section
     },
     benefitsSection: {
       paddingHorizontal: 20,

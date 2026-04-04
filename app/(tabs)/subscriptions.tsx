@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native';
+import { SubscriptionLogo } from '@/components/SubscriptionLogo';
 import { Plus, Search, CreditCard, Bot, ExternalLink, Share2, Brain } from 'lucide-react-native';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -15,6 +16,21 @@ import { affiliateSystemService } from '@/services/affiliateSystem';
 import { ShareSubscriptionModal } from '@/components/social/ShareSubscriptionModal';
 import { ShareButton } from '@/components/social/ShareButton';
 import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
+
+interface SubscriptionItem {
+  id: number;
+  name: string;
+  plan: string;
+  cost: number;
+  nextBilling: string;
+  status: 'active' | 'paused' | 'cancelled';
+  vendorUrl: string;
+  hasAffiliateLink: boolean;
+  affiliateUrl: string | null;
+  category: string;
+  logo?: string;
+  brandColor?: string;
+}
 
 export default function Subscriptions() {
   const { currentTier, canAccessFeature, getRemainingLimit } = useSubscription();
@@ -129,10 +145,18 @@ export default function Subscriptions() {
     }
   };
 
-  const renderSubscriptionCard = (subscription: any) => (
+  const renderSubscriptionCard = (subscription: SubscriptionItem) => (
     <View key={subscription.id} style={dynamicStyles.subscriptionCard}>
       <View style={dynamicStyles.subscriptionHeader}>
-        <Text style={dynamicStyles.subscriptionName}>{subscription.name}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <SubscriptionLogo
+            name={subscription.name}
+            logoUrl={subscription.logo}
+            color={subscription.brandColor}
+            size={36}
+          />
+          <Text style={[dynamicStyles.subscriptionName, { marginLeft: 10 }]}>{subscription.name}</Text>
+        </View>
         <Text style={dynamicStyles.subscriptionCost}>${subscription.cost}</Text>
       </View>
       <Text style={dynamicStyles.subscriptionPlan}>{subscription.plan}</Text>
