@@ -44,7 +44,7 @@ export const SubscriptionLogo: React.FC<SubscriptionLogoProps> = ({
   // Reset sourceIndex when props change to retry from first source
   useEffect(() => {
     setSourceIndex(0);
-  }, [name, logoUrl]);
+  }, [name, logoUrl, size]);
 
   const handleError = () => {
     const failedSource = sources[sourceIndex];
@@ -70,7 +70,7 @@ export const SubscriptionLogo: React.FC<SubscriptionLogoProps> = ({
   }
 
   // Fallback: colored circle with first initial
-  const initial = name?.charAt(0)?.toUpperCase() ?? '?';
+  const initial = name?.charAt(0)?.toUpperCase() || '?';
   const fontSize = Math.round(size * 0.45);
 
   return (
