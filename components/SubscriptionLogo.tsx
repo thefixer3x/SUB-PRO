@@ -47,6 +47,10 @@ export const SubscriptionLogo: React.FC<SubscriptionLogoProps> = ({
   }, [name, logoUrl]);
 
   const handleError = () => {
+    const failedSource = sources[sourceIndex];
+    if (__DEV__ && failedSource) {
+      console.warn(`[SubscriptionLogo] Failed to load logo for "${name}" from: ${failedSource}`);
+    }
     setSourceIndex((prev) => prev + 1);
   };
 
