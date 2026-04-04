@@ -267,10 +267,13 @@ export async function fetchBestLogoUrl(nameOrUrl: string, size = 128): Promise<s
     } catch (error) {
       // try next
       if (__DEV__) {
-        console.warn(`[logoService] Failed to fetch HEAD for ${url}`, error);
+        console.warn(`[logoService] Failed to fetch logo for domain "${domain}" from ${url}:`, error);
       }
     }
   }
 
+  if (__DEV__) {
+    console.warn(`[logoService] All logo sources failed for domain "${domain}"`);
+  }
   return null;
 }
