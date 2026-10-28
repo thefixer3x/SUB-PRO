@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native';
+import { router } from 'expo-router';
 import { Plus, Search, CreditCard, Bot, ExternalLink, Share2, Brain } from 'lucide-react-native';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -283,7 +284,10 @@ export default function Subscriptions() {
               }
             </Text>
             {remainingSlots <= 1 && (
-              <TouchableOpacity style={dynamicStyles.upgradeLink}>
+              <TouchableOpacity
+                style={dynamicStyles.upgradeLink}
+                onPress={() => router.push('/(tabs)/upgrade')}
+              >
                 <Text style={dynamicStyles.upgradeLinkText}>Upgrade for unlimited</Text>
               </TouchableOpacity>
             )}

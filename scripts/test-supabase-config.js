@@ -5,9 +5,43 @@ console.log('========================================');
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
+const getProjectRefFromUrl = (value) => {
+  try {
+    return new URL(value).hostname.split('.')[0] || null;
+  } catch {
+    return null;
+  }
+};
+
+const getProjectRefFromAnonKey = (value) => {
+  const payload = value?.split('.')?.[1];
+  if (!payload) {
+    return null;
+  }
+
+  const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = `${normalized}${'='.repeat((4 - (normalized.length % 4)) % 4)}`;
+
+  try {
+    return JSON.parse(Buffer.from(padded, 'base64').toString('utf8')).ref || null;
+  } catch {
+    return null;
+  }
+};
+
 if (supabaseUrl && supabaseAnonKey) {
+  const urlRef = getProjectRefFromUrl(supabaseUrl);
+  const keyRef = getProjectRefFromAnonKey(supabaseAnonKey);
+  const refsMatch = Boolean(urlRef) && Boolean(keyRef) && urlRef === keyRef;
+
   console.log('✅ Supabase environment variables are set');
-  console.log('✅ Authentication should work');
+  if (refsMatch) {
+    console.log('✅ Authentication should work');
+  } else {
+    console.log('❌ Authentication is likely broken: URL and anon key belong to different Supabase projects');
+    console.log(`Supabase URL Ref: ${urlRef || 'UNREADABLE'}`);
+    console.log(`Supabase Key Ref: ${keyRef || 'UNREADABLE'}`);
+  }
   console.log(`Supabase URL: ${supabaseUrl.substring(0, 30)}...`);
   console.log(`Supabase Anon Key: ${supabaseAnonKey.substring(0, 10)}...`);
 } else {

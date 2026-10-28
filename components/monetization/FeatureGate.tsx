@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Lock, Zap } from 'lucide-react-native';
 import { useSubscription } from '@/hooks/useSubscription';
 import { SUBSCRIPTION_PLANS } from '@/config/subscriptionPlans';
@@ -19,6 +20,7 @@ export const FeatureGate: React.FC<FeatureGateProps> = ({
   fallback,
   onUpgrade
 }) => {
+  const router = useRouter();
   const { canAccessFeature, currentTier } = useSubscription();
 
   const hasAccess = canAccessFeature(feature);
@@ -32,6 +34,14 @@ export const FeatureGate: React.FC<FeatureGateProps> = ({
   }
 
   const requiredPlan = SUBSCRIPTION_PLANS[requiredTier];
+  const handleUpgrade = () => {
+    if (onUpgrade) {
+      onUpgrade();
+      return;
+    }
+
+    router.push('/(tabs)/upgrade');
+  };
 
   return (
     <View style={styles.gateContainer}>
@@ -44,7 +54,7 @@ export const FeatureGate: React.FC<FeatureGateProps> = ({
           This feature requires a {requiredPlan.name} subscription.
           Upgrade to unlock advanced capabilities.
         </Text>
-        <TouchableOpacity style={styles.upgradeButton} onPress={onUpgrade}>
+        <TouchableOpacity style={styles.upgradeButton} onPress={handleUpgrade}>
           <Zap size={16} color="#ffffff" />
           <Text style={styles.upgradeButtonText}>
             Upgrade to {requiredPlan.name}
