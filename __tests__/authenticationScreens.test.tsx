@@ -2,6 +2,7 @@ import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { PASSWORD_REQUIREMENTS } from '@/constants/auth';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import SignInPage from '@/app/(auth)/signin';
 import SignUpPage from '@/app/(auth)/signup';
 
@@ -40,6 +41,10 @@ jest.mock('@/contexts/AuthContext', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
+// Both screens call useTheme(), which throws outside a provider. Wrap every render the way
+// components/__tests__/ThemeSelector.test.tsx does, so the suite exercises the real theme context.
+const renderScreen = (screen: React.ReactElement) => render(<ThemeProvider>{screen}</ThemeProvider>);
+
 describe('Authentication Screens', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -58,7 +63,7 @@ describe('Authentication Screens', () => {
 
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 
-    const { getByPlaceholderText, getByText, getByTestId } = render(<SignUpPage />);
+    const { getByPlaceholderText, getByText, getByTestId } = renderScreen(<SignUpPage />);
 
     fireEvent.changeText(getByPlaceholderText('Full Name'), 'Jane Doe');
     fireEvent.changeText(getByPlaceholderText('Email Address'), 'jane@example.com');
@@ -85,7 +90,7 @@ describe('Authentication Screens', () => {
 
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 
-    const { getByPlaceholderText, getByText, getByTestId } = render(<SignInPage />);
+    const { getByPlaceholderText, getByText, getByTestId } = renderScreen(<SignInPage />);
 
     fireEvent.changeText(getByPlaceholderText('Enter your email'), 'jane@example.com');
     fireEvent.changeText(getByPlaceholderText('Enter your password'), 'Password123');
@@ -108,7 +113,7 @@ describe('Authentication Screens', () => {
     const signInMock = jest.fn().mockResolvedValue({ success: true });
     mockUseAuth.mockReturnValue({ signIn: signInMock, authLoading: false });
 
-    const { getByPlaceholderText, getByText, getByTestId } = render(<SignInPage />);
+    const { getByPlaceholderText, getByText, getByTestId } = renderScreen(<SignInPage />);
 
     fireEvent.changeText(getByPlaceholderText('Enter your email'), 'user@example.com');
     fireEvent.changeText(getByPlaceholderText('Enter your password'), 'Password123');
@@ -122,4 +127,3 @@ describe('Authentication Screens', () => {
     });
   });
 });
-
