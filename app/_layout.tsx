@@ -8,6 +8,7 @@ import { queryClient } from '@/hooks/useQueryClient';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { FeatureFlagsProvider } from '@/contexts/FeatureFlagsContext';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { Sentry, setSentryRoute } from '@/utils/sentry';
 
 const AuthNavigationGuard = ({ children }: PropsWithChildren) => {
   const { session, isInitializing } = useAuth();
@@ -39,13 +40,25 @@ const AuthNavigationGuard = ({ children }: PropsWithChildren) => {
   return <>{children}</>;
 };
 
-export default function RootLayout() {
+const SentryRouteTracker = () => {
+  const segments = useSegments();
+
+  useEffect(() => {
+    const route = segments.length > 0 ? `/${segments.join('/')}` : '/';
+    setSentryRoute(route);
+  }, [segments]);
+
+  return null;
+};
+
+function RootLayout() {
   useFrameworkReady();
 
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <AuthNavigationGuard>
+          <SentryRouteTracker />
           <ThemeProvider>
             <FeatureFlagsProvider>
               <SubscriptionProvider>
@@ -64,3 +77,5 @@ export default function RootLayout() {
     </QueryClientProvider>
   );
 }
+
+export default Sentry.wrap(RootLayout);
