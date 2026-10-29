@@ -17,6 +17,7 @@ netlify/
 *.mobileprovision
 google-service-account.json
 *service-account*.json
+credentials.json
 .env
 .env.*
 !.env.example
