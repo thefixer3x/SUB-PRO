@@ -32,7 +32,7 @@ on:
         type: boolean
 
 env:
-  NODE_VERSION: 20
+  NODE_VERSION: 22
   EAS_CLI_VERSION: latest
 
 jobs:
@@ -228,6 +228,13 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EAS_ROBOT_TOKEN }}
           
+      - name: Verify EAS environment config
+        run: |
+          echo "🔐 Checking the EAS '${{ needs.validate.outputs.profile }}' environment has valid public Supabase config..."
+          CI=1 eas env:exec --environment ${{ needs.validate.outputs.profile }} 'node scripts/check-env.js'
+        env:
+          EXPO_TOKEN: ${{ secrets.EAS_ROBOT_TOKEN }}
+
       - name: Build for ${{ matrix.platform }}
         run: |
           echo "🚀 Building ${{ matrix.platform }} with profile: ${{ needs.validate.outputs.profile }}"
@@ -246,6 +253,10 @@ jobs:
           fi
         env:
           EXPO_TOKEN: ${{ secrets.EAS_ROBOT_TOKEN }}
+          EXPO_ASC_API_KEY_PATH: ./asc-api-key.p8
+          EXPO_ASC_KEY_ID: 2F2UYP8DDP
+          EXPO_ASC_ISSUER_ID: c63babaa-12b6-4399-b0ff-d5fd3a04f404
+          EXPO_APPLE_TEAM_ID: 5D9V25DXPB
           
       - name: Process build results
         if: success()
@@ -308,6 +319,7 @@ jobs:
         run: |
           echo "📱 Pushing OTA update for branch: ${{ needs.validate.outputs.profile }}"
           eas update --branch ${{ needs.validate.outputs.profile }} \
+            --environment ${{ needs.validate.outputs.profile }} \
             --message "Auto OTA update from commit ${{ github.sha }}" \
             --json > update-result.json || echo "OTA update attempted"
           
@@ -347,7 +359,7 @@ jobs:
     
     strategy:
       matrix:
-        platform: ${{ fromJson(needs.validate.outputs.platform == 'all' && '["android", "ios"]' || format('["{}"', needs.validate.outputs.platform)) }}
+        platform: ${{ fromJson(needs.validate.outputs.platform == 'all' && '["android", "ios"]' || format('["{0}"]', needs.validate.outputs.platform)) }}
       fail-fast: false
     
     steps:
