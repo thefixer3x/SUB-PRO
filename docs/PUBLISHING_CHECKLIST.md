@@ -8,7 +8,7 @@
 - [ ] Active Apple Developer Program membership ($99/year)
 - [ ] Access to [App Store Connect](https://appstoreconnect.apple.com)
 - [ ] Team ID: `5D9V25DXPB`
-- [ ] Apple ID: `sosnipez@yahoo.com`
+- [ ] Apple ID: `<your Apple ID>`
 
 ### 2. App Store Connect Setup
 - [ ] Create new app in App Store Connect

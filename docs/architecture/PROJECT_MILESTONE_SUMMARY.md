@@ -35,7 +35,7 @@
 - Discovered billing issue - failed builds were costing money
 - Created and configured EAS Robot Token for non-interactive builds
 - Updated GitHub Actions to use robot token instead of personal token
-- Token value: `y0KiSuc9mkqi5dJuHs3ByLzUTocRxHFsYs73tdhW` (later revoked)
+- Token value: <REDACTED: EAS robot token - rotated>
 
 ### 5. **Cost-Saving Measures** ✅
 - Created comprehensive pre-build validation script (`scripts/pre-build-check.sh`)
