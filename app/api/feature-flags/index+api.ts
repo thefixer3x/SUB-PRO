@@ -4,7 +4,7 @@ export async function GET(request: Request) {
   try {
     // Get Supabase configuration from environment variables
     const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-    const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+    const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
     if (!supabaseUrl || !supabaseKey) {
       console.error('Supabase configuration missing');
@@ -79,7 +79,8 @@ export async function POST(request: Request) {
     }
 
     const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-    const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY || '';
+    // Elevated key stays server-side. Do not read an EXPO_PUBLIC_* secret because it can be bundled into browser code.
+    const supabaseKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
     if (!supabaseUrl || !supabaseKey) {
       return Response.json({ error: 'Supabase configuration missing' }, { status: 500 });

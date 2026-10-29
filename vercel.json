@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npx expo export -p web --output-dir dist",
+  "buildCommand": "node scripts/check-env.js && npx expo export -p web --output-dir dist",
   "outputDirectory": "dist",
   "framework": null,
   "trailingSlash": false,
