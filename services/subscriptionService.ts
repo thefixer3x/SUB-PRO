@@ -6,7 +6,7 @@ type SubscriptionRow = Database['public']['Tables']['subscriptions']['Row'];
 type SubscriptionInsert = Database['public']['Tables']['subscriptions']['Insert'];
 type SubscriptionUpdate = Database['public']['Tables']['subscriptions']['Update'];
 
-const SUBSCRIPTIONS_TABLE: keyof Database['public']['Tables'] = 'subscriptions';
+const SUBSCRIPTIONS_TABLE: keyof Database['public']['Tables'] = 'sm_subscriptions';
 
 /** Map DB row (snake_case) to client model (camelCase). */
 function toSubscription(row: SubscriptionRow): Subscription {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Zap, X } from 'lucide-react-native';
 import { useSubscription } from '@/hooks/useSubscription';
 
@@ -12,12 +13,21 @@ export const UpgradeRibbon: React.FC<UpgradeRibbonProps> = ({
   onDismiss,
   onUpgrade
 }) => {
+  const router = useRouter();
   const { currentTier, getRemainingLimit } = useSubscription();
 
   if (currentTier !== 'free') return null;
 
   const remainingSubscriptions = getRemainingLimit('maxSubscriptions');
   const isNearLimit = remainingSubscriptions !== null && remainingSubscriptions <= 1;
+  const handleUpgrade = () => {
+    if (onUpgrade) {
+      onUpgrade();
+      return;
+    }
+
+    router.push('/(tabs)/upgrade');
+  };
 
   return (
     <View style={[styles.ribbon, isNearLimit && styles.ribbonWarning]}>
@@ -31,7 +41,7 @@ export const UpgradeRibbon: React.FC<UpgradeRibbonProps> = ({
         </Text>
       </View>
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.upgradeButton} onPress={onUpgrade}>
+        <TouchableOpacity style={styles.upgradeButton} onPress={handleUpgrade}>
           <Text style={styles.upgradeText}>Upgrade</Text>
         </TouchableOpacity>
         {onDismiss && (
