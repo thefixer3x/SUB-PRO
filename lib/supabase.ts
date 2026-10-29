@@ -387,7 +387,7 @@ export type Database = {
           created_at?: string;
         };
       };
-      payment_records: {
+      sm_payment_records: {
         Row: {
           id: string;
           user_id: string;

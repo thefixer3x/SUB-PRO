@@ -4,6 +4,10 @@ import type { Database } from '../lib/supabase';
 // Server-side database service for webhook handlers
 // This maintains the existing security model by only accessing server-side environment variables
 
+// subscription_id columns are uuid FKs to sm_subscriptions; Stripe ids (sub_...) would fail the insert.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const asUuid = (value?: string) => (value && UUID_RE.test(value) ? value : null);
+
 class DatabaseService {
   private supabase: SupabaseClient<Database>;
 
@@ -97,22 +101,16 @@ class DatabaseService {
     try {
       console.log('Storing virtual card reference:', { userId, cardId: cardData.stripe_card_id });
 
-      // Check if the table exists first, create if needed
-      const { data, error } = await this.supabase.rpc('create_virtual_cards_table_if_not_exists');
-      if (error) {
-        console.log('Table creation check result:', error.message);
-      }
-
       // Store only non-sensitive card metadata
       const { data: cardRef, error: cardError } = await this
         .from('virtual_cards')
         .insert({
           user_id: userId,
-          stripe_card_id: cardData.stripe_card_id,
+          card_id: cardData.stripe_card_id,
           last4: cardData.last4,
           brand: cardData.brand,
           status: cardData.status,
-          subscription_id: cardData.subscription_id,
+          subscription_id: asUuid(cardData.subscription_id),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         } as any);
@@ -211,9 +209,10 @@ class DatabaseService {
       });
 
       const { data, error } = await this
-        .from('payment_records')
+        .from('sm_payment_records')
         .insert({
           ...paymentData,
+          subscription_id: asUuid(paymentData.subscription_id),
           created_at: new Date().toISOString(),
         } as any);
 
