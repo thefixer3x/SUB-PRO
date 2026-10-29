@@ -1,4 +1,5 @@
 {
+  "root": true,
   "extends": ["expo"],
   "rules": {
     "no-console": "off",
