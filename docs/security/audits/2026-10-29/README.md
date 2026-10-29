@@ -14,4 +14,4 @@ Notes:
 - Secrets (an EAS robot token), personal email addresses and local filesystem paths were replaced with `<REDACTED: ...>` / `<local-path>` placeholders.
 - "Safe Reproduction" blocks were removed from the public copy until the underlying findings are fixed.
 - The auditors scanned an older snapshot of a monorepo copy of this project (`apps/SUB-PRO`). File paths and line numbers may be stale, and some findings (for example monorepo-only `.archive/` env files or the bun lockfile) do not apply to this repository.
-- Every finding that applies to this repository is tracked as a GitHub issue. The tracker issue link will be added here once it exists.
+- Every finding that applies to this repository is tracked as a GitHub issue: see the tracker, https://github.com/thefixer3x/SUB-PRO/issues/44. Findings that were stale or not applicable to this repository are listed there with reasons.

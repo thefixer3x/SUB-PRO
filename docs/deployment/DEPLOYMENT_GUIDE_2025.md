@@ -27,7 +27,7 @@ eas whoami  # Verify
 **Critical:** These secrets are used during cloud builds (never committed to git):
 
 ```bash
-cd /Users/seyederick/Development/SUB-PRO
+cd <path-to>/SUB-PRO
 
 # Stripe publishable key (safe to bundle in app)
 eas secret:create --scope project --name EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY \
@@ -99,7 +99,7 @@ Let me know your preference. The goal:
 ### **STEP 5: Add Billing Success Page**
 
 ```bash
-mkdir -p /Users/seyederick/Development/SUB-PRO/app/billing
+mkdir -p <path-to>/SUB-PRO/app/billing
 ```
 
 Create file: `app/billing/success.tsx`
