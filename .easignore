@@ -1,0 +1,72 @@
+# dependencies
+node_modules/
+
+# expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.expo-shm/
+test-dist/
+
+# native
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# metro
+.metro-health-check*
+
+# environment variables
+.env.local
+.env
+
+# Claude Code settings (may contain sensitive data)
+.claude/
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+bun.lock
+
+# macos
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+.env
+
+# typescript
+*.tsbuildinfo
+
+# Local Netlify folder
+.netlify
+.vercel
+
+# Sensitive credentials
+google-service-account.json
+credentials.json
+cohesive-mender-459104-c3-abc562777578.json
+.qwen/
+**/.qwen/
+.qwen/
+**/.qwen/
+.cache_ggshield
+# Generated build output
+build-result.json
+
+# --- EAS build upload exclusions (EAS uses this file INSTEAD of .gitignore) ---
+docs/
+coverage/
+supabase/
+netlify/
+__tests__/
+.github/
+.vscode/
+*.md
+!README.md

@@ -11,7 +11,7 @@ Navigate to: **SUB-PRO Repository** → **Settings** → **Secrets and variables
 ### Core Authentication
 
 ```
-EAS_ROBOT_TOKEN = y0KiSuc9mkqi5dJuHs3ByLzUTocRxHFsYs73tdhW
+EAS_ROBOT_TOKEN = <your EAS robot token - never commit the real value>
 ```
 
 ### Supabase Configuration
@@ -68,7 +68,7 @@ ADSENSE_SLOT_ID = YOUR_SLOT_ID
   "submit": {
     "production": {
       "ios": {
-        "appleId": "frill.roundup_3x@icloud.com",
+        "appleId": "<your Apple ID>",
         "ascAppId": "YOUR_ACTUAL_APP_ID_FROM_APP_STORE_CONNECT",
         "appleTeamId": "5D9V25DXPB"
       }

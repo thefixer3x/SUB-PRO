@@ -1,0 +1,23 @@
+docs/
+coverage/
+android/
+ios/
+supabase/
+__tests__/
+.github/
+netlify/
+
+# Signing credentials and service-account files must never be uploaded
+*.p8
+*.p12
+*.pem
+*.key
+*.jks
+*.keystore
+*.mobileprovision
+google-service-account.json
+*service-account*.json
+credentials.json
+.env
+.env.*
+!.env.example

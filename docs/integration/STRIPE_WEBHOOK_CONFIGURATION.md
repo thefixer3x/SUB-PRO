@@ -7,7 +7,7 @@
 
 ```
 URL: https://subtrack-pro.lanonasis.com/api/stripe/webhook
-Webhook Secret: whsec_BsDevFB9UiEuHhsUvXMCD2sirRFa8qLd
+Webhook Secret: whsec_<REDACTED: set in hosting env only>
 ```
 
 **Events to Select:**
@@ -47,7 +47,7 @@ charge.pending
 ### **Environment Variables**
 ```bash
 NEXT_PUBLIC_DOMAIN=https://subtrack-pro.lanonasis.com
-STRIPE_WEBHOOK_SECRET=whsec_BsDevFB9UiEuHhsUvXMCD2sirRFa8qLd
+STRIPE_WEBHOOK_SECRET=whsec_<REDACTED: set in hosting env only>
 STRIPE_CONNECT_WEBHOOK_SECRET=whsec_your_connect_webhook_secret_here
 ```
 
