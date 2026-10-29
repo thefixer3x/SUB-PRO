@@ -11,7 +11,7 @@
 ## FINDING #1 — CRITICAL (CVSS 9.8) Live EAS Robot Token Committed
 
 **File**: `docs/integration/GITHUB-SECRETS-SETUP.md:14`
-**Value**: `y0Suc9mkqi5dJuHs3ByLzUTocRxHFsYs73tdhW` (EAS publish token)
+**Value**: `<REDACTED: EAS robot token>` (EAS publish token)
 
 This token authenticates to Expo's API and can publish arbitrary code updates to your Expo Application Service (EAS) builds — effectively a full supply-chain compromise.
 

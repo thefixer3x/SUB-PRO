@@ -51,7 +51,7 @@
 - GitGuardian detected the exposure
 - Immediately removed sensitive file and updated `.gitignore`
 - Guided user through token revocation process
-- Successfully replaced with new token: `AUr80maP5onM2QPUOYoQESTSxI43s2KJN-wvXUxG`
+- Successfully replaced with new token: `<REDACTED: EAS robot token - rotate>`
 
 ### 7. **Production Builds Success** ✅
 - Both iOS and Android production builds completed successfully
