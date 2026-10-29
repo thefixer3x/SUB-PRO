@@ -1,5 +1,6 @@
 {
   "root": true,
+  "ignorePatterns": ["docs/", "coverage/", "dist/", "android/", "ios/"],
   "extends": ["expo"],
   "rules": {
     "no-console": "off",

@@ -1,0 +1,8 @@
+docs/
+coverage/
+android/
+ios/
+supabase/
+__tests__/
+.github/
+netlify/
