@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseEnvConfigured } from '@/lib/supabase';
 import { FEATURE_FLAGS as HARDCODED_FLAGS } from '@/config/featureFlags';
 
@@ -7,6 +7,15 @@ export type FeatureFlagMap = Record<string, boolean>;
 
 async function fetchFeatureFlags(): Promise<FeatureFlagMap> {
   if (!isSupabaseEnvConfigured) {
+    return { ...HARDCODED_FLAGS };
+  }
+
+  // sm_feature_flags is readable by signed-in users only (RLS), so skip the
+  // request before sign-in instead of triggering a 401 and retry loop.
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) {
     return { ...HARDCODED_FLAGS };
   }
 
@@ -41,6 +50,16 @@ async function fetchFeatureFlags(): Promise<FeatureFlagMap> {
  */
 export const useSupabaseFeatureFlags = () => {
   const lastSuccessfulFlags = useRef<FeatureFlagMap | null>(null);
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        queryClient.invalidateQueries({ queryKey: ['feature-flags'] });
+      }
+    });
+    return () => data.subscription.unsubscribe();
+  }, [queryClient]);
 
   const query = useQuery<FeatureFlagMap, Error>({
     queryKey: ['feature-flags'],
@@ -56,7 +75,7 @@ export const useSupabaseFeatureFlags = () => {
   }, [query.data]);
 
   const flags: FeatureFlagMap =
-    query.data ?? lastSuccessfulFlags.current ?? {};
+    query.data ?? lastSuccessfulFlags.current ?? { ...HARDCODED_FLAGS };
 
   const isEnabled = (flag: string): boolean => {
     return flags[flag] ?? false;

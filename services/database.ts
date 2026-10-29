@@ -8,8 +8,8 @@ class DatabaseService {
   private supabase: SupabaseClient<Database>;
 
   constructor() {
-    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceRoleKey) {
       throw new Error('Missing Supabase environment variables for server-side access');

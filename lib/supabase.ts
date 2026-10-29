@@ -2,38 +2,21 @@ import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-// Supabase configuration.
-//
-// EXPO_PUBLIC_* values are inlined into the client bundle at build time, so only values that are
-// safe to publish may be referenced in this file. A publishable key (`sb_publishable_...`) is public
-// by design and carries the same privileges as the legacy `anon` key. A secret key (`sb_secret_...`),
-// a service_role key, or any Stripe secret must NEVER be referenced here: everything in this file
-// ships to every browser and every app bundle. Server-only secrets belong in function env vars.
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const envAnonKey =
+// Supabase configuration
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
+// Modern Supabase publishable keys (sb_publishable_...) are shorter than legacy JWT anon keys.
+// Prefer the modern key names, retaining legacy names as a migration fallback.
+const envSupabaseKey =
   process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   '';
+const isSupportedSupabaseKey = envSupabaseKey.startsWith('sb_publishable_') || envSupabaseKey.length > 150;
+const supabaseAnonKey = isSupportedSupabaseKey ? envSupabaseKey : '';
 
-// Scrub artefact from the history rewrite. It must never be treated as a usable key — sending it
-// produces an opaque 401 from Supabase ("Invalid API key") that looks like a wrong key.
-const REDACTED_KEY = '***REMOVED-SUPABASE-CREDENTIAL***';
-
-/**
- * Accepts both supported public-key formats:
- *   - `sb_publishable_...` (current format; NOT a JWT)
- *   - a legacy `anon` JWT (three dot-separated segments)
- *
- * Length is deliberately not the discriminator. The previous `envAnonKey.length > 150` test was
- * true for legacy JWTs (208 chars) but false for publishable keys (~40-50 chars), so a valid new
- * key was silently replaced by a placeholder and every request failed with a 401.
- */
-export const isUsablePublicKey = (value: string): boolean =>
-  value.length > 0 &&
-  value !== REDACTED_KEY &&
-  (value.startsWith('sb_publishable_') || value.split('.').length === 3);
-
+// Check if we have the required environment variables
+const missingEnv = !supabaseUrl || !supabaseAnonKey;
 const isValidUrl = (url: string) => {
   try {
     new URL(url);
@@ -44,22 +27,19 @@ const isValidUrl = (url: string) => {
 };
 const isUrlValid = supabaseUrl ? isValidUrl(supabaseUrl) : false;
 
-export const isSupabaseEnvConfigured = Boolean(supabaseUrl) && isUrlValid && isUsablePublicKey(envAnonKey);
+export const isSupabaseEnvConfigured = !missingEnv && isUrlValid;
 
-// No credential-shaped fallbacks. `unconfigured.invalid` is a reserved TLD (RFC 2606) that never
-// resolves, so a misconfigured build fails fast and locally instead of shipping a plausible-looking
-// URL/key pair into the bundle. Call sites already gate on `isSupabaseEnvConfigured`.
-const UNCONFIGURED_URL = 'https://unconfigured.invalid';
-const UNCONFIGURED_KEY = 'unconfigured';
+const FALLBACK_SUPABASE_URL = 'https://placeholder.supabase.co';
+const FALLBACK_SUPABASE_ANON_KEY = 'public-anon-key-placeholder';
 
-const effectiveSupabaseUrl = isSupabaseEnvConfigured ? supabaseUrl : UNCONFIGURED_URL;
-const effectiveSupabaseAnonKey = isSupabaseEnvConfigured ? envAnonKey : UNCONFIGURED_KEY;
+const effectiveSupabaseUrl = isSupabaseEnvConfigured ? supabaseUrl : FALLBACK_SUPABASE_URL;
+const effectiveSupabaseAnonKey = isSupabaseEnvConfigured
+  ? supabaseAnonKey
+  : FALLBACK_SUPABASE_ANON_KEY;
 
 if (!isSupabaseEnvConfigured) {
   console.warn(
-    'Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ' +
-      '(EXPO_PUBLIC_SUPABASE_ANON_KEY is also accepted for a legacy anon key). ' +
-      'Features that depend on Supabase are disabled until then.',
+    'Supabase environment variables are missing or invalid. Configure EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or the legacy EXPO_PUBLIC_SUPABASE_ANON_KEY).',
   );
 }
 
