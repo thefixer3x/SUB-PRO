@@ -1,5 +1,7 @@
 [build]
-  command = "npx expo export -p web --output-dir dist"
+  # NOTE: the Netlify UI for this site sets the build command to `npm run build:production`, and the
+  # UI value overrides this block. Kept in sync so this file stops disagreeing with what actually runs.
+  command = "npm run build:production"
   publish = "dist"
 
 [functions]
@@ -35,14 +37,15 @@
   to = "/index.html"
   status = 200
 
-[template.environment]
-  NODE_VERSION = "18"
-  EXPO_PUBLIC_SUPABASE_URL = "Your Supabase URL"
-  EXPO_PUBLIC_SUPABASE_ANON_KEY = "Your Supabase Anon Key"
-  EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY = "Your Stripe Publishable Key"
-
 [build.environment]
-  NODE_VERSION = "18"
+  # react-native@0.81.5 declares engines.node ">= 20.19.4", and metro-config calls
+  # Array.prototype.toReversed (ES2023), which does not exist on Node 18. On Node 18 the build dies
+  # before bundling with: TypeError: configs.toReversed is not a function
+  # 22 matches the Node version the Vercel project for this app already runs.
+  #
+  # The block that used to sit here ([template.environment]) carried placeholder values like
+  # "Your Supabase URL" — a trap for any context that ever picked it up. Removed.
+  NODE_VERSION = "22"
 
 [[headers]]
   for = "/static/*"
