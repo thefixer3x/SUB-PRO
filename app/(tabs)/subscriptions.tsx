@@ -42,7 +42,7 @@ export default function Subscriptions() {
   const [expandedVirtualCard, setExpandedVirtualCard] = useState<string | null>(null);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   
-  const [subscriptions] = useState([
+  const [subscriptions] = useState<SubscriptionItem[]>([
     { 
       id: 1, 
       name: 'Netflix', 
