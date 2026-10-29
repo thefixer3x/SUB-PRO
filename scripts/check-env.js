@@ -38,10 +38,18 @@ const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabaseUrlRef = getProjectRefFromUrl(supabaseUrl);
 const supabaseKeyRef = getProjectRefFromAnonKey(supabaseAnonKey);
-const supabaseRefsMatch =
-  Boolean(supabaseUrlRef) &&
-  Boolean(supabaseKeyRef) &&
-  supabaseUrlRef === supabaseKeyRef;
+
+// Publishable keys (sb_publishable_...) are not JWTs and carry no project `ref` claim, so the ref
+// comparison below cannot apply to them. Legacy anon JWTs keep the original check.
+const isPublishableKey = (value) => typeof value === 'string' && value.startsWith('sb_publishable_');
+const REDACTED_KEY = '***REMOVED-SUPABASE-CREDENTIAL***';
+const keyLooksUsable =
+  Boolean(supabaseAnonKey) &&
+  supabaseAnonKey !== REDACTED_KEY &&
+  (isPublishableKey(supabaseAnonKey) || supabaseAnonKey.split('.').length === 3);
+const supabaseRefsMatch = isPublishableKey(supabaseAnonKey)
+  ? true
+  : Boolean(supabaseUrlRef) && Boolean(supabaseKeyRef) && supabaseUrlRef === supabaseKeyRef;
 
 console.log('EXPO_PUBLIC_SUPABASE_URL:', supabaseUrl || 'NOT SET');
 console.log('EXPO_PUBLIC_SUPABASE_ANON_KEY:', supabaseAnonKey || 'NOT SET');
@@ -79,6 +87,13 @@ if (runningInCI) {
     console.error('Set them in Netlify → Site configuration → Environment variables, or via CLI:');
     console.error('  netlify env:set EXPO_PUBLIC_SUPABASE_URL https://mxtsdgkwzjzlttpotole.supabase.co');
     console.error('  netlify env:set EXPO_PUBLIC_SUPABASE_ANON_KEY <your-anon-key>');
+    process.exit(1);
+  }
+
+  if (supabaseUrl && supabaseAnonKey && !keyLooksUsable) {
+    console.error('\nERROR: EXPO_PUBLIC_SUPABASE_ANON_KEY is not a usable public key.');
+    console.error('  Expected sb_publishable_... (current format) or a legacy anon JWT.');
+    console.error('  A redacted placeholder, an empty value, or a sb_secret_ key will always fail at runtime.');
     process.exit(1);
   }
 
