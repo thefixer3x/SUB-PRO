@@ -231,7 +231,7 @@ jobs:
       - name: Verify EAS environment config
         run: |
           echo "🔐 Checking the EAS '${{ needs.validate.outputs.profile }}' environment has valid public Supabase config..."
-          CI=1 eas env:exec --environment ${{ needs.validate.outputs.profile }} 'node scripts/check-env.js'
+          eas env:exec ${{ needs.validate.outputs.profile }} 'CI=1 node scripts/check-env.js' --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EAS_ROBOT_TOKEN }}
 
