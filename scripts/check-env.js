@@ -20,15 +20,36 @@ console.log('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY:', describeKey(publishableKey)
 console.log('EXPO_PUBLIC_SUPABASE_ANON_KEY (legacy):', describeKey(legacyAnonKey));
 console.log('EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY:', process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ? 'set' : 'NOT SET');
 
+// Legacy keys are JWTs; read the role claim (no signature check needed to reject one).
+const jwtRole = (key) => {
+  try {
+    return JSON.parse(Buffer.from(key.split('.')[1], 'base64url').toString('utf8')).role;
+  } catch {
+    return undefined;
+  }
+};
+
 const problems = [];
-if (!supabaseUrl) problems.push('EXPO_PUBLIC_SUPABASE_URL is not set');
+if (!supabaseUrl) {
+  problems.push('EXPO_PUBLIC_SUPABASE_URL is not set');
+} else {
+  try {
+    new URL(supabaseUrl);
+  } catch {
+    problems.push('EXPO_PUBLIC_SUPABASE_URL is not a valid absolute URL (the bundle would fall back to a placeholder client)');
+  }
+}
 if (!publishableKey && !legacyAnonKey) {
   problems.push('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not set (the bundle would fall back to a placeholder client)');
 }
 if (publishableKey && !publishableKey.startsWith('sb_publishable_')) {
   problems.push('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY must be an sb_publishable_ key');
 }
-if ([publishableKey, legacyAnonKey].some((key) => key.startsWith('sb_secret_'))) {
+if (
+  [publishableKey, legacyAnonKey].some(
+    (key) => key.startsWith('sb_secret_') || (key.startsWith('eyJ') && jwtRole(key) === 'service_role'),
+  )
+) {
   problems.push('A Supabase secret key is set in an EXPO_PUBLIC_* variable and would ship to browsers');
 }
 if (process.env.EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY || process.env.EXPO_PUBLIC_SUPABASE_SECRET_KEY) {
