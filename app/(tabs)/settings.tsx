@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Switch } from 'react-native';
-import { Bell, Shield, Palette, Download, HelpCircle, ChevronRight, Smartphone, Mail, Calendar, DollarSign, Settings as SettingsIcon, FileText, AlertTriangle } from 'lucide-react-native';
+import { Bell, Shield, Palette, Download, HelpCircle, ChevronRight, Smartphone, Mail, Calendar, DollarSign, Settings as SettingsIcon, FileText, AlertTriangle, LogOut } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { ThemeSelector } from '@/components/ThemeSelector';
 import { BudgetAlertRow } from '@/components/BudgetAlertRow';
 import { useBudgetAlert } from '@/hooks/useBudgetAlert';
@@ -18,6 +19,7 @@ import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
 export default function Settings() {
   const router = useRouter();
   const { colors } = useTheme();
+  const { signOut, user } = useAuth();
   const { enabled: budgetEnabled, budgetLimit, setBudgetEnabled, setBudgetLimit } = useBudgetAlert();
   const [securityHealthCheck, setSecurityHealthCheck] = useState<SecurityHealthCheck | null>(null);
   const [showSecurityDashboard, setShowSecurityDashboard] = useState(false);
@@ -222,6 +224,17 @@ export default function Settings() {
             title="Help & Support"
             subtitle="Get help with the app"
             onPress={() => {}}
+          />
+        </SettingsSection>
+
+        <SettingsSection title="Account">
+          <SettingsItem
+            icon={<LogOut size={20} color="#EF4444" />}
+            title="Sign Out"
+            subtitle={user?.email || 'Sign out of your account'}
+            onPress={() => {
+              void signOut();
+            }}
           />
         </SettingsSection>
 
