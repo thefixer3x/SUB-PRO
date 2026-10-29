@@ -3,9 +3,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 // Supabase configuration
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const envAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabaseAnonKey = envAnonKey.length > 150 ? envAnonKey : '***REMOVED-SUPABASE-CREDENTIAL***';
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
+// Modern Supabase publishable keys (sb_publishable_...) are shorter than legacy JWT anon keys.
+// Prefer the modern key names, retaining legacy names as a migration fallback.
+const envSupabaseKey =
+  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  '';
+const isSupportedSupabaseKey = envSupabaseKey.startsWith('sb_publishable_') || envSupabaseKey.length > 150;
+const supabaseAnonKey = isSupportedSupabaseKey ? envSupabaseKey : '';
 
 // Check if we have the required environment variables
 const missingEnv = !supabaseUrl || !supabaseAnonKey;
@@ -31,7 +39,7 @@ const effectiveSupabaseAnonKey = isSupabaseEnvConfigured
 
 if (!isSupabaseEnvConfigured) {
   console.warn(
-    'Supabase environment variables are missing or invalid. Features depending on Supabase will be disabled until EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY are configured.',
+    'Supabase environment variables are missing or invalid. Configure EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or the legacy EXPO_PUBLIC_SUPABASE_ANON_KEY).',
   );
 }
 
