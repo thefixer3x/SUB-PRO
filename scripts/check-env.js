@@ -73,8 +73,31 @@ console.log('\nTo fix missing environment variables:');
 console.log('1. Create a .env file in your project root with the required variables');
 console.log('2. Or set them in your deployment platform (Vercel, Netlify, etc.)');
 
-// In CI (e.g., Netlify), fail the build if required env vars are missing
+// In CI (e.g., Netlify), fail the build if required env vars are missing.
+//
+// Netlify sets CONTEXT to 'production' | 'deploy-preview' | 'branch-deploy' | 'dev'. A preview build
+// with placeholder or missing backend config does not need to fail — the preview just cannot reach
+// the backend, which is obvious and harmless. Production must still hard-fail: a production build
+// with broken config ships a broken app.
+//
+// This matters in practice: EXPO_PUBLIC_SUPABASE_URL is scoped to the 'production' context only, so
+// every deploy-preview build was aborting here with exit 1 before Expo ever ran.
+const netlifyContext = process.env.CONTEXT || '';
+const isPreviewBuild = netlifyContext === 'deploy-preview' || netlifyContext === 'branch-deploy';
 const runningInCI = Boolean(process.env.CI || process.env.NETLIFY);
+
+/** Returns true when the caller should exit(1). */
+const shouldFail = (message, detail) => {
+  if (isPreviewBuild) {
+    console.warn(`\nWARNING (${netlifyContext} build — not failing): ${message}`);
+    if (detail) console.warn(detail);
+    return false;
+  }
+  console.error(`\nERROR: ${message}`);
+  if (detail) console.error(detail);
+  return true;
+};
+
 if (runningInCI) {
   const missing = [];
   if (!supabaseUrl) missing.push('EXPO_PUBLIC_SUPABASE_URL');
@@ -82,25 +105,39 @@ if (runningInCI) {
   // Stripe can be optional depending on feature flags; enforce only if your app requires it at build time
   // if (!process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY) missing.push('EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY');
 
-  if (missing.length > 0) {
-    console.error('\nERROR: Missing required environment variables in CI:', missing.join(', '));
-    console.error('Set them in Netlify → Site configuration → Environment variables, or via CLI:');
-    console.error('  netlify env:set EXPO_PUBLIC_SUPABASE_URL https://mxtsdgkwzjzlttpotole.supabase.co');
-    console.error('  netlify env:set EXPO_PUBLIC_SUPABASE_ANON_KEY <your-anon-key>');
+  if (
+    missing.length > 0 &&
+    shouldFail(
+      `Missing required environment variables in CI: ${missing.join(', ')}`,
+      'Set them in Netlify → Site configuration → Environment variables, and scope them to "All" ' +
+        '(or at least deploy-preview). EXPO_PUBLIC_SUPABASE_URL is currently production-only.',
+    )
+  ) {
     process.exit(1);
   }
 
-  if (supabaseUrl && supabaseAnonKey && !keyLooksUsable) {
-    console.error('\nERROR: EXPO_PUBLIC_SUPABASE_ANON_KEY is not a usable public key.');
-    console.error('  Expected sb_publishable_... (current format) or a legacy anon JWT.');
-    console.error('  A redacted placeholder, an empty value, or a sb_secret_ key will always fail at runtime.');
+  if (
+    supabaseUrl &&
+    supabaseAnonKey &&
+    !keyLooksUsable &&
+    shouldFail(
+      'EXPO_PUBLIC_SUPABASE_ANON_KEY is not a usable public key.',
+      '  Expected sb_publishable_... (current format) or a legacy anon JWT. A redacted placeholder, ' +
+        'an empty value, or a sb_secret_ key will always fail at runtime.',
+    )
+  ) {
     process.exit(1);
   }
 
-  if (supabaseUrl && supabaseAnonKey && !supabaseRefsMatch) {
-    console.error('\nERROR: Supabase URL and anon key belong to different projects.');
-    console.error(`  URL project ref: ${supabaseUrlRef || 'UNREADABLE'}`);
-    console.error(`  Key project ref: ${supabaseKeyRef || 'UNREADABLE'}`);
+  if (
+    supabaseUrl &&
+    supabaseAnonKey &&
+    !supabaseRefsMatch &&
+    shouldFail(
+      'Supabase URL and anon key belong to different projects.',
+      `  URL project ref: ${supabaseUrlRef || 'UNREADABLE'}\n  Key project ref: ${supabaseKeyRef || 'UNREADABLE'}`,
+    )
+  ) {
     process.exit(1);
   }
 }
