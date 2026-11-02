@@ -106,7 +106,7 @@ class DatabaseService {
         .from('virtual_cards')
         .insert({
           user_id: userId,
-          card_id: cardData.stripe_card_id,
+          stripe_card_id: cardData.stripe_card_id,
           last4: cardData.last4,
           brand: cardData.brand,
           status: cardData.status,

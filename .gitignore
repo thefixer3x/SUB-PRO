@@ -54,14 +54,7 @@ credentials.json
 cohesive-mender-459104-c3-abc562777578.json
 .qwen/
 **/.qwen/
-.qwen/
-**/.qwen/
 .cache_ggshield
-<<<<<<< Updated upstream
+
 # Generated build output
 build-result.json
-||||||| Stash base
-.cache_ggshield
-=======
-.env*
->>>>>>> Stashed changes

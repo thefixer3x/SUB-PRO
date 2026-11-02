@@ -57,7 +57,7 @@ const handleSubscriptionCreated = async (subscription: Stripe.Subscription) => {
     const customerId = subscription.customer as string;
     const customer = await client.customers.retrieve(customerId);
 
-    if ((customer as Stripe.Customer).deleted) {
+    if ((customer as any).deleted) {
       return;
     }
 
@@ -98,7 +98,7 @@ const handleSubscriptionUpdated = async (subscription: Stripe.Subscription) => {
     const customerId = subscription.customer as string;
     const customer = await client.customers.retrieve(customerId);
 
-    if ((customer as Stripe.Customer).deleted) {
+    if ((customer as any).deleted) {
       return;
     }
 
@@ -139,7 +139,7 @@ const handleSubscriptionDeleted = async (subscription: Stripe.Subscription) => {
     const customerId = subscription.customer as string;
     const customer = await client.customers.retrieve(customerId);
 
-    if ((customer as Stripe.Customer).deleted) {
+    if ((customer as any).deleted) {
       return;
     }
 
@@ -183,7 +183,7 @@ const handlePaymentSucceeded = async (invoice: Stripe.Invoice) => {
     }
 
     const customer = await client.customers.retrieve(customerId);
-    if ((customer as Stripe.Customer).deleted) {
+    if ((customer as any).deleted) {
       return;
     }
 
@@ -229,7 +229,7 @@ const handlePaymentFailed = async (invoice: Stripe.Invoice) => {
     }
 
     const customer = await client.customers.retrieve(customerId);
-    if ((customer as Stripe.Customer).deleted) {
+    if ((customer as any).deleted) {
       return;
     }
 
