@@ -15,13 +15,13 @@ Each card is one objective. Read `docs/agents/WORKER_GUIDE.md` first; its rules 
 - **Scope:** `netlify/functions/embedded-finance-virtual-cards.ts`, new `netlify/functions/_shared/auth.ts`, new `netlify/functions/_shared/cors.ts`, tests.
 - **Do:** extract the bearer-token check from `banking-proxy.ts` into `_shared/auth.ts` (returns the Supabase user or a 401 response). Add `_shared/cors.ts` (origin allowlist from `ALLOWED_ORIGINS`, handles `OPTIONS`). In virtual-cards: require auth, take the user id only from the session, ignore any `userId` in the body or query, check `virtual_cards.user_id` before every read or update, and validate or escape values used in Stripe search queries. Remove the hardcoded `123 Main St` billing address: use the profile's address, or return 400 if it is missing.
 - **Done when:** tests cover no token → 401, bad token → 401, another user's card → 403/404, and own card → 200. Wildcard CORS is gone from this file.
-- **Owner action after merge:** set `ALLOWED_ORIGINS` on Netlify (e.g. `https://sub-pro.lanonasis.com,https://subtrack-pro.lanonasis.com`).
+- **Owner action before merge:** set `ALLOWED_ORIGINS` on Netlify (e.g. `https://sub-pro.lanonasis.com,https://subtrack-pro.lanonasis.com`). Do not merge or deploy C01 until it is set, or browser requests from the production app fail the CORS preflight.
 
 ### C02: Require login on checkout and lock down CORS (#28, P1)
 - **Role:** builder · **Depends on:** C01 (reuse `_shared/auth.ts` and `_shared/cors.ts`)
 - **Scope:** `netlify/functions/create-checkout-session.ts`, `netlify/functions/banking-proxy.ts`, `hooks/usePayments.ts`, tests.
 - **Do:** checkout derives `userId` and `email` from the verified session and ignores body values. `hooks/usePayments.ts` sends `Authorization: Bearer <session access_token>`. Validate the success/cancel URL origin against the allowlist. Switch banking-proxy to the shared CORS helper.
-- **Done when:** tests prove a body `userId` that differs from the session is ignored, and `Access-Control-Allow-Origin: *` no longer appears in `netlify/functions/`.
+- **Done when:** tests prove a body `userId` and a body `email` that differ from the session are both ignored, and `Access-Control-Allow-Origin: *` no longer appears in `netlify/functions/`.
 
 ### C03: Locked-down Claude GitHub workflows (#29, P1)
 - **Role:** builder
@@ -111,7 +111,7 @@ Each card is one objective. Read `docs/agents/WORKER_GUIDE.md` first; its rules 
 
 ## Review and QA (one per merged PR)
 
-### R: Review PR for Cxx
+### R00: Review each agent PR
 - **Role:** reviewer
 - **Do:** check the PR against `WORKER_GUIDE.md` section 2 (hard rules), confirm the checks were run, and look for secrets, scope creep and missing tests. Approve, or request changes with specific lines.
 

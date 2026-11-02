@@ -67,4 +67,4 @@ No secrets or raw logs in comments; summarise.
 
 ## 7. When stuck
 
-Block the card with a concrete reason (`hermes kanban block <id> --reason "..."`), comment what you tried, and stop. Do not widen scope to get unstuck.
+Block the card with a concrete reason and what you tried, then stop. Hermes workers use the `kanban_block` tool (kind `needs_input` for owner actions, `dependency` when waiting on another card); humans use `hermes kanban block <id> "<reason>"`. Do not widen scope to get unstuck.
