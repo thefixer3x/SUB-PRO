@@ -45,7 +45,7 @@ echo "🔐 Setting up production environment variables..."
 echo "You'll need to provide the following production values:"
 
 echo "Setting up Stripe environment variables..."
-read -p "Enter your LIVE Stripe Publishable Key (pk_live_...): " STRIPE_LIVE_KEY
+read -s -p "Enter your LIVE Stripe Publishable Key (pk_live_...): " STRIPE_LIVE_KEY
 eas secret:create --scope project --name STRIPE_LIVE_PUBLISHABLE_KEY --value "$STRIPE_LIVE_KEY"
 
 read -p "Enter your LIVE AdMob App ID: " ADMOB_APP_ID
@@ -60,10 +60,10 @@ eas secret:create --scope project --name ADMOB_LIVE_INTERSTITIAL_ID --value "$AD
 read -p "Enter your LIVE AdMob Rewarded ID: " ADMOB_REWARDED_ID
 eas secret:create --scope project --name ADMOB_LIVE_REWARDED_ID --value "$ADMOB_REWARDED_ID"
 
-read -p "Enter your production Supabase URL: " SUPABASE_URL
+read -s -p "Enter your production Supabase URL: " SUPABASE_URL
 eas secret:create --scope project --name SUPABASE_PRODUCTION_URL --value "$SUPABASE_URL"
 
-read -p "Enter your production Supabase Anon Key: " SUPABASE_KEY
+read -s -p "Enter your production Supabase Anon Key: " SUPABASE_KEY
 eas secret:create --scope project --name SUPABASE_PRODUCTION_ANON_KEY --value "$SUPABASE_KEY"
 
 echo "✅ All environment variables set up successfully!"

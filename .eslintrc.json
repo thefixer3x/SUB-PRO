@@ -10,6 +10,12 @@
     "react/display-name": "off",
     "@typescript-eslint/no-require-imports": "off",
     "@typescript-eslint/no-empty-object-type": "off",
-    "@typescript-eslint/no-wrapper-object-types": "off"
+    "@typescript-eslint/no-wrapper-object-types": "off",
+    "no-restricted-imports": ["error", {
+      "patterns": [{
+        "group": ["services/database"],
+        "message": "Import services/database only in netlify/functions/ (server-side). For client code, use the Supabase client directly via lib/supabase."
+      }]
+    }]
   }
 }

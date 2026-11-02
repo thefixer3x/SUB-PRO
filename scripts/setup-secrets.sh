@@ -25,7 +25,7 @@ set_secret() {
     
     echo ""
     echo "Setting up: $description"
-    read -p "Enter $name: " value
+    read -s -p "Enter $name: " value
     
     if [[ -n "$value" ]]; then
         eas secret:create --scope project --name "$name" --value "$value" --force
