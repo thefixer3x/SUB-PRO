@@ -397,6 +397,56 @@ describe('card ownership', () => {
     expect(body.cards[0].id).toBe('ic_own');
   });
 
+  it('continues across Stripe pages and returns user-level pagination metadata', async () => {
+    mockStripeApi.issuing.cards.list
+      .mockResolvedValueOnce({
+        data: [{ id: 'ic_other_1', metadata: { user_id: OTHER_USER_ID } }],
+        has_more: true,
+      })
+      .mockResolvedValueOnce({
+        data: [{ id: 'ic_own_1', metadata: { user_id: SESSION_USER_ID } }],
+        has_more: true,
+      })
+      .mockResolvedValueOnce({
+        data: [{ id: 'ic_own_2', metadata: { user_id: SESSION_USER_ID } }],
+        has_more: false,
+      });
+
+    const result = await handler(makeEvent({
+      queryStringParameters: { limit: '1' },
+    }));
+
+    expect(result.statusCode).toBe(200);
+    expect(parseBody(result)).toMatchObject({
+      cards: [{ id: 'ic_own_1' }],
+      has_more: true,
+      next_cursor: 'ic_own_1',
+    });
+    expect(mockStripeApi.issuing.cards.list).toHaveBeenNthCalledWith(1, { limit: 1 });
+    expect(mockStripeApi.issuing.cards.list).toHaveBeenNthCalledWith(2, {
+      limit: 1,
+      starting_after: 'ic_other_1',
+    });
+
+    mockStripeApi.issuing.cards.list.mockResolvedValueOnce({
+      data: [{ id: 'ic_own_2', metadata: { user_id: SESSION_USER_ID } }],
+      has_more: false,
+    });
+    const nextPage = await handler(makeEvent({
+      queryStringParameters: { limit: '1', starting_after: 'ic_own_1' },
+    }));
+
+    expect(parseBody(nextPage)).toMatchObject({
+      cards: [{ id: 'ic_own_2' }],
+      has_more: false,
+      next_cursor: null,
+    });
+    expect(mockStripeApi.issuing.cards.list).toHaveBeenLastCalledWith({
+      limit: 1,
+      starting_after: 'ic_own_1',
+    });
+  });
+
   it('ignores the user id in the path of the user listing', async () => {
     mockStripeApi.issuing.cards.list.mockResolvedValue({
       data: [{ id: 'ic_own', status: 'active', metadata: { user_id: SESSION_USER_ID } }],
@@ -414,6 +464,22 @@ describe('card ownership', () => {
 });
 
 describe('create', () => {
+
+  it('returns 400 for malformed JSON without calling Stripe', async () => {
+    const result = await handler(makeEvent({
+      httpMethod: 'POST',
+      path: '/embedded-finance/virtual-cards/create',
+      body: '{invalid json',
+    }));
+
+    expect(result.statusCode).toBe(400);
+    expect(parseBody(result).error).toMatch(/invalid json/i);
+    expect(mockStripeApi.issuing.cards.list).not.toHaveBeenCalled();
+    expect(mockStripeApi.issuing.cardholders.create).not.toHaveBeenCalled();
+    expect(mockStripeApi.issuing.cards.create).not.toHaveBeenCalled();
+    expect(mockStripeApi.customers.search).not.toHaveBeenCalled();
+    expect(mockStripeApi.customers.create).not.toHaveBeenCalled();
+  });
 
   it('uses the session user and ignores the user id in the body', async () => {
     const result = await handler(

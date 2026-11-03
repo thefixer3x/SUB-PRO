@@ -56,9 +56,15 @@ const handleCreate = async (
   userId: string,
   userEmail?: string,
 ): Promise<NetlifyResult> => {
+  let payload: any;
+  try {
+    payload = event.body ? JSON.parse(event.body) : {};
+  } catch {
+    return badRequest('Invalid JSON body');
+  }
+
   try {
     const client = ensureStripe();
-    const payload = event.body ? JSON.parse(event.body) : {};
     const {
       provider,
       subscriptionId,
@@ -230,11 +236,9 @@ const handleList = async (event: NetlifyEvent, userId: string): Promise<NetlifyR
     const client = ensureStripe();
     const params = event.queryStringParameters ?? {};
     const { cardholderId, status } = params;
-    const limit = Math.min(parseInt(params.limit ?? '10', 10) || 10, 100);
+    const limit = Math.max(1, Math.min(parseInt(params.limit ?? '10', 10) || 10, 100));
 
-    const listParams: Stripe.Issuing.CardListParams = {
-      limit,
-    };
+    const listParams: Stripe.Issuing.CardListParams = { limit };
 
     if (cardholderId) {
       listParams.cardholder = cardholderId;
@@ -244,11 +248,38 @@ const handleList = async (event: NetlifyEvent, userId: string): Promise<NetlifyR
       listParams.status = status as Stripe.Issuing.Card.Status;
     }
 
-    const cards = await client.issuing.cards.list(listParams);
+    if (params.starting_after) {
+      listParams.starting_after = params.starting_after;
+    }
 
-    const filteredCards = cards.data.filter((card) => card.metadata?.user_id === userId);
+    const filteredCards: Stripe.Issuing.Card[] = [];
+    let hasMoreGlobalCards = true;
+    let lastScannedCardId = listParams.starting_after;
 
-    const sanitizedCards = filteredCards.map((card) => ({
+    // Stripe paginates globally, so keep scanning until the user page is full
+    // (plus one matching card to determine user-visible has_more) or exhausted.
+    while (hasMoreGlobalCards && filteredCards.length <= limit) {
+      const cards = await client.issuing.cards.list({
+        ...listParams,
+        ...(lastScannedCardId ? { starting_after: lastScannedCardId } : {}),
+      });
+
+      const lastCard = cards.data[cards.data.length - 1];
+      if (!lastCard || lastCard.id === lastScannedCardId) {
+        // Stop on an empty/non-advancing page to avoid an infinite loop if the
+        // upstream pagination response is inconsistent.
+        hasMoreGlobalCards = false;
+      } else {
+        lastScannedCardId = lastCard.id;
+        filteredCards.push(...cards.data.filter((card) => card.metadata?.user_id === userId));
+        hasMoreGlobalCards = cards.has_more;
+      }
+    }
+
+    const hasMoreUserCards = filteredCards.length > limit;
+    const pageCards = filteredCards.slice(0, limit);
+
+    const sanitizedCards = pageCards.map((card) => ({
       id: card.id,
       status: card.status,
       type: card.type,
@@ -277,8 +308,8 @@ const handleList = async (event: NetlifyEvent, userId: string): Promise<NetlifyR
 
     return ok({
       cards: sanitizedCards,
-      has_more: cards.has_more,
-      total_count: filteredCards.length,
+      has_more: hasMoreUserCards,
+      next_cursor: hasMoreUserCards ? pageCards[pageCards.length - 1]?.id ?? null : null,
     });
   } catch (error) {
     console.error('Failed to list virtual cards:', error);
