@@ -1,4 +1,6 @@
 import Stripe from 'stripe';
+import { getServiceRoleClient, requireUser, type NetlifyEvent, type NetlifyResult } from './_shared/auth';
+import { corsHeaders, getRequestOrigin, handlePreflight, isOriginAllowed } from './_shared/cors';
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 
@@ -12,32 +14,11 @@ const stripe = stripeSecret
     })
   : undefined;
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET,POST,PATCH,OPTIONS,HEAD',
-  'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-};
-
-interface NetlifyEvent {
-  httpMethod: string;
-  headers: Record<string, string | undefined>;
-  body: string | null;
-  path?: string;
-  rawUrl?: string;
-  queryStringParameters?: Record<string, string | undefined>;
-}
-
-interface NetlifyResult {
-  statusCode: number;
-  headers?: Record<string, string | undefined>;
-  body: string;
-}
-
-const json = (statusCode: number, data: unknown): NetlifyResult => ({
+const json = (statusCode: number, data: unknown, headers?: Record<string, string | undefined>): NetlifyResult => ({
   statusCode,
   headers: {
     'Content-Type': 'application/json',
-    ...corsHeaders,
+    ...headers,
   },
   body: JSON.stringify(data),
 });
@@ -70,19 +51,47 @@ const ensureStripe = () => {
   return stripe;
 };
 
-const handleCreate = async (event: NetlifyEvent): Promise<NetlifyResult> => {
+const handleCreate = async (
+  event: NetlifyEvent,
+  userId: string,
+  userEmail?: string,
+): Promise<NetlifyResult> => {
+  let payload: any;
+  try {
+    payload = event.body ? JSON.parse(event.body) : {};
+  } catch {
+    return badRequest('Invalid JSON body');
+  }
+
   try {
     const client = ensureStripe();
-    const payload = event.body ? JSON.parse(event.body) : {};
+    const {
+      provider,
+      subscriptionId,
+      spendingLimit,
+      merchantCategory,
+      userName,
+      userPhone,
+      billingAddress,
+    } = payload ?? {};
 
-    const { provider, subscriptionId, userId, spendingLimit, merchantCategory, userEmail, userName, userPhone } =
-      payload ?? {};
-
-    if (!subscriptionId || !userId) {
+    if (!subscriptionId) {
       return badRequest('Missing required fields');
     }
 
+    if (spendingLimit != null &&
+      (typeof spendingLimit !== 'number' || !Number.isFinite(spendingLimit) || spendingLimit < 0)) {
+      return badRequest('Spending limit must be non-negative');
+    }
+
     if (provider === 'stripe') {
+      const address = billingAddress as Record<string, unknown> | undefined;
+      const requiredAddressFields = ['line1', 'city', 'postal_code', 'country'] as const;
+      if (!address || requiredAddressFields.some((field) =>
+        typeof address[field] !== 'string' || !address[field]?.trim())) {
+        return badRequest('A valid billing address is required');
+      }
+
       const customer = await ensureCustomer(client, {
         userId,
         userEmail,
@@ -94,14 +103,15 @@ const handleCreate = async (event: NetlifyEvent): Promise<NetlifyResult> => {
         type: 'individual',
         name: userName || `User ${userId}`,
         email: userEmail || customer.email || `user-${userId}@subtrack-pro.lanonasis.com`,
-        phone_number: userPhone || '+1234567890',
+        ...(typeof userPhone === 'string' && userPhone.trim() ? { phone_number: userPhone.trim() } : {}),
         billing: {
           address: {
-            line1: '123 Main St',
-            city: 'San Francisco',
-            state: 'CA',
-            country: 'US',
-            postal_code: '94111',
+            line1: address.line1 as string,
+            line2: typeof address.line2 === 'string' ? address.line2 : undefined,
+            city: address.city as string,
+            state: typeof address.state === 'string' ? address.state : undefined,
+            country: address.country as string,
+            postal_code: address.postal_code as string,
           },
         },
         metadata: {
@@ -112,7 +122,7 @@ const handleCreate = async (event: NetlifyEvent): Promise<NetlifyResult> => {
       });
 
       const amountCents = Math.round((spendingLimit ?? 0) * 100);
-
+      const effectiveAmount = amountCents || 10000;
       const card = await client.issuing.cards.create({
         cardholder: cardholder.id,
         type: 'virtual',
@@ -120,14 +130,8 @@ const handleCreate = async (event: NetlifyEvent): Promise<NetlifyResult> => {
         status: 'active',
         spending_controls: {
           spending_limits: [
-            {
-              amount: amountCents || 10000,
-              interval: 'monthly',
-            },
-            {
-              amount: Math.min(amountCents || 10000, 50000),
-              interval: 'per_authorization',
-            },
+            { amount: effectiveAmount, interval: 'monthly' },
+            { amount: Math.min(effectiveAmount, 50000), interval: 'per_authorization' },
           ],
           allowed_categories: merchantCategory
             ? [merchantCategory]
@@ -149,27 +153,25 @@ const handleCreate = async (event: NetlifyEvent): Promise<NetlifyResult> => {
         },
       });
 
-      const sanitizedCard = {
+      return ok({
         id: card.id,
         subscriptionId,
         userId,
         last4: card.last4,
         brand: card.brand,
         status: card.status,
-        spendingLimit: spendingLimit,
+        spendingLimit,
         currency: card.currency,
         createdAt: new Date(card.created * 1000),
         updatedAt: new Date(),
         provider: 'stripe',
         providerCardId: card.id,
         merchantCategory,
-      };
-
-      return ok(sanitizedCard);
+      });
     }
 
     if (provider === 'weavr') {
-      const mockCard = {
+      return ok({
         id: `weavr_card_${Date.now()}`,
         subscriptionId,
         userId,
@@ -185,9 +187,7 @@ const handleCreate = async (event: NetlifyEvent): Promise<NetlifyResult> => {
         updatedAt: new Date(),
         provider: 'weavr',
         providerCardId: `weavr_${Date.now()}`,
-      };
-
-      return ok(mockCard);
+      });
     }
 
     return badRequest('Unsupported provider');
@@ -196,6 +196,9 @@ const handleCreate = async (event: NetlifyEvent): Promise<NetlifyResult> => {
     return internalError('Internal server error');
   }
 };
+
+const escapeStripeSearchValue = (value: string): string =>
+  value.replace(/'/g, String.fromCharCode(92) + "'");
 
 const ensureCustomer = async (
   client: Stripe,
@@ -206,7 +209,7 @@ const ensureCustomer = async (
   try {
     if (userEmail) {
       const existing = await client.customers.search({
-        query: `email:'${userEmail}' OR metadata['userId']:'${userId}'`,
+        query: `email:'${escapeStripeSearchValue(userEmail)}' OR metadata['userId']:'${escapeStripeSearchValue(userId)}'`,
         limit: 1,
       });
 
@@ -228,16 +231,14 @@ const ensureCustomer = async (
   });
 };
 
-const handleList = async (event: NetlifyEvent): Promise<NetlifyResult> => {
+const handleList = async (event: NetlifyEvent, userId: string): Promise<NetlifyResult> => {
   try {
     const client = ensureStripe();
     const params = event.queryStringParameters ?? {};
-    const { userId, cardholderId, status } = params;
-    const limit = Math.min(parseInt(params.limit ?? '10', 10) || 10, 100);
+    const { cardholderId, status } = params;
+    const limit = Math.max(1, Math.min(parseInt(params.limit ?? '10', 10) || 10, 100));
 
-    const listParams: Stripe.Issuing.CardListParams = {
-      limit,
-    };
+    const listParams: Stripe.Issuing.CardListParams = { limit };
 
     if (cardholderId) {
       listParams.cardholder = cardholderId;
@@ -247,13 +248,38 @@ const handleList = async (event: NetlifyEvent): Promise<NetlifyResult> => {
       listParams.status = status as Stripe.Issuing.Card.Status;
     }
 
-    const cards = await client.issuing.cards.list(listParams);
+    if (params.starting_after) {
+      listParams.starting_after = params.starting_after;
+    }
 
-    const filteredCards = userId
-      ? cards.data.filter((card) => card.metadata?.user_id === userId)
-      : cards.data;
+    const filteredCards: Stripe.Issuing.Card[] = [];
+    let hasMoreGlobalCards = true;
+    let lastScannedCardId = listParams.starting_after;
 
-    const sanitizedCards = filteredCards.map((card) => ({
+    // Stripe paginates globally, so keep scanning until the user page is full
+    // (plus one matching card to determine user-visible has_more) or exhausted.
+    while (hasMoreGlobalCards && filteredCards.length <= limit) {
+      const cards = await client.issuing.cards.list({
+        ...listParams,
+        ...(lastScannedCardId ? { starting_after: lastScannedCardId } : {}),
+      });
+
+      const lastCard = cards.data[cards.data.length - 1];
+      if (!lastCard || lastCard.id === lastScannedCardId) {
+        // Stop on an empty/non-advancing page to avoid an infinite loop if the
+        // upstream pagination response is inconsistent.
+        hasMoreGlobalCards = false;
+      } else {
+        lastScannedCardId = lastCard.id;
+        filteredCards.push(...cards.data.filter((card) => card.metadata?.user_id === userId));
+        hasMoreGlobalCards = cards.has_more;
+      }
+    }
+
+    const hasMoreUserCards = filteredCards.length > limit;
+    const pageCards = filteredCards.slice(0, limit);
+
+    const sanitizedCards = pageCards.map((card) => ({
       id: card.id,
       status: card.status,
       type: card.type,
@@ -282,8 +308,8 @@ const handleList = async (event: NetlifyEvent): Promise<NetlifyResult> => {
 
     return ok({
       cards: sanitizedCards,
-      has_more: cards.has_more,
-      total_count: filteredCards.length,
+      has_more: hasMoreUserCards,
+      next_cursor: hasMoreUserCards ? pageCards[pageCards.length - 1]?.id ?? null : null,
     });
   } catch (error) {
     console.error('Failed to list virtual cards:', error);
@@ -299,14 +325,42 @@ const handleList = async (event: NetlifyEvent): Promise<NetlifyResult> => {
   }
 };
 
-const handleRetrieve = async (cardId: string): Promise<NetlifyResult> => {
+
+const verifyCardOwnership = async (cardId: string, userId: string): Promise<NetlifyResult | null> => {
+  const dbClient = getServiceRoleClient();
+  if (!dbClient) {
+    return internalError('Card ownership service is not configured');
+  }
+
+  const { data, error } = await dbClient
+    .from('virtual_cards')
+    .select('card_id')
+    .eq('card_id', cardId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[virtual-cards] Failed to verify card ownership:', error.message);
+    return json(503, { error: 'Card ownership service temporarily unavailable' });
+  }
+  return data ? null : json(403, { error: 'Access denied' });
+};
+
+const handleRetrieve = async (cardId: string, userId: string): Promise<NetlifyResult> => {
   try {
-    const client = ensureStripe();
     if (!cardId) {
       return badRequest('Card ID is required');
     }
+    const ownershipFailure = await verifyCardOwnership(cardId, userId);
+    if (ownershipFailure) return ownershipFailure;
 
+    const client = ensureStripe();
     const card = await client.issuing.cards.retrieve(cardId);
+
+    // Verify ownership: only return the card if it belongs to this user
+    if (card.metadata?.user_id !== userId) {
+      return json(403, { error: 'Access denied' });
+    }
 
     const sanitizedCard = {
       id: card.id,
@@ -342,15 +396,23 @@ const handleRetrieve = async (cardId: string): Promise<NetlifyResult> => {
   }
 };
 
-const handleUpdate = async (cardId: string, event: NetlifyEvent): Promise<NetlifyResult> => {
+const handleUpdate = async (cardId: string, event: NetlifyEvent, userId: string): Promise<NetlifyResult> => {
   try {
-    const client = ensureStripe();
     if (!cardId) {
       return badRequest('Card ID is required');
     }
+    const ownershipFailure = await verifyCardOwnership(cardId, userId);
+    if (ownershipFailure) return ownershipFailure;
 
+    const client = ensureStripe();
     const payload = event.body ? JSON.parse(event.body) : {};
     const { status, spendingLimits, allowedCategories, blockedCategories } = payload ?? {};
+
+    // First verify ownership
+    const existing = await client.issuing.cards.retrieve(cardId);
+    if (existing.metadata?.user_id !== userId) {
+      return json(403, { error: 'Access denied' });
+    }
 
     const updateParams: Stripe.Issuing.CardUpdateParams = {};
 
@@ -408,49 +470,51 @@ const handleUpdate = async (cardId: string, event: NetlifyEvent): Promise<Netlif
 };
 
 export const handler = async (event: NetlifyEvent): Promise<NetlifyResult> => {
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: '',
-    };
+  if (event.httpMethod === 'OPTIONS' || event.httpMethod === 'HEAD') {
+    return handlePreflight(event);
   }
 
-  if (event.httpMethod === 'HEAD') {
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: '',
-    };
+  const origin = getRequestOrigin(event);
+  if (!isOriginAllowed(origin)) {
+    return json(403, { error: 'Origin not allowed' });
   }
 
   const segments = parseSegments(event);
+  const auth = await requireUser(event);
+  if (!auth.ok) {
+    return {
+      ...auth.response,
+      headers: { ...auth.response.headers, ...corsHeaders(origin) },
+    };
+  }
+
+  const userId = auth.user.id;
+  let result: NetlifyResult;
 
   if (!stripe) {
-    return internalError('Stripe is not configured');
+    result = internalError('Stripe is not configured');
+  } else if (event.httpMethod === 'POST' && segments.length === 1 && segments[0] === 'create') {
+    result = await handleCreate(event, userId, auth.user.email ?? undefined);
+  } else if (event.httpMethod === 'GET' && segments.length === 1 && segments[0] === 'list') {
+    result = await handleList(event, userId);
+  } else if (event.httpMethod === 'GET' && segments.length === 2 && segments[0] === 'user') {
+    result = await handleList(event, userId);
+  } else if (event.httpMethod === 'GET' && segments.length === 1) {
+    result = await handleRetrieve(decodeURIComponent(segments[0]), userId);
+  } else if (event.httpMethod === 'PATCH' && segments.length === 2 && segments[1] === 'update') {
+    result = await handleUpdate(decodeURIComponent(segments[0]), event, userId);
+  } else {
+    result = json(404, {
+      error: 'Not Found',
+      path: event.path,
+      segments,
+    });
   }
 
-  if (event.httpMethod === 'POST' && segments.length === 1 && segments[0] === 'create') {
-    return handleCreate(event);
-  }
-
-  if (event.httpMethod === 'GET' && segments.length === 1 && segments[0] === 'list') {
-    return handleList(event);
-  }
-
-  if (event.httpMethod === 'GET' && segments.length === 1) {
-    return handleRetrieve(decodeURIComponent(segments[0]));
-  }
-
-  if (event.httpMethod === 'PATCH' && segments.length === 2 && segments[1] === 'update') {
-    return handleUpdate(decodeURIComponent(segments[0]), event);
-  }
-
-  return json(404, {
-    error: 'Not Found',
-    path: event.path,
-    segments,
-  });
+  return {
+    ...result,
+    headers: { ...result.headers, ...corsHeaders(origin) },
+  };
 };
 
 export default handler;

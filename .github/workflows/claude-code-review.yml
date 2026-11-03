@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   claude-review:
-    if: github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR'
+    if: contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association)
     
     runs-on: ubuntu-latest
     permissions:
@@ -27,12 +27,12 @@ jobs:
 
       - name: Run Claude Code Review
         id: claude-review
-        # Pinned to main (replace with a release SHA for production safety)
-        uses: anthropics/claude-code-action@main
+        # Pinned to the v1 release commit for supply-chain integrity
+        uses: anthropics/claude-code-action@4845bacbb38b3c4b15d948f035349786f678e068
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           
-          direct_prompt: |
+          prompt: |
             Please review this pull request and provide feedback on:
             - Code quality and best practices
             - Potential bugs or issues

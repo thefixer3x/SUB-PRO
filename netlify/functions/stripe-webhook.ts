@@ -273,7 +273,7 @@ const handleCardCreated = async (card: Stripe.Issuing.Card) => {
     }
 
     const success = await databaseService.storeVirtualCardReference(userId, {
-      stripe_card_id: card.id,
+      card_id: card.id,
       last4: card.last4,
       brand: card.brand,
       status: card.status,
