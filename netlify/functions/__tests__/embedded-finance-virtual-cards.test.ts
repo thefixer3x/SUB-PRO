@@ -41,6 +41,15 @@ jest.mock('@supabase/supabase-js', () => {
       rowLimit = value;
       return builder;
     });
+    builder.single = jest.fn(() => {
+      const rows = (mockState.tables as Record<string, Row[]>)[table] ?? [];
+      const filtered = rows.filter((row) =>
+        filters.every(([column, value]) =>
+          Array.isArray(value) ? value.includes(row[column]) : row[column] === value,
+        ),
+      );
+      return Promise.resolve({ data: filtered[0] ?? null, error: filtered.length === 0 ? { message: 'Not found' } : null });
+    });
     builder.insert = jest.fn((row: Row) => {
       mockState.inserted.push({ table, row });
       return Promise.resolve({ data: row, error: null });

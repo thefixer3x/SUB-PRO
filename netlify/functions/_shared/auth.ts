@@ -40,23 +40,24 @@ const getSupabaseAnonKey = (): string =>
   process.env.SUPABASE_PUBLISHABLE_KEY ||
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   '';
 
 const getServiceRoleKey = (): string =>
   process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-/** Pull the access token out of an `Authorization: Bearer <token>` header. */
+/** Pull the access token out of an `Authorization: Bearer *** header. */
 export const extractBearerToken = (
   headers: Record<string, string | undefined> | undefined,
 ): string | null => {
   const raw = headers?.authorization ?? headers?.Authorization;
 
-  if (!raw || !raw.startsWith('Bearer ')) {
+  if (!raw || !raw.match(/^bearer\s+/i)) {
     return null;
   }
 
-  const token = raw.slice('Bearer '.length).trim();
+  const token = raw.replace(/^bearer\s+/i, '').trim();
   return token.length > 0 ? token : null;
 };
 
@@ -100,12 +101,14 @@ export const requireUser = async (event: NetlifyEvent): Promise<AuthOutcome> => 
 
   if (error || !data?.user) {
     // Distinguish token errors (401) from infrastructure failures (503).
-    // Supabase returns message fields like "Invalid JWT" or "Token expired" for auth failures;
-    // network/timeout errors indicate the Supabase service is unreachable.
+    // Auth failures return 401/403 or specific error codes;
+    // network/timeout errors are 503.
+    const authErr = error as { status?: number; code?: string };
     const isTokenError =
-      error &&
-      typeof error.message === 'string' &&
-      /invalid|expired|unauthorized|malformed/i.test(error.message);
+      authErr.status === 401 ||
+      authErr.status === 403 ||
+      typeof authErr.code === 'string' &&
+        /invalid|expired|unauthorized|deleted_user/i.test(authErr.code);
 
     if (isTokenError) {
       console.warn('[netlify/_shared/auth] Invalid user token');

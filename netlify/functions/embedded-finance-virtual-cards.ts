@@ -74,22 +74,43 @@ const handleCreate = async (
       return badRequest('Spending limit must be non-negative');
     }
 
-    // Look up the user's billing address from the profile
+    // Look up the user's billing address from the profile.
+    // A missing service-role client means infrastructure is unavailable (500).
+    // A query error also means a database failure (503).
+    // Missing billing address in a successful query is a client problem (400).
     const profileClient = getServiceRoleClient();
-    let billingAddress: Record<string, string> | null = null;
-    if (profileClient) {
-      const { data, error } = await profileClient
-        .from('profiles')
-        .select('billing_address')
-        .eq('id', userId)
-        .single();
-      if (!error && data) {
-        billingAddress = (data as { billing_address?: Record<string, string> }).billing_address ?? null;
-      }
+    if (!profileClient) {
+      return internalError('Service role client not configured');
     }
+
+    const { data, error } = await profileClient
+      .from('profiles')
+      .select('billing_address')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      console.error('[virtual-cards] Failed to look up profile billing address:', error.message);
+      return internalError('Failed to look up billing address');
+    }
+
+    if (!data) {
+      return badRequest('Profile not found. Please contact support.');
+    }
+
+    let billingAddress: Record<string, string> | null =
+      (data as { billing_address?: Record<string, string> }).billing_address ?? null;
 
     if (!billingAddress) {
       return badRequest('Billing address is required. Please update your profile.');
+    }
+
+    // Validate billing address has all required fields before Stripe call
+    const requiredFields: Array<keyof Record<string, string>> = ['line1', 'city', 'postal_code', 'country'];
+    for (const field of requiredFields) {
+      if (!billingAddress[field]) {
+        return badRequest(`Billing address is missing ${field}. Please update your profile.`);
+      }
     }
 
     if (provider === 'stripe') {
@@ -105,15 +126,15 @@ const handleCreate = async (
         type: 'individual',
         name: userName || `User ${userId}`,
         email: userEmail || customer.email || `user-${userId}@subtrack-pro.lanonasis.com`,
-        phone_number: userPhone || '+123****7890',
+        ...(userPhone ? { phone_number: userPhone } : {}),
         billing: {
           address: {
-            line1: billingAddress.line1 || '123 Main St',
+            line1: billingAddress.line1,
             line2: billingAddress.line2,
-            city: billingAddress.city || 'San Francisco',
-            state: billingAddress.state || 'CA',
-            country: billingAddress.country || 'US',
-            postal_code: billingAddress.postal_code || '94111',
+            city: billingAddress.city,
+            state: billingAddress.state,
+            country: billingAddress.country,
+            postal_code: billingAddress.postal_code,
           },
         },
         metadata: {
@@ -217,8 +238,10 @@ const ensureCustomer = async (
 
   try {
     if (userEmail) {
+      const escapedEmail = userEmail.replace(/'/g, "\\\\'");
+      const escapedUserId = userId.replace(/'/g, "\\\\'");
       const existing = await client.customers.search({
-        query: `email:'${userEmail}' OR metadata['userId']:'${userId}'`,
+        query: `email:'${escapedEmail}' OR metadata['userId']:'${escapedUserId}'`,
         limit: 1,
       });
 
@@ -320,7 +343,10 @@ const handleRetrieve = async (cardId: string, userId: string): Promise<NetlifyRe
         .eq('stripe_card_id', cardId)
         .eq('user_id', userId)
         .single();
-      if (error || !data) {
+      if (error) {
+        return internalError('Failed to verify card ownership');
+      }
+      if (!data) {
         return json(403, { error: 'Access denied' });
       }
     }
@@ -373,18 +399,24 @@ const handleRetrieve = async (cardId: string, userId: string): Promise<NetlifyRe
 
 const handleUpdate = async (cardId: string, event: NetlifyEvent, userId: string): Promise<NetlifyResult> => {
   try {
-    // First verify ownership in our database before calling Stripe.
+    // Fail closed: service role client is required for ownership verification.
     const dbClient = getServiceRoleClient();
-    if (dbClient) {
-      const { data, error } = await dbClient
-        .from('virtual_cards')
-        .select('stripe_card_id')
-        .eq('stripe_card_id', cardId)
-        .eq('user_id', userId)
-        .single();
-      if (error || !data) {
-        return json(403, { error: 'Access denied' });
-      }
+    if (!dbClient) {
+      return internalError('Service role client not configured');
+    }
+
+    // Verify ownership in our database before calling Stripe.
+    const { data, error } = await dbClient
+      .from('virtual_cards')
+      .select('stripe_card_id')
+      .eq('stripe_card_id', cardId)
+      .eq('user_id', userId)
+      .single();
+    if (error) {
+      return internalError('Failed to verify card ownership');
+    }
+    if (!data) {
+      return json(403, { error: 'Access denied' });
     }
 
     const client = ensureStripe();
