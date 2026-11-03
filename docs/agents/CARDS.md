@@ -111,7 +111,7 @@ Each card is one objective. Read `docs/agents/WORKER_GUIDE.md` first; its rules 
 
 ## Wave 4: Vercel migration (plan: `docs/agents/VERCEL_MIGRATION.md`)
 
-Vercel (`sub-pro.lanonasis.com`) is the canonical web and payments host. Netlify is deprecated. From now on, server code goes in `server/` (shared logic) and `api/` (Vercel handlers), never in new `netlify/functions/` files. C02, C06 and C08 follow this layout.
+Vercel (`sub-pro.lanonasis.com`) is the canonical web and payments host. Netlify is deprecated. From now on, server code goes in `server/` (shared logic) and `api/` (Vercel handlers), never in new `netlify/functions/` files. **This overrides the Netlify paths in C02, C06 and C08:** C02's work lands in M00/M02, C06 uses `api/create-checkout-session.ts` and `api/stripe/webhook.ts` from M02, and C08 (already merged as Netlify functions) is redone in M03. Routes follow the route map in the migration plan, section 3.
 
 ### M00: Consolidate PRs #57 and #59 into one PR (P0)
 - **Role:** builder
@@ -131,17 +131,17 @@ Vercel (`sub-pro.lanonasis.com`) is the canonical web and payments host. Netlify
 - **Done when:** a test asserts the insert payload uses `card_id`, and the types match the live columns.
 
 ### M02: Shared `server/` module and Vercel checkout + webhook (P1)
-- **Role:** builder · **Depends on:** M00, M01
+- **Role:** builder · **Depends on:** M00, M01, owner entitlement decision (migration plan section 4)
 - **Scope:** new `server/auth.ts`, `server/cors.ts`, `server/stripe.ts`, `server/supabase-admin.ts`, `api/create-checkout-session.ts`, `api/stripe/webhook.ts`, `vercel.json`, `.vercelignore`, ESLint config, tests.
 - **Do:** follow section 3 of the migration plan. Web-standard `Request` handlers; webhook verifies the raw body; skip events whose price `metadata.project !== 'subtrack'`; checkout resolves price by lookup key `subtrack_pro_monthly` and takes user id/email from the session only. Make the Netlify checkout and webhook functions thin adapters over `server/`. Remove the Vercel rewrite to Netlify and exclude `api/` from the SPA rewrite.
-- **Done when:** unit tests cover signature failure (400), foreign-project event skipped (200, no DB write), subscription created for a SubTrack price (DB write), and checkout ignoring body ids; a Vercel preview serves `POST /api/stripe/webhook` (not `index.html`).
+- **Done when:** unit tests cover signature failure (400), foreign-project event skipped (200, no DB write), subscription created for a SubTrack price (DB write under option (b) only; under option (a) no subscription write and Issuing events still handled), and checkout ignoring body ids; a Vercel preview serves `POST /api/stripe/webhook` (not `index.html`).
 - **Owner action:** add `STRIPE_SECRET_KEY`, `ALLOWED_ORIGINS`, `SITE_URL` to Vercel; add lookup key `subtrack_pro_monthly` to the SubTrack Pro monthly price.
 
 ### M03: Port virtual cards, banking proxy, HIBP and Splitwise to Vercel (P1)
 - **Role:** builder · **Depends on:** M02
-- **Scope:** `api/virtual-cards/[...path].ts`, `api/banking-proxy.ts`, `api/hibp-check.ts`, `api/splitwise.ts`, client base URLs in `services/virtualCards.ts`, `services/mcpBankingService.ts`, `services/splitwise.ts`, `config/compliance.ts`.
-- **Do:** move the logic into `server/` and add Vercel handlers; replace the broken C08 Netlify functions (`hibp-check.ts`, `splitwise-api.ts`) rather than fixing their imports. Clients use `EXPO_PUBLIC_API_BASE_URL` with a same-origin default on web.
-- **Done when:** the C01/C08 test suites run against the `api/` handlers and pass.
+- **Scope:** `api/embedded-finance/virtual-cards/[...path].ts`, `api/banking/proxy.ts`, `api/hibp-check.ts`, `api/splitwise.ts`, client base URLs and paths in `services/virtualCards.ts`, `services/mcpBankingService.ts`, `services/sharedSubscriptions.ts`, `config/compliance.ts`.
+- **Do:** move the logic into `server/` and add Vercel handlers; replace the broken C08 Netlify functions (`hibp-check.ts`, `splitwise-api.ts`) rather than fixing their imports. Follow the route map (migration plan section 3): native bases end in `/api`; change the native banking path from `/banking-proxy` to `/banking/proxy`; web uses relative `/api/...`.
+- **Done when:** the C01/C08 test suites run against the `api/` handlers and pass, and a test (or preview check) shows every client request URL in the route map reaches its handler, with unknown `/api/*` paths returning 404, not `index.html`.
 
 ### M04: Stripe webhook cutover to Vercel (owner, P1)
 - **Role:** owner (builder prepares the checklist in the PR)

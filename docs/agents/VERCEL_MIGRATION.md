@@ -36,8 +36,8 @@ Layout:
 api/
   create-checkout-session.ts
   stripe/webhook.ts
-  virtual-cards/[...path].ts
-  banking-proxy.ts
+  embedded-finance/virtual-cards/[...path].ts
+  banking/proxy.ts
   hibp-check.ts
   splitwise.ts
 server/            # shared, runtime-agnostic, never imported by app code
@@ -56,12 +56,25 @@ Rules:
 - Webhook handler: skip (return 200) any subscription or invoice event whose price `metadata.project !== 'subtrack'`. Log the skip. Handle `checkout.session.completed` idempotently.
 - Checkout: resolve the price with `stripe.prices.list({ lookup_keys: ['subtrack_pro_monthly'] })`; derive user id and email from the verified session only.
 
-Vercel environment (owner sets these; names only, never values in the repo): `STRIPE_SECRET_KEY` (missing on Vercel today), `STRIPE_WEBHOOK_SECRET` (present), `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (present), `ALLOWED_ORIGINS`, `SITE_URL`, `SPLITWISE_API_KEY`, `HAVEIBEENPWNED_API_KEY`. Mobile and web clients: `EXPO_PUBLIC_API_BASE_URL=https://sub-pro.lanonasis.com`.
+Route map. Every server route lives under `/api`, and the API base URL includes `/api`, so web (relative) and native (absolute) requests hit the same handler:
+
+| Client request (path after the base) | Web URL | Handler |
+|---|---|---|
+| `/create-checkout-session` (`hooks/usePayments.ts`) | `/api/create-checkout-session` | `api/create-checkout-session.ts` |
+| Stripe → webhook | n/a | `api/stripe/webhook.ts` |
+| `/embedded-finance/virtual-cards/*` (`services/virtualCards.ts`) | `/api/embedded-finance/virtual-cards/*` | `api/embedded-finance/virtual-cards/[...path].ts` |
+| `/banking/proxy` (`services/mcpBankingService.ts`; change its native constant from `/banking-proxy`) | `/api/banking/proxy` | `api/banking/proxy.ts` |
+| `/splitwise` (`services/sharedSubscriptions.ts`) | `/api/splitwise` | `api/splitwise.ts` |
+| `/hibp-check` | `/api/hibp-check` | `api/hibp-check.ts` |
+
+Any path not in this table must not exist on the client; an unmatched `/api/*` path returns 404 from Vercel (it is excluded from the SPA rewrite), never `index.html`.
+
+Vercel environment (owner sets these; names only, never values in the repo): `STRIPE_SECRET_KEY` (missing on Vercel today), `STRIPE_WEBHOOK_SECRET` (present), `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (present), `ALLOWED_ORIGINS`, `SITE_URL`, `SPLITWISE_API_KEY`, `HAVEIBEENPWNED_API_KEY`. Native clients: `EXPO_PUBLIC_API_BASE_URL=https://sub-pro.lanonasis.com/api` (and the same value for `EXPO_PUBLIC_EMBEDDED_FINANCE_API_BASE_URL`). The `/api` suffix is required: client paths are appended to the base without it. Web uses relative `/api/...` URLs.
 
 ## 4. Phase 2: Stripe cutover (owner, about 15 minutes)
 
 1. Add lookup key `subtrack_pro_monthly` to `price_1RiSAL2KF4vMCpn8wUyDio3N` (additive; nothing reads it until the new checkout ships).
-2. Tag endpoint `we_1RiSB62…` with `metadata.project = subtrack`.
+2. Tag endpoint `we_1RiSB62…` with `metadata.project = subtrack`. Re-list SubTrack prices and confirm each carries `metadata.project = subtrack` (checked 2026-11-03: Pro monthly `price_1RiSAL2…`, Enterprise monthly `price_1RiSAi2…` and the legacy one-time Pro price are all tagged; the Basic product has no price). Add lookup key `subtrack_enterprise_monthly` to the Enterprise price as well.
 3. After the Vercel preview passes a Stripe **test-mode** run (checkout → webhook → tier shown in app), change the endpoint URL to `https://sub-pro.lanonasis.com/api/stripe/webhook`. The signing secret does not change, and Vercel already holds it.
 4. Send a test event from the Stripe dashboard and confirm a 200 in Vercel function logs.
 5. Rollback: set the endpoint URL back to the Netlify address. Both handlers share `server/`, so behaviour is identical.
@@ -69,6 +82,7 @@ Vercel environment (owner sets these; names only, never values in the repo): `ST
 **Owner decision needed: one entitlement source or two.**
 - (a) Recommended: SubTrack reads entitlements from `public.user_tiers` / `public.stripe_subscriptions`, which VortexCore's `stripe-entitlements` already maintains for every subscription on the account. SubTrack's webhook then only handles Issuing events, and the cross-project "one profile, honoured everywhere" rule holds automatically.
 - (b) SubTrack keeps writing `profiles.subscription_tier` itself, with the project filter above.
+- M02 implements whichever option is chosen; under (a) the Vercel webhook writes no subscription state.
 - Either way, note the current VortexCore mapping: a $4.99 SubTrack Pro subscription resolves to VortexCore `pro` ($29.99) entitlements. Confirm that is intended.
 
 ## 5. Phase 3: retire Netlify
