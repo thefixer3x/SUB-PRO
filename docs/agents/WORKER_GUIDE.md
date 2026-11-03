@@ -7,7 +7,7 @@ Read this before picking up any card from `docs/agents/CARDS.md`. It applies to 
 | Piece | Where | Notes |
 |---|---|---|
 | Web app (production) | Vercel project `sub-pro` → `sub-pro.lanonasis.com` | **Static SPA only** (`app.json` `web.output: "single"`, publishes `dist/`). Nothing under `app/api/**` is served. |
-| Server code | Netlify site `subtrack-pro` → `subtrack-pro.lanonasis.com` | `netlify/functions/*.ts`: checkout, Stripe webhook (`/stripe/webhook`), banking proxy, virtual cards. Vercel rewrites `/api/create-checkout-session` here. |
+| Server code | Netlify site `subtrack-pro` → `subtrack-pro.lanonasis.com` | `netlify/functions/*.ts`: checkout, Stripe webhook (`/stripe/webhook`), banking proxy, virtual cards. Vercel rewrites `/api/create-checkout-session` here. **Deprecated:** new server code goes in `server/` + `api/` on Vercel (`docs/agents/VERCEL_MIGRATION.md`). |
 | Mobile | EAS (`eas.json`, `.github/workflows/enhanced-eas-build.yml`) | Committed `android/` and `ios/` (non-CNG): `app.json` native fields are ignored unless mirrored there. |
 | Database | Supabase project `mxtsdgkwzjzlttpotole` (custom domain) | **Shared with other apps.** This app's tables are prefixed `sm_` plus `virtual_cards`, `card_authorizations`, `profiles`. `supabase/migrations/` does **not** match production (#37). |
 | Payments | Stripe live account, webhook `we_1RiSB62KF4vMCpn8afHaBbrF` → Netlify `/stripe/webhook` | |
