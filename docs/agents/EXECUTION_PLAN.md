@@ -58,10 +58,10 @@ All seven must hold; "mostly" is a rejection.
 | D2 | Is a $4.99 SubTrack Pro subscription meant to grant VortexCore `pro` entitlements? | S202 | — |
 | D3 | Billing address: keep it per request (current), or approve a column migration | S304 | per request |
 | A1 | Netlify env: `ALLOWED_ORIGINS=https://sub-pro.lanonasis.com,https://subtrack-pro.lanonasis.com` | production card calls from the browser | — |
-| A2 | Vercel env: `STRIPE_SECRET_KEY`, `ALLOWED_ORIGINS`, `SITE_URL` (`STRIPE_WEBHOOK_SECRET`, `SUPABASE_SECRET_KEY` already set) | S201 preview test | — |
+| A2 | ~~Vercel env~~ **DONE 2026-11-03** — verified via Vercel API: `STRIPE_SECRET_KEY` (dev/preview/prod), `ALLOWED_ORIGINS`, `SITE_URL`, `STRIPE_WEBHOOK_SECRET` (prod) and `SUPABASE_SECRET_KEY` all present | S201 preview test | closed |
 | A3 | Stripe: lookup keys `subtrack_pro_monthly` (`price_1RiSAL2…`) and `subtrack_enterprise_monthly` (`price_1RiSAi2…`) | S201 | orchestrator can add these via the Stripe connector on request (additive) |
 | A4 | Top up the Anthropic key used by the `claude-review` workflow | automated review | — |
-| A5 | `SPLITWISE_API_KEY`, `HAVEIBEENPWNED_API_KEY` on Vercel | S203 preview test | — |
+| A5 | `SPLITWISE_API_KEY`, `HAVEIBEENPWNED_API_KEY` on Vercel — **confirmed still MISSING 2026-11-03** (Vercel API lists neither key) | S203 preview test | — |
 
 **Decisions log.** Only the orchestrator edits this list, and only after the owner answers. A worker whose card depends on a D or A item checks here first. If the item is still open and the table gives a default, the worker proceeds under that default and says so in the PR; if there is no default, the worker blocks the card with `needs owner: <ID>`.
 
