@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Switch, Alert, Platform } from 'react-native';
 import { Bell, Shield, Palette, Download, HelpCircle, ChevronRight, Smartphone, Mail, Calendar, DollarSign, Settings as SettingsIcon, FileText, AlertTriangle, LogOut } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -57,6 +57,52 @@ export default function Settings() {
       ...prev,
       [key]: !prev[key]
     }));
+  };
+
+  // react-native-web has no working Alert.alert, so the confirmation dialog is
+  // platform-specific: a native alert on iOS/Android, window.confirm on web.
+  const confirmSignOut = async (): Promise<boolean> => {
+    if (Platform.OS === 'web') {
+      if (typeof window === 'undefined' || typeof window.confirm !== 'function') {
+        return true;
+      }
+      return window.confirm('Sign out of your account?');
+    }
+
+    return new Promise<boolean>((resolve) => {
+      Alert.alert(
+        'Sign Out',
+        'Are you sure you want to sign out?',
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Sign Out', style: 'destructive', onPress: () => resolve(true) },
+        ],
+        { cancelable: true, onDismiss: () => resolve(false) }
+      );
+    });
+  };
+
+  const showMessage = (title: string, message: string) => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+      window.alert(`${title}\n\n${message}`);
+      return;
+    }
+    Alert.alert(title, message);
+  };
+
+  const handleSignOut = async () => {
+    const confirmed = await confirmSignOut();
+    if (!confirmed) {
+      return;
+    }
+
+    const result = await signOut();
+    if (!result.success) {
+      showMessage('Sign Out Failed', result.error ?? 'Unable to sign out. Please try again.');
+      return;
+    }
+
+    router.replace('/(auth)/signin');
   };
 
   const SettingsSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
@@ -233,7 +279,7 @@ export default function Settings() {
             title="Sign Out"
             subtitle={user?.email || 'Sign out of your account'}
             onPress={() => {
-              void signOut();
+              void handleSignOut();
             }}
           />
         </SettingsSection>
