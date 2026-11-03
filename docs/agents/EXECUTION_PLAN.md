@@ -149,9 +149,11 @@ All four cards run **in parallel**. None touches `netlify/`, `api/` or `server/`
 | S104 | #81 | `ed192b6` | C07 embedded credit flag. Merged `origin/agent/c07-embedded-credit-flag`; consent check fails closed. Mutation-tested (5 gates broken, 5 killed). |
 | — | #82 | `61b1e77` | **Orchestrator PR.** CSPRNG fix for the demo user id (`Math.random()` → `expo-crypto` `randomUUID()`). Required to clear CodeQL `js/insecure-randomness` alert #81 on the S103 merge ref. |
 | S103 | #80 | `67bae8c` | Virtual Cards shows no invented card data. PR body corrected to "Part of #44" so the umbrella tracker is not auto-closed. |
-| S102 | — | — | **In progress** on `agent/s102-shared-groups-gate`. |
+| S102 | #83 | `baaa3e9` | Shared Groups own `subscriptionSharing` gate + working share flow. Worker exited without pushing; orchestrator finished the card, and fixed two review findings (stale group list after create → CodeRabbit major; unused import → CodeQL). |
 
-Orchestrator verification for every merged card above: `npm run type-check` 0 errors, `npm run lint` 0 errors, `npx jest --testPathIgnorePatterns '/.claude/'` all pass (S103 branch: 119/119 across 16 suites), web export ok, diff clean of secrets and outside Scope. The `claude-review` check fails on every PR (known **A4** external-service issue, not a technical gate — PR #72 was merged with the same failure).
+**Sprint 1 complete 2026-11-03 — 4/4 merged.**
+
+Orchestrator verification for every merged card above: `npm run type-check` 0 errors, `npm run lint` 0 errors, `npx jest --testPathIgnorePatterns '/.claude/'` all pass (S103: 119/119/16 suites; S102: 127/127/19 suites), web export ok, diff clean of secrets and outside Scope. The `claude-review` check fails on every PR (known **A4** external-service issue, not a technical gate — PR #72 was merged with the same failure).
 
 ---
 
