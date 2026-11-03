@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Seed a Hermes Kanban board with the agent cards from docs/agents/CARDS.md.
+# Seed a Hermes Kanban board with the sprint cards from docs/agents/EXECUTION_PLAN.md.
+# (CARDS.md is history; its open work was folded into the plan.)
 #
 # Usage (on the machine running Hermes, from anywhere inside the repo):
 #   bash scripts/hermes/seed-cards.sh --dry-run   # print the plan; does not touch the board
@@ -7,7 +8,7 @@
 #
 # Safe to re-run: every card is created with a fixed --idempotency-key, so Hermes
 # returns the existing card instead of making a duplicate. Each card body carries
-# its full section from CARDS.md, because Hermes workers only see their own card.
+# its full section from EXECUTION_PLAN.md, because Hermes workers only see their own card.
 # Dependencies use --parent, so a child card stays in `todo` until its parents are done.
 set -euo pipefail
 
@@ -17,12 +18,13 @@ QA="${HERMES_QA:-qa}"
 TENANT="${HERMES_TENANT:-sub-pro}"
 # Hermes dispatches higher priority first (ORDER BY priority DESC; default 0).
 P0="${HERMES_P0:-40}"; P1="${HERMES_P1:-30}"; P2="${HERMES_P2:-20}"; P3="${HERMES_P3:-10}"
-KEY_PREFIX="${HERMES_KEY_PREFIX:-sub-pro-cards-v1}"
+KEY_PREFIX="${HERMES_KEY_PREFIX:-sub-pro-exec-v2}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CARDS_FILE="$ROOT/docs/agents/CARDS.md"
+CARDS_FILE="$ROOT/docs/agents/EXECUTION_PLAN.md"
 REPO_URL="https://github.com/thefixer3x/SUB-PRO"
 GUIDE_URL="$REPO_URL/blob/main/docs/agents/WORKER_GUIDE.md"
+PLAN_URL="$REPO_URL/blob/main/docs/agents/EXECUTION_PLAN.md"
 
 DRY_RUN=0
 [[ "${1:-}" == "--dry-run" ]] && DRY_RUN=1
@@ -38,14 +40,14 @@ fi
 set_id() { printf -v "ID_$1" "%s" "$2"; }
 get_id() { local v="ID_$1"; echo "${!v:-}"; }
 
-# Print the CARDS.md section for a card id ("### C01: ..." up to the next heading).
+# Print the plan section for a card id ("### S101: ..." up to the next heading).
 card_section() {
   CARD="$1" python3 - "$CARDS_FILE" <<'PY'
 import os, re, sys
 text = open(sys.argv[1], encoding="utf-8").read()
 m = re.search(r"^### %s:.*?(?=^#{2,3} |\Z)" % re.escape(os.environ["CARD"]), text, re.S | re.M)
 if not m:
-    sys.exit("card %s not found in CARDS.md" % os.environ["CARD"])
+    sys.exit("card %s not found in %s" % (os.environ["CARD"], sys.argv[1]))
 print(m.group(0).rstrip())
 PY
 }
@@ -56,8 +58,8 @@ create_card() {
   local full="$cid: $title" section body issue_line="none" parents=() p pid
   section="$(card_section "$cid")"
   [[ "$issue" != "-" ]] && issue_line="$REPO_URL/issues/$issue"
-  body="$(printf '%s\n\nIssue: %s\nRules (read sections 2-5 before starting): %s\nPublic repo: no secrets, no production writes. Post handoff evidence per guide section 5.\n' \
-    "$section" "$issue_line" "$GUIDE_URL")"
+  body="$(printf '%s\n\nIssue: %s\nRunbook (sections 0-3 and the Definition of done apply to every card): %s\nRules (read sections 2-5 before starting): %s\nPublic repo: no secrets, no production writes. Never merge: the orchestrator reviews and merges.\n' \
+    "$section" "$issue_line" "$PLAN_URL" "$GUIDE_URL")"
 
   for p in "$@"; do
     pid="$(get_id "$p")"
@@ -79,32 +81,28 @@ create_card() {
 }
 
 # Order matters: parents are created before their children.
-# Wave 1: security fixes in server code
-create_card C01 "Require login on virtual-cards function"          "$BUILDER" "$P0" 27
-create_card C02 "Require login on checkout + CORS allowlist"       "$BUILDER" "$P1" 28 C01
-create_card C03 "Lock down Claude GitHub workflows"                "$BUILDER" "$P1" 29
-create_card C04 "Security headers (CSP report-only)"               "$BUILDER" "$P1" 30
-# Wave 2: make the product real
-create_card C05 "Real subscriptions + dashboard data"              "$BUILDER" "$P1" 33
-create_card C06 "One reliable Free to Pro upgrade flow"            "$BUILDER" "$P1" 34 C02
-create_card C07 "Hide fake credit approvals behind flag"           "$BUILDER" "$P2" 39
-create_card C08 "Move Splitwise/HIBP calls server-side"            "$BUILDER" "$P2" 35 C01
-# Wave 3: database and platform
-create_card C09 "Write live-DB permission fixes as SQL (owner applies)" "$BUILDER" "$P1" 31 C06
-create_card C10 "Expo Doctor patch alignment"                      "$BUILDER" "$P2" 40
-create_card C11 "CI supply chain: pins, Dependabot, CodeQL"        "$BUILDER" "$P2" 38 C03
-create_card C12 "Retire unserved app/api routes"                   "$BUILDER" "$P2" 36
-create_card C13 "Hardening bundle"                                 "$BUILDER" "$P3" 41
-# Wave 4: Vercel migration (docs/agents/VERCEL_MIGRATION.md)
-create_card M00 "Consolidate PRs #57 and #59 into one PR"          "$BUILDER" "$P0" 27
-create_card M01 "Fix virtual_cards column drift on main"           "$BUILDER" "$P0" -
-create_card M02 "Shared server/ module + Vercel checkout and webhook" "$BUILDER" "$P1" 28 M00 M01
-create_card M03 "Port cards, banking, HIBP, Splitwise to Vercel"   "$BUILDER" "$P1" 35 M02
-create_card M04 "Stripe webhook cutover to Vercel (owner)"         "$BUILDER" "$P1" 34 M02
-create_card M05 "Retire Netlify"                                    "$BUILDER" "$P2" - M03 M04
-# Review and QA
-create_card R00 "Review each agent PR against WORKER_GUIDE"        "$REVIEWER" "$P1" -
-create_card Q01 "End-to-end smoke test after Wave 2"               "$QA"      "$P1" - C05 C06
+# Owner decisions (D1-D3, A1-A5) are not cards: workers check the decisions log in the plan.
+# S402 (webhook cutover) is owner work and is not seeded.
+# Sprint 1: stop showing fake or unsafe things (parallel)
+create_card S101 "Sign Out in Settings"                               "$BUILDER" "$P1" -
+create_card S102 "Shared Groups: own feature gate and real share flow" "$BUILDER" "$P1" -
+create_card S103 "Virtual Cards screen shows no invented card data"   "$BUILDER" "$P0" -
+create_card S104 "Finish C07 embedded credit flag"                    "$BUILDER" "$P2" 39
+# Sprint 2: payments on Vercel (serial)
+create_card S201 "server/ module + Vercel checkout and webhook"       "$BUILDER" "$P0" 28
+create_card S202 "One Free to Pro upgrade flow"                       "$BUILDER" "$P1" 34 S201
+create_card S203 "Port cards, banking, HIBP, Splitwise to Vercel"     "$BUILDER" "$P1" 35 S201
+# Sprint 3: real data (parallel with Sprint 2 where no parent)
+create_card S301 "Real subscriptions and dashboard"                   "$BUILDER" "$P1" 33
+create_card S302 "Settings: real user, working rows, saved prefs"     "$BUILDER" "$P2" - S101
+create_card S303 "Analytics built on real data"                       "$BUILDER" "$P2" - S301
+create_card S304 "Real virtual-card management"                       "$BUILDER" "$P1" - S203 S103
+# Sprint 4: database, QA, retirement
+create_card S401 "Live-DB permission fixes as SQL (owner applies)"    "$BUILDER" "$P1" 31 S202
+create_card S403 "End-to-end smoke and layout screenshots"            "$QA"      "$P1" - S202 S301
+create_card S404 "Retire Netlify (after owner cutover + 7 days)"      "$BUILDER" "$P2" - S203 S403
+# Review
+create_card R00 "Review each agent PR against the plan's review gate" "$REVIEWER" "$P1" -
 
 if (( DRY_RUN )); then
   echo "dry run: nothing was written to the board"

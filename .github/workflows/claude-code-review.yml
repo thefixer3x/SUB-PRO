@@ -13,12 +13,15 @@ permissions:
 
 jobs:
   claude-review:
-    if: github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR'
+    if: contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association)
     
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: read
+      # Required by claude-code-action: it exchanges an OIDC token for the
+      # Claude GitHub App token. Grants no repository access by itself.
+      id-token: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -27,12 +30,12 @@ jobs:
 
       - name: Run Claude Code Review
         id: claude-review
-        # Pinned to main (replace with a release SHA for production safety)
-        uses: anthropics/claude-code-action@main
+        # Pinned to the v1 release commit for supply-chain integrity
+        uses: anthropics/claude-code-action@4845bacbb38b3c4b15d948f035349786f678e068
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           
-          direct_prompt: |
+          prompt: |
             Please review this pull request and provide feedback on:
             - Code quality and best practices
             - Potential bugs or issues

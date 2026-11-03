@@ -1,6 +1,6 @@
 # Worker guide for coding agents
 
-Read this before picking up any card from `docs/agents/CARDS.md`. It applies to every agent (Hermes workers, Claude Code, Codex, others) and to humans pairing with them.
+Read this before picking up any card from `docs/agents/EXECUTION_PLAN.md` (the sprint runbook; `CARDS.md` is history). It applies to every agent (Hermes workers, Claude Code, Codex, others) and to humans pairing with them.
 
 ## 1. How the system is wired (read first)
 
@@ -48,7 +48,7 @@ npx jest --testPathIgnorePatterns '/.claude/'
 npx expo export -p web --output-dir /tmp/sub-pro-web   # only if you changed app/, components/, hooks/, services/ or config
 ```
 
-For Netlify function changes also run `npx tsc --noEmit -p .` (included in type-check) and add a unit test that calls the handler with: no `Authorization` header (expect 401), a bad token (expect 401), and a valid mocked user (expect success). Mock Supabase and Stripe; never call live services from tests.
+For server changes (`server/`, `api/`, and the thin Netlify adapters) also run `npx tsc --noEmit -p .` (included in type-check) and add a unit test that calls the handler with: no `Authorization` header (expect 401), a bad token (expect 401), and a valid mocked user (expect success). Mock Supabase and Stripe; never call live services from tests.
 
 ## 5. Handoff evidence (card comment + PR)
 
@@ -61,9 +61,9 @@ No secrets or raw logs in comments; summarise.
 
 ## 6. Shared building blocks
 
-- Auth for Netlify functions: follow `netlify/functions/banking-proxy.ts` (Supabase `auth.getUser(token)` from the `Authorization: Bearer` header). Card C01 extracts this into `netlify/functions/_shared/auth.ts` plus a CORS allowlist helper; later function cards must reuse it, not copy it.
+- Auth: `netlify/functions/_shared/auth.ts` (bearer token → Supabase user; 401 bad token, 503 auth outage) and `_shared/cors.ts` (allowlist). S201 moves them to `server/auth.ts` and `server/cors.ts`; after that, import from `server/` only, never copy.
 - CORS allowlist comes from env `ALLOWED_ORIGINS` (comma-separated). Default for local dev only: `http://localhost:5000`.
-- Server-side Supabase: `services/database.ts` uses the service-role key. Import it only from `netlify/functions/**`.
+- Server-side Supabase: `services/database.ts` uses the service-role key. Import it only from `server/`, `api/` or `netlify/functions/**`.
 
 ## 7. When stuck
 

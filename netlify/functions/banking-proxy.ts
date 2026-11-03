@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
 import { validateBankingProxyRequestBody } from '../../lib/bankingProxy';
+import { requireUser } from './_shared/auth';
 
 const MCP_API_KEY = process.env.MCP_API_KEY ?? '';
 const MCP_BASE_URL =
@@ -44,39 +44,6 @@ const json = (statusCode: number, data: unknown): NetlifyResult => ({
   body: JSON.stringify(data),
 });
 
-const getAuthenticatedUserId = async (
-  authHeader?: string,
-): Promise<string | null> => {
-  if (!authHeader?.startsWith('Bearer ')) {
-    return null;
-  }
-
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    console.error('[netlify/banking-proxy] Supabase auth env missing');
-    return null;
-  }
-
-  const accessToken = authHeader.slice('Bearer '.length).trim();
-  if (!accessToken) {
-    return null;
-  }
-
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-
-  const { data, error } = await supabase.auth.getUser(accessToken);
-  if (error || !data.user) {
-    console.warn('[netlify/banking-proxy] Invalid user token', error);
-    return null;
-  }
-
-  return data.user.id;
-};
-
 export const handler = async (event: NetlifyEvent): Promise<NetlifyResult> => {
   if (event.httpMethod === 'OPTIONS') {
     return json(200, { ok: true });
@@ -94,12 +61,15 @@ export const handler = async (event: NetlifyEvent): Promise<NetlifyResult> => {
     return json(503, { error: 'Authentication service not configured' });
   }
 
-  const authenticatedUserId = await getAuthenticatedUserId(
-    event.headers.authorization ?? event.headers.Authorization,
-  );
-  if (!authenticatedUserId) {
-    return json(401, { error: 'Authentication required' });
+  const auth = await requireUser(event);
+  if (!auth.ok) {
+    const payload = JSON.parse(auth.response.body) as { error?: string };
+    return json(auth.response.statusCode, {
+      error: payload.error ?? 'Authentication required',
+    });
   }
+
+  const authenticatedUserId = auth.user.id;
 
   let body: unknown;
   try {

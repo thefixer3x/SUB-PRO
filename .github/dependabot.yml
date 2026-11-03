@@ -20,6 +20,19 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      # Expo SDK pins these versions; upgrade them with `npx expo install --fix`
+      # (card C10 / an SDK upgrade), never one package at a time.
+      - dependency-name: "expo"
+      - dependency-name: "expo-*"
+      - dependency-name: "@expo/*"
+      - dependency-name: "@expo-google-fonts/*"
+      - dependency-name: "react"
+      - dependency-name: "react-dom"
+      - dependency-name: "react-native"
+      - dependency-name: "react-native-*"
+      - dependency-name: "@react-native/*"
+      - dependency-name: "@react-native-async-storage/*"
+      - dependency-name: "@react-native-community/*"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"

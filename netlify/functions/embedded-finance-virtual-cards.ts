@@ -1,4 +1,6 @@
 import Stripe from 'stripe';
+import { getServiceRoleClient, requireUser, type NetlifyEvent, type NetlifyResult } from './_shared/auth';
+import { corsHeaders, getRequestOrigin, handlePreflight, isOriginAllowed } from './_shared/cors';
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 
@@ -12,32 +14,11 @@ const stripe = stripeSecret
     })
   : undefined;
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET,POST,PATCH,OPTIONS,HEAD',
-  'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-};
-
-interface NetlifyEvent {
-  httpMethod: string;
-  headers: Record<string, string | undefined>;
-  body: string | null;
-  path?: string;
-  rawUrl?: string;
-  queryStringParameters?: Record<string, string | undefined>;
-}
-
-interface NetlifyResult {
-  statusCode: number;
-  headers?: Record<string, string | undefined>;
-  body: string;
-}
-
-const json = (statusCode: number, data: unknown): NetlifyResult => ({
+const json = (statusCode: number, data: unknown, headers?: Record<string, string | undefined>): NetlifyResult => ({
   statusCode,
   headers: {
     'Content-Type': 'application/json',
-    ...corsHeaders,
+    ...headers,
   },
   body: JSON.stringify(data),
 });
@@ -63,6 +44,83 @@ const parseSegments = (event: NetlifyEvent): string[] => {
   return [];
 };
 
+// Merchant categories a subscription card may be limited to. Anything else
+// (gambling, cash disbursement, transfers) stays blocked by the allowlist.
+const ALLOWED_CARD_CATEGORIES = [
+  'computer_software_stores',
+  'digital_goods_media',
+  'digital_goods_applications',
+  'digital_goods_games',
+  'digital_goods_large_volume',
+  'cable_satellite_and_other_pay_television_and_radio',
+  'computer_network_services',
+  'telecommunication_services',
+  'direct_marketing_subscription',
+] as const;
+type CardCategory = (typeof ALLOWED_CARD_CATEGORIES)[number];
+const DEFAULT_ALLOWED_CATEGORIES: CardCategory[] = [
+  'computer_software_stores',
+  'digital_goods_media',
+  'digital_goods_applications',
+];
+const isAllowedCategory = (value: unknown): value is CardCategory =>
+  typeof value === 'string' && (ALLOWED_CARD_CATEGORIES as readonly string[]).includes(value);
+
+const ALLOWED_LIMIT_INTERVALS = ['per_authorization', 'daily', 'weekly', 'monthly', 'yearly'] as const;
+type LimitInterval = (typeof ALLOWED_LIMIT_INTERVALS)[number];
+const MAX_PER_AUTHORIZATION_CENTS = 50000;
+const MAX_LIMIT_CENTS = 500000;
+const MAX_SPENDING_LIMITS = 5;
+
+type UpdateControls = Stripe.Issuing.CardUpdateParams.SpendingControls;
+
+/** Validate client-supplied card controls. Returns an error message or the Stripe params. */
+const parseUpdateControls = (payload: Record<string, unknown>): string | UpdateControls | null => {
+  const { spendingLimits, allowedCategories, blockedCategories } = payload;
+  if (blockedCategories !== undefined) {
+    return 'blockedCategories is not supported; use allowedCategories';
+  }
+  if (spendingLimits === undefined && allowedCategories === undefined) return null;
+
+  const controls: UpdateControls = {};
+
+  if (allowedCategories !== undefined) {
+    if (!Array.isArray(allowedCategories) || allowedCategories.length === 0 ||
+      !allowedCategories.every(isAllowedCategory)) {
+      return 'allowedCategories must be a non-empty list of supported categories';
+    }
+    controls.allowed_categories = [...new Set(allowedCategories)] as UpdateControls['allowed_categories'];
+  }
+
+  if (spendingLimits !== undefined) {
+    if (!Array.isArray(spendingLimits) || spendingLimits.length === 0 ||
+      spendingLimits.length > MAX_SPENDING_LIMITS) {
+      return `spendingLimits must have 1-${MAX_SPENDING_LIMITS} entries`;
+    }
+    const limits: UpdateControls['spending_limits'] = [];
+    for (const raw of spendingLimits) {
+      const limit = raw as { amount?: unknown; interval?: unknown } | null;
+      const amount = limit?.amount;
+      const interval = limit?.interval;
+      if (typeof interval !== 'string' || !(ALLOWED_LIMIT_INTERVALS as readonly string[]).includes(interval)) {
+        return 'Unsupported spending limit interval';
+      }
+      if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+        return 'Spending limit amounts must be positive numbers';
+      }
+      const cents = Math.round(amount * 100);
+      const cap = interval === 'per_authorization' ? MAX_PER_AUTHORIZATION_CENTS : MAX_LIMIT_CENTS;
+      if (cents > cap) {
+        return 'Spending limit exceeds the maximum allowed';
+      }
+      limits.push({ amount: cents, interval: interval as LimitInterval });
+    }
+    controls.spending_limits = limits;
+  }
+
+  return controls;
+};
+
 const ensureStripe = () => {
   if (!stripe) {
     throw new Error('Stripe client is not configured. Set STRIPE_SECRET_KEY in the environment.');
@@ -70,19 +128,51 @@ const ensureStripe = () => {
   return stripe;
 };
 
-const handleCreate = async (event: NetlifyEvent): Promise<NetlifyResult> => {
+const handleCreate = async (
+  event: NetlifyEvent,
+  userId: string,
+  userEmail?: string,
+): Promise<NetlifyResult> => {
+  let payload: any;
+  try {
+    payload = event.body ? JSON.parse(event.body) : {};
+  } catch {
+    return badRequest('Invalid JSON body');
+  }
+
   try {
     const client = ensureStripe();
-    const payload = event.body ? JSON.parse(event.body) : {};
+    const {
+      provider,
+      subscriptionId,
+      spendingLimit,
+      merchantCategory,
+      userName,
+      userPhone,
+      billingAddress,
+    } = payload ?? {};
 
-    const { provider, subscriptionId, userId, spendingLimit, merchantCategory, userEmail, userName, userPhone } =
-      payload ?? {};
-
-    if (!subscriptionId || !userId) {
+    if (!subscriptionId) {
       return badRequest('Missing required fields');
     }
 
+    if (spendingLimit != null &&
+      (typeof spendingLimit !== 'number' || !Number.isFinite(spendingLimit) || spendingLimit < 0)) {
+      return badRequest('Spending limit must be non-negative');
+    }
+
+    if (merchantCategory != null && !isAllowedCategory(merchantCategory)) {
+      return badRequest('Unsupported merchant category');
+    }
+
     if (provider === 'stripe') {
+      const address = billingAddress as Record<string, unknown> | undefined;
+      const requiredAddressFields = ['line1', 'city', 'postal_code', 'country'] as const;
+      if (!address || requiredAddressFields.some((field) =>
+        typeof address[field] !== 'string' || !address[field]?.trim())) {
+        return badRequest('A valid billing address is required');
+      }
+
       const customer = await ensureCustomer(client, {
         userId,
         userEmail,
@@ -94,14 +184,15 @@ const handleCreate = async (event: NetlifyEvent): Promise<NetlifyResult> => {
         type: 'individual',
         name: userName || `User ${userId}`,
         email: userEmail || customer.email || `user-${userId}@subtrack-pro.lanonasis.com`,
-        phone_number: userPhone || '+1234567890',
+        ...(typeof userPhone === 'string' && userPhone.trim() ? { phone_number: userPhone.trim() } : {}),
         billing: {
           address: {
-            line1: '123 Main St',
-            city: 'San Francisco',
-            state: 'CA',
-            country: 'US',
-            postal_code: '94111',
+            line1: address.line1 as string,
+            line2: typeof address.line2 === 'string' ? address.line2 : undefined,
+            city: address.city as string,
+            state: typeof address.state === 'string' ? address.state : undefined,
+            country: address.country as string,
+            postal_code: address.postal_code as string,
           },
         },
         metadata: {
@@ -112,7 +203,7 @@ const handleCreate = async (event: NetlifyEvent): Promise<NetlifyResult> => {
       });
 
       const amountCents = Math.round((spendingLimit ?? 0) * 100);
-
+      const effectiveAmount = amountCents || 10000;
       const card = await client.issuing.cards.create({
         cardholder: cardholder.id,
         type: 'virtual',
@@ -120,24 +211,14 @@ const handleCreate = async (event: NetlifyEvent): Promise<NetlifyResult> => {
         status: 'active',
         spending_controls: {
           spending_limits: [
-            {
-              amount: amountCents || 10000,
-              interval: 'monthly',
-            },
-            {
-              amount: Math.min(amountCents || 10000, 50000),
-              interval: 'per_authorization',
-            },
+            { amount: effectiveAmount, interval: 'monthly' },
+            { amount: Math.min(effectiveAmount, MAX_PER_AUTHORIZATION_CENTS), interval: 'per_authorization' },
           ],
+          // Stripe rejects allowed_categories together with blocked_categories.
+          // An allowlist blocks every other category, including gambling and cash.
           allowed_categories: merchantCategory
-            ? [merchantCategory]
-            : ['computer_software_stores', 'digital_goods_media', 'online_services'],
-          blocked_categories: [
-            'betting_casino_gambling',
-            'government_licensed_online_casions_online_gambling_us_region_only',
-            'automated_cash_disburse',
-            'manual_cash_disburse',
-          ],
+            ? [merchantCategory as Stripe.Issuing.CardCreateParams.SpendingControls.AllowedCategory]
+            : [...DEFAULT_ALLOWED_CATEGORIES],
         },
         metadata: {
           subscription_id: subscriptionId,
@@ -149,45 +230,26 @@ const handleCreate = async (event: NetlifyEvent): Promise<NetlifyResult> => {
         },
       });
 
-      const sanitizedCard = {
+      return ok({
         id: card.id,
         subscriptionId,
         userId,
         last4: card.last4,
         brand: card.brand,
         status: card.status,
-        spendingLimit: spendingLimit,
+        spendingLimit,
         currency: card.currency,
         createdAt: new Date(card.created * 1000),
         updatedAt: new Date(),
         provider: 'stripe',
         providerCardId: card.id,
         merchantCategory,
-      };
-
-      return ok(sanitizedCard);
+      });
     }
 
     if (provider === 'weavr') {
-      const mockCard = {
-        id: `weavr_card_${Date.now()}`,
-        subscriptionId,
-        userId,
-        cardNumber: 'encrypted_card_number',
-        last4: '5555',
-        expiryMonth: 11,
-        expiryYear: 2027,
-        cvv: 'encrypted_cvv',
-        status: 'active',
-        spendingLimit,
-        merchantCategory,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        provider: 'weavr',
-        providerCardId: `weavr_${Date.now()}`,
-      };
-
-      return ok(mockCard);
+      // No Weavr integration exists yet; never return a placeholder card.
+      return json(501, { error: 'Provider not available' });
     }
 
     return badRequest('Unsupported provider');
@@ -196,6 +258,9 @@ const handleCreate = async (event: NetlifyEvent): Promise<NetlifyResult> => {
     return internalError('Internal server error');
   }
 };
+
+const escapeStripeSearchValue = (value: string): string =>
+  value.replace(/'/g, String.fromCharCode(92) + "'");
 
 const ensureCustomer = async (
   client: Stripe,
@@ -206,7 +271,7 @@ const ensureCustomer = async (
   try {
     if (userEmail) {
       const existing = await client.customers.search({
-        query: `email:'${userEmail}' OR metadata['userId']:'${userId}'`,
+        query: `email:'${escapeStripeSearchValue(userEmail)}' OR metadata['userId']:'${escapeStripeSearchValue(userId)}'`,
         limit: 1,
       });
 
@@ -228,16 +293,14 @@ const ensureCustomer = async (
   });
 };
 
-const handleList = async (event: NetlifyEvent): Promise<NetlifyResult> => {
+const handleList = async (event: NetlifyEvent, userId: string): Promise<NetlifyResult> => {
   try {
     const client = ensureStripe();
     const params = event.queryStringParameters ?? {};
-    const { userId, cardholderId, status } = params;
-    const limit = Math.min(parseInt(params.limit ?? '10', 10) || 10, 100);
+    const { cardholderId, status } = params;
+    const limit = Math.max(1, Math.min(parseInt(params.limit ?? '10', 10) || 10, 100));
 
-    const listParams: Stripe.Issuing.CardListParams = {
-      limit,
-    };
+    const listParams: Stripe.Issuing.CardListParams = { limit };
 
     if (cardholderId) {
       listParams.cardholder = cardholderId;
@@ -247,13 +310,38 @@ const handleList = async (event: NetlifyEvent): Promise<NetlifyResult> => {
       listParams.status = status as Stripe.Issuing.Card.Status;
     }
 
-    const cards = await client.issuing.cards.list(listParams);
+    if (params.starting_after) {
+      listParams.starting_after = params.starting_after;
+    }
 
-    const filteredCards = userId
-      ? cards.data.filter((card) => card.metadata?.user_id === userId)
-      : cards.data;
+    const filteredCards: Stripe.Issuing.Card[] = [];
+    let hasMoreGlobalCards = true;
+    let lastScannedCardId = listParams.starting_after;
 
-    const sanitizedCards = filteredCards.map((card) => ({
+    // Stripe paginates globally, so keep scanning until the user page is full
+    // (plus one matching card to determine user-visible has_more) or exhausted.
+    while (hasMoreGlobalCards && filteredCards.length <= limit) {
+      const cards = await client.issuing.cards.list({
+        ...listParams,
+        ...(lastScannedCardId ? { starting_after: lastScannedCardId } : {}),
+      });
+
+      const lastCard = cards.data[cards.data.length - 1];
+      if (!lastCard || lastCard.id === lastScannedCardId) {
+        // Stop on an empty/non-advancing page to avoid an infinite loop if the
+        // upstream pagination response is inconsistent.
+        hasMoreGlobalCards = false;
+      } else {
+        lastScannedCardId = lastCard.id;
+        filteredCards.push(...cards.data.filter((card) => card.metadata?.user_id === userId));
+        hasMoreGlobalCards = cards.has_more;
+      }
+    }
+
+    const hasMoreUserCards = filteredCards.length > limit;
+    const pageCards = filteredCards.slice(0, limit);
+
+    const sanitizedCards = pageCards.map((card) => ({
       id: card.id,
       status: card.status,
       type: card.type,
@@ -282,8 +370,8 @@ const handleList = async (event: NetlifyEvent): Promise<NetlifyResult> => {
 
     return ok({
       cards: sanitizedCards,
-      has_more: cards.has_more,
-      total_count: filteredCards.length,
+      has_more: hasMoreUserCards,
+      next_cursor: hasMoreUserCards ? pageCards[pageCards.length - 1]?.id ?? null : null,
     });
   } catch (error) {
     console.error('Failed to list virtual cards:', error);
@@ -299,14 +387,42 @@ const handleList = async (event: NetlifyEvent): Promise<NetlifyResult> => {
   }
 };
 
-const handleRetrieve = async (cardId: string): Promise<NetlifyResult> => {
+
+const verifyCardOwnership = async (cardId: string, userId: string): Promise<NetlifyResult | null> => {
+  const dbClient = getServiceRoleClient();
+  if (!dbClient) {
+    return internalError('Card ownership service is not configured');
+  }
+
+  const { data, error } = await dbClient
+    .from('virtual_cards')
+    .select('card_id')
+    .eq('card_id', cardId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[virtual-cards] Failed to verify card ownership:', error.message);
+    return json(503, { error: 'Card ownership service temporarily unavailable' });
+  }
+  return data ? null : json(403, { error: 'Access denied' });
+};
+
+const handleRetrieve = async (cardId: string, userId: string): Promise<NetlifyResult> => {
   try {
-    const client = ensureStripe();
     if (!cardId) {
       return badRequest('Card ID is required');
     }
+    const ownershipFailure = await verifyCardOwnership(cardId, userId);
+    if (ownershipFailure) return ownershipFailure;
 
+    const client = ensureStripe();
     const card = await client.issuing.cards.retrieve(cardId);
+
+    // Verify ownership: only return the card if it belongs to this user
+    if (card.metadata?.user_id !== userId) {
+      return json(403, { error: 'Access denied' });
+    }
 
     const sanitizedCard = {
       id: card.id,
@@ -342,39 +458,50 @@ const handleRetrieve = async (cardId: string): Promise<NetlifyResult> => {
   }
 };
 
-const handleUpdate = async (cardId: string, event: NetlifyEvent): Promise<NetlifyResult> => {
+const handleUpdate = async (cardId: string, event: NetlifyEvent, userId: string): Promise<NetlifyResult> => {
   try {
-    const client = ensureStripe();
     if (!cardId) {
       return badRequest('Card ID is required');
     }
+    const ownershipFailure = await verifyCardOwnership(cardId, userId);
+    if (ownershipFailure) return ownershipFailure;
 
-    const payload = event.body ? JSON.parse(event.body) : {};
-    const { status, spendingLimits, allowedCategories, blockedCategories } = payload ?? {};
-
-    const updateParams: Stripe.Issuing.CardUpdateParams = {};
-
-    if (status && ['active', 'inactive', 'canceled'].includes(status)) {
-      updateParams.status = status as Stripe.Issuing.Card.Status;
+    let payload: Record<string, unknown>;
+    try {
+      const parsed = event.body ? JSON.parse(event.body) : {};
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return badRequest('Invalid JSON body');
+      }
+      payload = parsed as Record<string, unknown>;
+    } catch {
+      return badRequest('Invalid JSON body');
     }
 
-    if (spendingLimits || allowedCategories || blockedCategories) {
-      updateParams.spending_controls = {};
+    const { status } = payload;
+    if (status !== undefined && !(typeof status === 'string' && ['active', 'inactive', 'canceled'].includes(status))) {
+      return badRequest('Unsupported status');
+    }
+    const controls = parseUpdateControls(payload);
+    if (typeof controls === 'string') {
+      return badRequest(controls);
+    }
 
-      if (Array.isArray(spendingLimits)) {
-        updateParams.spending_controls.spending_limits = spendingLimits.map((limit) => ({
-          amount: Math.round((limit.amount ?? 0) * 100),
-          interval: limit.interval,
-        }));
-      }
+    const updateParams: Stripe.Issuing.CardUpdateParams = {};
+    if (status !== undefined) {
+      updateParams.status = status as Stripe.Issuing.CardUpdateParams.Status;
+    }
+    if (controls) {
+      updateParams.spending_controls = controls;
+    }
+    if (Object.keys(updateParams).length === 0) {
+      return badRequest('Nothing to update');
+    }
 
-      if (Array.isArray(allowedCategories)) {
-        updateParams.spending_controls.allowed_categories = allowedCategories;
-      }
-
-      if (Array.isArray(blockedCategories)) {
-        updateParams.spending_controls.blocked_categories = blockedCategories;
-      }
+    const client = ensureStripe();
+    // Second ownership check against the card's own metadata.
+    const existing = await client.issuing.cards.retrieve(cardId);
+    if (existing.metadata?.user_id !== userId) {
+      return json(403, { error: 'Access denied' });
     }
 
     const updatedCard = await client.issuing.cards.update(cardId, updateParams);
@@ -408,49 +535,51 @@ const handleUpdate = async (cardId: string, event: NetlifyEvent): Promise<Netlif
 };
 
 export const handler = async (event: NetlifyEvent): Promise<NetlifyResult> => {
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: '',
-    };
+  if (event.httpMethod === 'OPTIONS' || event.httpMethod === 'HEAD') {
+    return handlePreflight(event);
   }
 
-  if (event.httpMethod === 'HEAD') {
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: '',
-    };
+  const origin = getRequestOrigin(event);
+  if (!isOriginAllowed(origin)) {
+    return json(403, { error: 'Origin not allowed' });
   }
 
   const segments = parseSegments(event);
+  const auth = await requireUser(event);
+  if (!auth.ok) {
+    return {
+      ...auth.response,
+      headers: { ...auth.response.headers, ...corsHeaders(origin) },
+    };
+  }
+
+  const userId = auth.user.id;
+  let result: NetlifyResult;
 
   if (!stripe) {
-    return internalError('Stripe is not configured');
+    result = internalError('Stripe is not configured');
+  } else if (event.httpMethod === 'POST' && segments.length === 1 && segments[0] === 'create') {
+    result = await handleCreate(event, userId, auth.user.email ?? undefined);
+  } else if (event.httpMethod === 'GET' && segments.length === 1 && segments[0] === 'list') {
+    result = await handleList(event, userId);
+  } else if (event.httpMethod === 'GET' && segments.length === 2 && segments[0] === 'user') {
+    result = await handleList(event, userId);
+  } else if (event.httpMethod === 'GET' && segments.length === 1) {
+    result = await handleRetrieve(decodeURIComponent(segments[0]), userId);
+  } else if (event.httpMethod === 'PATCH' && segments.length === 2 && segments[1] === 'update') {
+    result = await handleUpdate(decodeURIComponent(segments[0]), event, userId);
+  } else {
+    result = json(404, {
+      error: 'Not Found',
+      path: event.path,
+      segments,
+    });
   }
 
-  if (event.httpMethod === 'POST' && segments.length === 1 && segments[0] === 'create') {
-    return handleCreate(event);
-  }
-
-  if (event.httpMethod === 'GET' && segments.length === 1 && segments[0] === 'list') {
-    return handleList(event);
-  }
-
-  if (event.httpMethod === 'GET' && segments.length === 1) {
-    return handleRetrieve(decodeURIComponent(segments[0]));
-  }
-
-  if (event.httpMethod === 'PATCH' && segments.length === 2 && segments[1] === 'update') {
-    return handleUpdate(decodeURIComponent(segments[0]), event);
-  }
-
-  return json(404, {
-    error: 'Not Found',
-    path: event.path,
-    segments,
-  });
+  return {
+    ...result,
+    headers: { ...result.headers, ...corsHeaders(origin) },
+  };
 };
 
 export default handler;
