@@ -10,11 +10,6 @@ on:
   pull_request_review:
     types: [submitted]
 
-# Prevent parallel runs for the same issue/PR
-concurrency:
-  group: claude-${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: true
-
 jobs:
   claude:
     if: |
@@ -23,10 +18,17 @@ jobs:
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
     runs-on: ubuntu-latest
+    # Scope cancellation to only matching @claude runs for this repo/issue/PR.
+    # Unrelated comments on other repos/issues cannot cancel an active run, and
+    # skipped jobs (the `if` guard failing) do not trigger cancellation.
+    concurrency:
+      group: claude-${{ github.repository }}-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
+      cancel-in-progress: true
     permissions:
       contents: read
       pull-requests: read
       issues: read
+      id-token: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@b4ffde65f46336ab88eb53be808476332228c1c1
@@ -39,13 +41,8 @@ jobs:
         uses: anthropics/claude-code-action@main
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          
-          # Restrict Claude to safe commands only
-          allowed_tools: "Bash(npm install),Bash(npm run build),Bash(npm run test:*),Bash(npm run lint:*)"
-          
-          # Custom instructions for project standards
-          custom_instructions: |
-            Follow the project's coding standards.
+          claude_args: >-
+            --allowedTools Bash(npm install),Bash(npm run build),Bash(npm run test:*),Bash(npm run lint:*)
+            --append-system-prompt "Follow the project's coding standards.
             Ensure all new code has tests.
-            Use TypeScript for new files.
-
+            Use TypeScript for new files."

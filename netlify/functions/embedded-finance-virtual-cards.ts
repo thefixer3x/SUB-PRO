@@ -1,4 +1,6 @@
 import Stripe from 'stripe';
+import { requireUser, getServiceRoleClient, type NetlifyEvent, type NetlifyResult } from './_shared/auth';
+import { handlePreflight } from './_shared/cors';
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 
@@ -12,32 +14,11 @@ const stripe = stripeSecret
     })
   : undefined;
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET,POST,PATCH,OPTIONS,HEAD',
-  'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-};
-
-interface NetlifyEvent {
-  httpMethod: string;
-  headers: Record<string, string | undefined>;
-  body: string | null;
-  path?: string;
-  rawUrl?: string;
-  queryStringParameters?: Record<string, string | undefined>;
-}
-
-interface NetlifyResult {
-  statusCode: number;
-  headers?: Record<string, string | undefined>;
-  body: string;
-}
-
-const json = (statusCode: number, data: unknown): NetlifyResult => ({
+const json = (statusCode: number, data: unknown, headers?: Record<string, string | undefined>): NetlifyResult => ({
   statusCode,
   headers: {
     'Content-Type': 'application/json',
-    ...corsHeaders,
+    ...headers,
   },
   body: JSON.stringify(data),
 });
@@ -70,19 +51,49 @@ const ensureStripe = () => {
   return stripe;
 };
 
-const handleCreate = async (event: NetlifyEvent): Promise<NetlifyResult> => {
+const handleCreate = async (
+  event: NetlifyEvent,
+  userId: string,
+  userSessionEmail?: string,
+): Promise<NetlifyResult> => {
   try {
     const client = ensureStripe();
     const payload = event.body ? JSON.parse(event.body) : {};
 
-    const { provider, subscriptionId, userId, spendingLimit, merchantCategory, userEmail, userName, userPhone } =
+    // Ignore userId and userEmail from the request body — use the verified session identity instead.
+    // Body-supplied userId is never trusted.
+    const { provider, subscriptionId, spendingLimit, merchantCategory, userName, userPhone } =
       payload ?? {};
 
-    if (!subscriptionId || !userId) {
+    if (!subscriptionId) {
       return badRequest('Missing required fields');
     }
 
+    // Validate spending limit before any Stripe calls
+    if (spendingLimit != null && typeof spendingLimit === 'number' && spendingLimit < 0) {
+      return badRequest('Spending limit must be non-negative');
+    }
+
+    // Look up the user's billing address from the profile
+    const profileClient = getServiceRoleClient();
+    let billingAddress: Record<string, string> | null = null;
+    if (profileClient) {
+      const { data, error } = await profileClient
+        .from('profiles')
+        .select('billing_address')
+        .eq('id', userId)
+        .single();
+      if (!error && data) {
+        billingAddress = (data as { billing_address?: Record<string, string> }).billing_address ?? null;
+      }
+    }
+
+    if (!billingAddress) {
+      return badRequest('Billing address is required. Please update your profile.');
+    }
+
     if (provider === 'stripe') {
+      const userEmail = userSessionEmail;
       const customer = await ensureCustomer(client, {
         userId,
         userEmail,
@@ -94,14 +105,15 @@ const handleCreate = async (event: NetlifyEvent): Promise<NetlifyResult> => {
         type: 'individual',
         name: userName || `User ${userId}`,
         email: userEmail || customer.email || `user-${userId}@subtrack-pro.lanonasis.com`,
-        phone_number: userPhone || '+1234567890',
+        phone_number: userPhone || '+123****7890',
         billing: {
           address: {
-            line1: '123 Main St',
-            city: 'San Francisco',
-            state: 'CA',
-            country: 'US',
-            postal_code: '94111',
+            line1: billingAddress.line1 || '123 Main St',
+            line2: billingAddress.line2,
+            city: billingAddress.city || 'San Francisco',
+            state: billingAddress.state || 'CA',
+            country: billingAddress.country || 'US',
+            postal_code: billingAddress.postal_code || '94111',
           },
         },
         metadata: {
@@ -228,11 +240,11 @@ const ensureCustomer = async (
   });
 };
 
-const handleList = async (event: NetlifyEvent): Promise<NetlifyResult> => {
+const handleList = async (event: NetlifyEvent, userId: string): Promise<NetlifyResult> => {
   try {
     const client = ensureStripe();
     const params = event.queryStringParameters ?? {};
-    const { userId, cardholderId, status } = params;
+    const { cardholderId, status } = params;
     const limit = Math.min(parseInt(params.limit ?? '10', 10) || 10, 100);
 
     const listParams: Stripe.Issuing.CardListParams = {
@@ -249,9 +261,7 @@ const handleList = async (event: NetlifyEvent): Promise<NetlifyResult> => {
 
     const cards = await client.issuing.cards.list(listParams);
 
-    const filteredCards = userId
-      ? cards.data.filter((card) => card.metadata?.user_id === userId)
-      : cards.data;
+    const filteredCards = cards.data.filter((card) => card.metadata?.user_id === userId);
 
     const sanitizedCards = filteredCards.map((card) => ({
       id: card.id,
@@ -299,14 +309,33 @@ const handleList = async (event: NetlifyEvent): Promise<NetlifyResult> => {
   }
 };
 
-const handleRetrieve = async (cardId: string): Promise<NetlifyResult> => {
+const handleRetrieve = async (cardId: string, userId: string): Promise<NetlifyResult> => {
   try {
+    // First verify ownership in our database before calling Stripe.
+    const dbClient = getServiceRoleClient();
+    if (dbClient) {
+      const { data, error } = await dbClient
+        .from('virtual_cards')
+        .select('stripe_card_id')
+        .eq('stripe_card_id', cardId)
+        .eq('user_id', userId)
+        .single();
+      if (error || !data) {
+        return json(403, { error: 'Access denied' });
+      }
+    }
+
     const client = ensureStripe();
     if (!cardId) {
       return badRequest('Card ID is required');
     }
 
     const card = await client.issuing.cards.retrieve(cardId);
+
+    // Also verify Stripe metadata ownership
+    if (card.metadata?.user_id !== userId) {
+      return json(403, { error: 'Access denied' });
+    }
 
     const sanitizedCard = {
       id: card.id,
@@ -342,8 +371,22 @@ const handleRetrieve = async (cardId: string): Promise<NetlifyResult> => {
   }
 };
 
-const handleUpdate = async (cardId: string, event: NetlifyEvent): Promise<NetlifyResult> => {
+const handleUpdate = async (cardId: string, event: NetlifyEvent, userId: string): Promise<NetlifyResult> => {
   try {
+    // First verify ownership in our database before calling Stripe.
+    const dbClient = getServiceRoleClient();
+    if (dbClient) {
+      const { data, error } = await dbClient
+        .from('virtual_cards')
+        .select('stripe_card_id')
+        .eq('stripe_card_id', cardId)
+        .eq('user_id', userId)
+        .single();
+      if (error || !data) {
+        return json(403, { error: 'Access denied' });
+      }
+    }
+
     const client = ensureStripe();
     if (!cardId) {
       return badRequest('Card ID is required');
@@ -408,49 +451,64 @@ const handleUpdate = async (cardId: string, event: NetlifyEvent): Promise<Netlif
 };
 
 export const handler = async (event: NetlifyEvent): Promise<NetlifyResult> => {
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: '',
-    };
-  }
-
-  if (event.httpMethod === 'HEAD') {
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: '',
-    };
+  // Handle preflight (CORS)
+  if (event.httpMethod === 'OPTIONS' || event.httpMethod === 'HEAD') {
+    return handlePreflight(event);
   }
 
   const segments = parseSegments(event);
+
+  // Enforce origin policy for browser requests before requiring auth.
+  // Non-browser requests (mobile, server-to-server) have no Origin header
+  // and pass through. Browser requests from unknown origins are rejected.
+  const origin = event.headers?.origin ?? event.headers?.Origin;
+  const { isOriginAllowed, corsHeaders } = await import('./_shared/cors');
+  if (origin && !isOriginAllowed(origin)) {
+    return json(403, { error: 'Origin not allowed' }, { 'Access-Control-Allow-Origin': undefined });
+  }
+
+  // Require authentication for all non-preflight routes
+  const auth = await requireUser(event);
+  if (!auth.ok) {
+    return auth.response;
+  }
+
+  const userId = auth.user.id;
+  const userEmail = auth.user.email ?? undefined;
 
   if (!stripe) {
     return internalError('Stripe is not configured');
   }
 
+  let result: NetlifyResult;
+
   if (event.httpMethod === 'POST' && segments.length === 1 && segments[0] === 'create') {
-    return handleCreate(event);
+    result = await handleCreate(event, userId, userEmail);
+  } else if (event.httpMethod === 'GET' && segments.length === 1 && segments[0] === 'list') {
+    result = await handleList(event, userId);
+  } else if (event.httpMethod === 'GET' && segments.length === 2 && segments[0] === 'user') {
+    // Handle user/<id> path: list cards for the authenticated user (ignore the path ID).
+    result = await handleList(event, userId);
+  } else if (event.httpMethod === 'GET' && segments.length === 1) {
+    result = await handleRetrieve(decodeURIComponent(segments[0]), userId);
+  } else if (event.httpMethod === 'PATCH' && segments.length === 2 && segments[1] === 'update') {
+    result = await handleUpdate(decodeURIComponent(segments[0]), event, userId);
+  } else {
+    result = json(404, {
+      error: 'Not Found',
+      path: event.path,
+      segments,
+    });
   }
 
-  if (event.httpMethod === 'GET' && segments.length === 1 && segments[0] === 'list') {
-    return handleList(event);
-  }
-
-  if (event.httpMethod === 'GET' && segments.length === 1) {
-    return handleRetrieve(decodeURIComponent(segments[0]));
-  }
-
-  if (event.httpMethod === 'PATCH' && segments.length === 2 && segments[1] === 'update') {
-    return handleUpdate(decodeURIComponent(segments[0]), event);
-  }
-
-  return json(404, {
-    error: 'Not Found',
-    path: event.path,
-    segments,
-  });
+  // Merge CORS headers into every response
+  return {
+    ...result,
+    headers: {
+      ...result.headers,
+      ...corsHeaders(origin),
+    },
+  };
 };
 
 export default handler;
