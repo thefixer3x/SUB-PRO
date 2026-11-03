@@ -192,7 +192,7 @@ const handleCreate = async (
 };
 
 const escapeStripeSearchValue = (value: string): string =>
-  value.replace(/'/g, String.raw`\'`);
+  value.replace(/'/g, String.fromCharCode(92) + "'");
 
 const ensureCustomer = async (
   client: Stripe,

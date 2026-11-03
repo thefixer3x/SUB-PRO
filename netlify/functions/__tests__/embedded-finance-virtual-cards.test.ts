@@ -501,7 +501,10 @@ describe('create', () => {
     );
 
     const searchParams = mockStripeApi.customers.search.mock.calls[0][0];
-    expect(searchParams.query).toBe("email:'o\\'brien@example.com' OR metadata['userId']:'session\\'o'");
+    const escapedApostrophe = String.fromCharCode(92) + "'";
+    expect(searchParams.query).toBe(
+      `email:'o${escapedApostrophe}brien@example.com' OR metadata['userId']:'session${escapedApostrophe}o'`,
+    );
     expect(searchParams.query).not.toContain('attacker@example.com');
   });
 
