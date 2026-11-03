@@ -53,6 +53,20 @@ describe('communityStatsService.contributeToCommunityStats consent gate', () => 
     expect(contributions()).toHaveLength(0);
   });
 
+  it('sends nothing when the user opted out, even if the granular flags are stale', async () => {
+    // The master switch and the per-type flags are written separately, so a
+    // user who turns sharing off can still have `dataTypes` reading true. The
+    // opt-out has to win on its own: if only the per-type check were
+    // consulted, this would publish the whole subscription portfolio.
+    mockFetch.mockResolvedValue(
+      sharingResponse(false, { subscriptionCosts: true, categories: true, planTypes: true }),
+    );
+
+    await communityStatsService.contributeToCommunityStats('user-1', subscriptions);
+
+    expect(contributions()).toHaveLength(0);
+  });
+
   it('sends nothing when the consent lookup fails', async () => {
     // The preferences endpoint errors out: the method must fail closed rather
     // than assume consent.
