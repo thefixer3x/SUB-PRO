@@ -79,11 +79,9 @@ Vercel environment (owner sets these; names only, never values in the repo): `ST
 4. Send a test event from the Stripe dashboard and confirm a 200 in Vercel function logs.
 5. Rollback: set the endpoint URL back to the Netlify address. Both handlers share `server/`, so behaviour is identical.
 
-**Owner decision needed: one entitlement source or two.**
-- (a) Recommended: SubTrack reads entitlements from `public.user_tiers` / `public.stripe_subscriptions`, which VortexCore's `stripe-entitlements` already maintains for every subscription on the account. SubTrack's webhook then only handles Issuing events, and the cross-project "one profile, honoured everywhere" rule holds automatically.
-- (b) SubTrack keeps writing `profiles.subscription_tier` itself, with the project filter above.
-- M02 implements whichever option is chosen; under (a) the Vercel webhook writes no subscription state.
-- Either way, note the current VortexCore mapping: a $4.99 SubTrack Pro subscription resolves to VortexCore `pro` ($29.99) entitlements. Confirm that is intended.
+**Owner decision (2026-11-03): two entitlement sources, kept separate.**
+- SubTrack keeps its own tier in `profiles.subscription_tier`, written only by SubTrack's webhook for prices tagged `metadata.project = subtrack` (option b). SubTrack never reads VortexCore's `user_tiers` / `stripe_subscriptions`.
+- A SubTrack subscription must not grant, change or revoke VortexCore entitlements. VortexCore's `stripe-entitlements` currently maps the SubTrack price ids to `pro`/`enterprise`; that is fixed in the vortex-core-app repo (filter on `metadata.project = 'vortexcore'`), not here.
 
 ## 5. Phase 3: retire Netlify
 

@@ -36,7 +36,7 @@ npm ci
 1. Read the linked GitHub issue and the files in **Scope**. Confirm the problem still exists on `main`; if it is already fixed, complete the card with evidence and stop.
 2. Make the smallest change that meets **Done when**. Add or update tests next to the code (`__tests__/` or `*.test.ts`).
 3. Run the checks below. All must pass.
-4. Commit with a conventional message (`fix(netlify): ...`), push, open a PR titled `[Cxx] <card title>` whose body has: summary, `Fixes #<issue>`, the checks you ran with results, and any owner action needed.
+4. Commit with a conventional message (`fix(netlify): ...`), push, open a PR titled `[<card id>] <card title>` (for example `[S101] Sign Out in Settings`) whose body has: summary, `Fixes #<issue>`, the checks you ran with results, and any owner action needed.
 5. Post the handoff on the card (section 5) and move it to review.
 
 ## 4. Required checks (paste results in the PR)
@@ -48,7 +48,7 @@ npx jest --testPathIgnorePatterns '/.claude/'
 npx expo export -p web --output-dir /tmp/sub-pro-web   # only if you changed app/, components/, hooks/, services/ or config
 ```
 
-For server changes (`server/`, `api/`, and the thin Netlify adapters) also run `npx tsc --noEmit -p .` (included in type-check) and add a unit test that calls the handler with: no `Authorization` header (expect 401), a bad token (expect 401), and a valid mocked user (expect success). Mock Supabase and Stripe; never call live services from tests.
+For server changes (`server/`, `api/`, and the thin Netlify adapters) also run `npx tsc --noEmit -p .` (included in type-check) and add unit tests that call the handler. For bearer-token handlers: no `Authorization` header (expect 401), a bad token (expect 401), and a valid mocked user (expect success). For the Stripe webhook: a missing or invalid `stripe-signature` (expect 400) and a validly signed event (expect success). Mock Supabase and Stripe; never call live services from tests.
 
 ## 5. Handoff evidence (card comment + PR)
 

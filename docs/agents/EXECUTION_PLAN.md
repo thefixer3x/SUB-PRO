@@ -54,8 +54,8 @@ All seven must hold; "mostly" is a rejection.
 
 | ID | Decision or action | Blocks | Default if no answer |
 |---|---|---|---|
-| D1 | Entitlement source: (a) read `public.user_tiers` / `stripe_subscriptions` written by VortexCore's `stripe-entitlements` [recommended], or (b) SubTrack writes `profiles.subscription_tier` with a project filter | S201, S202 | none; S201 stays blocked |
-| D2 | Is a $4.99 SubTrack Pro subscription meant to grant VortexCore `pro` entitlements? | S202 | treated as a bug to report, not fix |
+| D1 | Entitlement source: (a) read VortexCore's `public.user_tiers`, or (b) SubTrack keeps its own `profiles.subscription_tier`, written only for `project=subtrack` prices | S201, S202 | none; S201 stays blocked |
+| D2 | Is a $4.99 SubTrack Pro subscription meant to grant VortexCore `pro` entitlements? | S202 | — |
 | D3 | Billing address: keep it per request (current), or approve a column migration | S304 | per request |
 | A1 | Netlify env: `ALLOWED_ORIGINS=https://sub-pro.lanonasis.com,https://subtrack-pro.lanonasis.com` | production card calls from the browser | — |
 | A2 | Vercel env: `STRIPE_SECRET_KEY`, `ALLOWED_ORIGINS`, `SITE_URL` (`STRIPE_WEBHOOK_SECRET`, `SUPABASE_SECRET_KEY` already set) | S201 preview test | — |
@@ -63,12 +63,13 @@ All seven must hold; "mostly" is a rejection.
 | A4 | Top up the Anthropic key used by the `claude-review` workflow | automated review | — |
 | A5 | `SPLITWISE_API_KEY`, `HAVEIBEENPWNED_API_KEY` on Vercel | S203 preview test | — |
 
-**Decisions log.** Only the orchestrator edits this list, and only after the owner answers. A worker whose card depends on a D or A item checks here first; if the item is still open, the worker blocks the card with `needs owner: <ID>`.
+**Decisions log.** Only the orchestrator edits this list, and only after the owner answers. A worker whose card depends on a D or A item checks here first. If the item is still open and the table gives a default, the worker proceeds under that default and says so in the PR; if there is no default, the worker blocks the card with `needs owner: <ID>`.
 
-- D1: open
-- D2: open
-- D3: open (default "per request" applies)
-- A1–A5: open
+- **D1: (b), decided 2026-11-03.** SubTrack and VortexCore are separate apps with separate entitlements. SubTrack's tier lives in `profiles.subscription_tier`, written only by SubTrack's webhook and only for prices with `metadata.project = subtrack`. SubTrack never reads `user_tiers` or `stripe_subscriptions`.
+- **D2: no, decided 2026-11-03.** A SubTrack subscription must not grant, change or revoke VortexCore entitlements. Today VortexCore's `stripe-entitlements` does exactly that (it maps the SubTrack price ids to `pro`/`enterprise`, and a SubTrack cancellation downgrades the user's VortexCore tier). The fix belongs in the vortex-core-app repo (filter on `metadata.project = 'vortexcore'`) and is tracked outside this plan; S202 must not depend on it.
+- D3: open (default "per request" applies).
+- A1, A2, A4, A5: open.
+- **A3: open, verified 2026-11-03.** The SubTrack prices have **no** lookup keys yet (VortexCore's and company-services' do), and endpoint `we_1RiSB62…` has no `metadata.project`. Owner approves, then the orchestrator adds `subtrack_pro_monthly`, `subtrack_enterprise_monthly` and the endpoint tag.
 
 ---
 
@@ -154,10 +155,10 @@ Read `VERCEL_MIGRATION.md` sections 1–4 first. All new server code goes in `se
      - `hooks/usePayments.ts` sends `Authorization: Bearer <access_token>`.
   3. Webhook:
      - read the raw body with `await request.text()` and verify the signature;
-     - return 200 and skip (log the reason) any event whose price `metadata.project !== 'subtrack'`;
+     - subscription, invoice and checkout events: return 200 and skip (log the reason) when the price's `metadata.project !== 'subtrack'`. The endpoint receives every project's events on the shared account;
+     - `issuing_*` events carry no price and are **never** skipped by the project filter; they are the only writers of `virtual_cards` and `card_authorizations` references. A failed write returns 500 so Stripe retries;
      - handle `checkout.session.completed` idempotently, keyed on the event id;
-     - under D1 = (a), write no subscription state; Issuing events only;
-     - under D1 = (b), write `profiles.subscription_tier` through the service role.
+     - D1 = (b): set `profiles.subscription_tier` through the service role from the price's `metadata.tier` (never from the product or plan name, which is what `services/database.ts` does today). Write nothing to `user_tiers` or `stripe_subscriptions`.
   4. In `vercel.json`:
      - delete the `/api/create-checkout-session` rewrite to Netlify;
      - change the SPA catch-all to `/((?!api/|_expo|static|favicon.ico|manifest.json|service-worker.js).*)`;
@@ -167,7 +168,8 @@ Read `VERCEL_MIGRATION.md` sections 1–4 first. All new server code goes in `se
   - Unit tests cover:
     - bad signature → 400;
     - a foreign-project price → 200 with no DB call;
-    - a SubTrack price → handled per D1;
+    - a SubTrack price → `profiles.subscription_tier` set from `metadata.tier`, with no write to `user_tiers`;
+    - an `issuing_card.created` event is processed even though it has no price;
     - a body `userId` or `email` that differs from the session is ignored;
     - success/cancel URLs off-allowlist → 400;
     - no token → 401.
@@ -180,7 +182,7 @@ Read `VERCEL_MIGRATION.md` sections 1–4 first. All new server code goes in `se
 - **Scope:** `hooks/usePayments.ts`, `services/stripe.ts`, `hooks/useSubscription.tsx`, `components/monetization/*`, `app/(tabs)/upgrade.tsx`, `app/billing/*`, tests.
 - **Do:**
   1. Use one checkout call (`/api/create-checkout-session`), and delete the dead `/api/stripe/create-checkout-session` call.
-  2. Read the tier from the D1 source only.
+  2. Read the tier from `profiles.subscription_tier` only (D1 = b). Never read `user_tiers`.
   3. Make `canAccessFeature` deny by default when the tier is unknown or loading.
   4. Refresh the tier on return to `app/billing/success`.
   5. `UpgradeRibbon` and `FeatureGate` keep their `router.push('/(tabs)/upgrade')` fallback. Add an `onUpgrade` prop only if a caller needs it.

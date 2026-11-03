@@ -20,19 +20,40 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
-      # Expo SDK pins these versions; upgrade them with `npx expo install --fix`
-      # (card C10 / an SDK upgrade), never one package at a time.
+      # Expo SDK 54 pins these versions. Minor and major moves go through
+      # `npx expo install --fix` (an SDK upgrade); patch updates, including
+      # security fixes, still come through Dependabot.
       - dependency-name: "expo"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
       - dependency-name: "expo-*"
-      - dependency-name: "@expo/*"
-      - dependency-name: "@expo-google-fonts/*"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "@expo/vector-icons"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
       - dependency-name: "react"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
       - dependency-name: "react-dom"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
       - dependency-name: "react-native"
-      - dependency-name: "react-native-*"
-      - dependency-name: "@react-native/*"
-      - dependency-name: "@react-native-async-storage/*"
-      - dependency-name: "@react-native-community/*"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "react-native-gesture-handler"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "react-native-reanimated"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "react-native-safe-area-context"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "react-native-screens"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "react-native-svg"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "react-native-web"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "react-native-worklets"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "@react-native-async-storage/async-storage"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # 0.x font packages: a minor bump can change exports.
+      - dependency-name: "@expo-google-fonts/*"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
