@@ -1,82 +1,69 @@
-import { HandlerEvent, HandlerContext } from '@netlify/functions';
-import { requireUser } from '../_shared/auth';
-import { handlePreflight } from '../_shared/cors';
+import { requireUser, type NetlifyEvent, type NetlifyResult } from './_shared/auth';
+import { getRequestOrigin, handlePreflight, isOriginAllowed, jsonResponse } from './_shared/cors';
 
 /**
- * Server-side proxy for Have I Been Pwned (HIBP) API calls.
- * Holds HAVEIBEENPWNED_API_KEY server-side — never exposed to client.
+ * Server-side proxy for Have I Been Pwned (HIBP) breach lookups.
+ * Holds HAVEIBEENPWNED_API_KEY server-side; never exposed to the client.
+ * Checks only the signed-in user's own email address.
+ * Card S203 (docs/agents/EXECUTION_PLAN.md) moves this to api/hibp-check.ts.
  */
-
-const HIBP_API_KEY = process.env.HAVEIBEENPWNED_API_KEY;
-
-if (!HIBP_API_KEY) {
-  throw new Error('HAVEIBEENPWNED_API_KEY environment variable is required');
-}
-
-interface HIBPRequest {
-  email: string;
-}
-
-export async function handler(event: HandlerEvent, _context: HandlerContext) {
-  // Handle CORS preflight
+export const handler = async (event: NetlifyEvent): Promise<NetlifyResult> => {
   if (event.httpMethod === 'OPTIONS') {
-    return handlePreflight();
+    return handlePreflight(event);
   }
 
-  // Require auth
-  const userId = await requireUser(event);
-  if (!userId) {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+  const origin = getRequestOrigin(event);
+  if (!isOriginAllowed(origin)) {
+    return jsonResponse(403, { error: 'Origin not allowed' });
   }
 
   if (!['POST', 'GET'].includes(event.httpMethod)) {
-    return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
+    return jsonResponse(405, { error: 'Method not allowed' }, origin);
+  }
+
+  const auth = await requireUser(event);
+  if (!auth.ok) {
+    return auth.response;
+  }
+
+  const apiKey = process.env.HAVEIBEENPWNED_API_KEY;
+  if (!apiKey) {
+    return jsonResponse(503, { error: 'Breach check is not configured' }, origin);
+  }
+
+  const email = auth.user.email;
+  if (!email) {
+    return jsonResponse(400, { error: 'Account has no email address' }, origin);
   }
 
   try {
-    // Get email from query params or body
-    const email = event.queryStringParameters?.email
-      || (event.body ? JSON.parse(event.body)?.email : null);
-
-    if (!email) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'email required' }) };
-    }
-
-    // HIBP API: check if email appears in breaches
     const response = await fetch(
-      `https://haveibeenpwned.com/api/v3/breachedaccount/${encodeURIComponent(email)}?truncateResponse=true`,
-      {
-        headers: {
-          'hibp-api-key': HIBP_API_KEY,
-          'user-agent': 'SubTrackPro/1.0',
-        },
-      }
+      `https://haveibeenpwned.com/api/v3/breachedaccount/${encodeURIComponent(email)}?truncateResponse=false`,
+      { headers: { 'hibp-api-key': apiKey, 'user-agent': 'SubTrackPro/1.0' } },
     );
 
     if (response.status === 404) {
-      // Not found = not breached
-      return { statusCode: 200, body: JSON.stringify({ breached: false }) };
+      return jsonResponse(200, { breached: false }, origin);
     }
-
     if (!response.ok) {
-      return { statusCode: response.status, body: await response.text() };
+      return jsonResponse(502, { error: 'Breach service unavailable' }, origin);
     }
 
-    const breaches = await response.json();
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
+    const breaches = (await response.json()) as Record<string, unknown>[];
+    return jsonResponse(
+      200,
+      {
         breached: true,
-        breaches: breaches.map((b: any) => ({
+        breaches: breaches.map((b) => ({
           name: b.Name,
-          description: b.Description,
           breachDate: b.BreachDate,
           addedDate: b.AddedDate,
           dataClasses: b.DataClasses,
         })),
-      }),
-    };
-  } catch (error) {
-    return { statusCode: 500, body: JSON.stringify({ error: 'Internal server error' }) };
+      },
+      origin,
+    );
+  } catch {
+    return jsonResponse(500, { error: 'Internal server error' }, origin);
   }
-}
+};

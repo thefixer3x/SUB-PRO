@@ -25,7 +25,7 @@
 All seven must hold; "mostly" is a rejection.
 
 1. Every **Accept when** item is met, and the evidence is in the PR.
-2. `npm run type-check` shows no errors except the known ones in `netlify/functions/hibp-check.ts` and `splitwise-api.ts` (S203 removes those; after S203 merges, zero errors).
+2. `npm run type-check`: **zero** errors.
 3. `npm run lint`: 0 errors.
 4. `npx jest --testPathIgnorePatterns '/.claude/'`: all pass, with the new tests named in the PR.
 5. Web export passes if `app/`, `components/`, `hooks/`, `services/` or config changed.
@@ -46,7 +46,7 @@ All seven must hold; "mostly" is a rejection.
 | Card-update control validation, `weavr` → 501, Stripe category fix on create | Sprint 0 PR (orchestrator) |
 | `package-lock.json` tracked; Dependabot ignores Expo-pinned packages | Sprint 0 PR (orchestrator) |
 | C10, C11, C12, C13 | on `main` |
-| C08 | on `main` but broken (does not compile) → **replaced by S203** |
+| C08 | on `main` but did not compile; Sprint 0 PR makes it compile safely (HIBP checks only the signed-in user's email; Splitwise returns 501). **S203 still rebuilds both on Vercel** |
 
 ---
 
@@ -197,7 +197,6 @@ Read `VERCEL_MIGRATION.md` sections 1–4 first. All new server code goes in `se
   3. Web uses relative `/api/...`; native bases end in `/api`.
 - **Accept when:**
   - The existing `netlify/functions/__tests__/embedded-finance-virtual-cards.test.ts` cases all pass against the `api/` handler; move or duplicate them, but don't weaken any.
-  - `npm run type-check` has **zero** errors.
   - A test or preview check shows every route-map URL reaches its handler and an unknown `/api/*` returns 404.
   - A grep for `SPLITWISE_API_KEY|HAVEIBEENPWNED_API_KEY` in `app/ components/ hooks/ services/ config/` returns nothing.
 
