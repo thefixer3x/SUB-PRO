@@ -83,14 +83,42 @@ class CommunityStatsService {
     }
   }
 
-  async contributeToCommunityStats(subscriptions: Subscription[]): Promise<void> {
+  /**
+   * Contributes anonymised subscription data to the community stats pool.
+   *
+   * The consent check lives inside this method on purpose: whoever calls it
+   * must not be able to opt a user into sharing data (issue #39). The method
+   * resolves the user's data-sharing preferences first and sends nothing when
+   * consent is missing, revoked, or unreadable — it fails closed.
+   *
+   * Granular consent is honoured field by field:
+   *   - `subscriptionCosts` gates `monthlyCost` and `billingCycle`
+   *   - `categories`      gates `category`
+   *   - `planTypes`       gates `planName`
+   * `serviceName` is always included: it is the aggregation key for the pool
+   * and identifies a public service, not the user.
+   */
+  async contributeToCommunityStats(userId: string, subscriptions: Subscription[]): Promise<void> {
     try {
+      const sharing = await this.getUserDataSharing(userId);
+
+      if (!sharing || !sharing.enabled) {
+        console.log('Skipping community stats contribution: user has not consented to data sharing');
+        return;
+      }
+
+      const { subscriptionCosts, categories, planTypes } = sharing.dataTypes;
+
+      if (!subscriptionCosts && !categories && !planTypes) {
+        console.log('Skipping community stats contribution: user consented to no data types');
+        return;
+      }
+
       const anonymizedData = subscriptions.map(sub => ({
         serviceName: sub.name,
-        category: sub.category,
-        monthlyCost: sub.monthlyCost,
-        planName: sub.planName,
-        billingCycle: sub.billingCycle,
+        ...(categories ? { category: sub.category } : {}),
+        ...(subscriptionCosts ? { monthlyCost: sub.monthlyCost, billingCycle: sub.billingCycle } : {}),
+        ...(planTypes ? { planName: sub.planName } : {}),
       }));
 
       await fetch('/api/social/contribute-stats', {
