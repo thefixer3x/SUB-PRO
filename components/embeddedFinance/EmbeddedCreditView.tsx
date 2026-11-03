@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { CreditCard, Calendar, DollarSign, Settings, AlertCircle, CheckCircle } from 'lucide-react-native';
-import { embeddedCreditService } from '@/services/embeddedCredit';
+import { embeddedCreditService, isEmbeddedCreditEnabled } from '@/services/embeddedCredit';
 import { EmbeddedCreditAccount, MonthlySettlement, EmbeddedCreditTransaction } from '@/types/embeddedCredit';
 
 interface EmbeddedCreditViewProps {
@@ -21,6 +21,12 @@ export function EmbeddedCreditView({
   expanded,
   onToggle,
 }: EmbeddedCreditViewProps) {
+  // Embedded credit has no real provider behind it yet, so every value the
+  // service returns is simulated. While the feature flag is off this view
+  // renders a "coming soon" panel and never asks the service for data, so a
+  // simulated approval or credit limit cannot reach the screen (issue #39).
+  const creditEnabled = isEmbeddedCreditEnabled();
+
   const [creditAccount, setCreditAccount] = useState<EmbeddedCreditAccount | null>(null);
   const [monthlySettlement, setMonthlySettlement] = useState<MonthlySettlement | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<EmbeddedCreditTransaction[]>([]);
@@ -28,6 +34,9 @@ export function EmbeddedCreditView({
   const [isEnabledForSubscription, setIsEnabledForSubscription] = useState(false);
 
   useEffect(() => {
+    if (!creditEnabled) {
+      return;
+    }
     loadCreditData();
   }, [userId]);
 
@@ -80,6 +89,36 @@ export function EmbeddedCreditView({
       console.error('Failed to create credit account:', error);
     }
   };
+
+  if (!creditEnabled) {
+    return (
+      <View style={styles.container}>
+        <TouchableOpacity style={styles.header} onPress={onToggle}>
+          <View style={styles.headerLeft}>
+            <CreditCard size={20} color="#94A3B8" />
+            <Text style={styles.headerTitle}>Embedded Finance</Text>
+          </View>
+          <Text style={styles.headerSubtitle}>Coming soon</Text>
+        </TouchableOpacity>
+
+        {expanded && (
+          <View style={styles.content}>
+            <View style={styles.promoCard}>
+              <Text style={styles.promoTitle}>💳 SubTrack Credit Service</Text>
+              <Text style={styles.promoDescription}>
+                Embedded credit is not available yet. We are working with a credit provider
+                and will let you know as soon as applications open.
+              </Text>
+
+              <Text style={styles.disclaimer}>
+                No credit applications, approvals or limits are available at this time.
+              </Text>
+            </View>
+          </View>
+        )}
+      </View>
+    );
+  }
 
   if (!creditAccount) {
     return (
