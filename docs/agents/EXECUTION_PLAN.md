@@ -68,7 +68,10 @@ All seven must hold; "mostly" is a rejection.
 - **D1: (b), decided 2026-11-03.** SubTrack and VortexCore are separate apps with separate entitlements. SubTrack's tier lives in `profiles.subscription_tier`, written only by SubTrack's webhook and only for prices with `metadata.project = subtrack`. SubTrack never reads `user_tiers` or `stripe_subscriptions`.
 - **D2: no, decided 2026-11-03.** A SubTrack subscription must not grant, change or revoke VortexCore entitlements. Today VortexCore's `stripe-entitlements` does exactly that (it maps the SubTrack price ids to `pro`/`enterprise`, and a SubTrack cancellation downgrades the user's VortexCore tier). The fix belongs in the vortex-core-app repo (filter on `metadata.project = 'vortexcore'`) and is tracked outside this plan; S202 must not depend on it.
 - D3: open (default "per request" applies).
-- A1, A2, A4, A5: open.
+- **A1: open.** Netlify env `ALLOWED_ORIGINS` still needs to be set on the Netlify dashboard.
+- **A2: partial, 2026-11-03.** `ALLOWED_ORIGINS` and `SITE_URL` added to Vercel (production, preview, development) by the orchestrator. `STRIPE_SECRET_KEY` still missing — owner must add it before S201 can run.
+- A4: open.
+- **A5: open.** `SPLITWISE_API_KEY` and `HAVEIBEENPWNED_API_KEY` must be added to Vercel before S203 can run. Owner action.
 - **A3: open, verified 2026-11-03.** The SubTrack prices have **no** lookup keys yet (VortexCore's and company-services' do), and endpoint `we_1RiSB62…` has no `metadata.project`. Owner approves, then the orchestrator adds `subtrack_pro_monthly`, `subtrack_enterprise_monthly` and the endpoint tag.
 
 ---
