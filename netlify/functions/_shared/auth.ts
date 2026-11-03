@@ -90,15 +90,15 @@ export const requireUser = async (event: NetlifyEvent): Promise<AuthOutcome> => 
     };
   }
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-
-  let authResult: Awaited<ReturnType<typeof supabase.auth.getUser>>;
+  let authResult: Awaited<ReturnType<SupabaseClient['auth']['getUser']>>;
   try {
+    // Inside the try: a malformed URL makes the constructor throw.
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
     authResult = await supabase.auth.getUser(accessToken);
   } catch (authFailure) {
     console.error('[netlify/_shared/auth] Supabase getUser threw:', authFailure);

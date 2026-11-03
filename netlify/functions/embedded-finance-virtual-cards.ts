@@ -71,6 +71,8 @@ type LimitInterval = (typeof ALLOWED_LIMIT_INTERVALS)[number];
 const MAX_PER_AUTHORIZATION_CENTS = 50000;
 const MAX_LIMIT_CENTS = 500000;
 const MAX_SPENDING_LIMITS = 5;
+// Upper bound on Stripe list calls per request (Stripe paginates the whole account).
+const MAX_LIST_SCAN_PAGES = 5;
 
 type UpdateControls = Stripe.Issuing.CardUpdateParams.SpendingControls;
 
@@ -109,6 +111,9 @@ const parseUpdateControls = (payload: Record<string, unknown>): string | UpdateC
         return 'Spending limit amounts must be positive numbers';
       }
       const cents = Math.round(amount * 100);
+      if (cents <= 0) {
+        return 'Spending limit amounts must be at least 0.01';
+      }
       const cap = interval === 'per_authorization' ? MAX_PER_AUTHORIZATION_CENTS : MAX_LIMIT_CENTS;
       if (cents > cap) {
         return 'Spending limit exceeds the maximum allowed';
@@ -159,6 +164,10 @@ const handleCreate = async (
     if (spendingLimit != null &&
       (typeof spendingLimit !== 'number' || !Number.isFinite(spendingLimit) || spendingLimit < 0)) {
       return badRequest('Spending limit must be non-negative');
+    }
+
+    if (spendingLimit != null && Math.round(spendingLimit * 100) > MAX_LIMIT_CENTS) {
+      return badRequest('Spending limit exceeds the maximum allowed');
     }
 
     if (merchantCategory != null && !isAllowedCategory(merchantCategory)) {
@@ -229,6 +238,10 @@ const handleCreate = async (
           created_via: 'subtrack_pro_app',
         },
       });
+
+      // Record ownership now so the owner can manage the card immediately; the
+      // issuing_card.created webhook writes the same row idempotently as a backstop.
+      await recordCardReference(userId, card, subscriptionId);
 
       return ok({
         id: card.id,
@@ -317,10 +330,13 @@ const handleList = async (event: NetlifyEvent, userId: string): Promise<NetlifyR
     const filteredCards: Stripe.Issuing.Card[] = [];
     let hasMoreGlobalCards = true;
     let lastScannedCardId = listParams.starting_after;
+    let pagesScanned = 0;
 
     // Stripe paginates globally, so keep scanning until the user page is full
-    // (plus one matching card to determine user-visible has_more) or exhausted.
-    while (hasMoreGlobalCards && filteredCards.length <= limit) {
+    // (plus one matching card to determine user-visible has_more), Stripe is
+    // exhausted, or the per-request page budget runs out.
+    while (hasMoreGlobalCards && filteredCards.length <= limit && pagesScanned < MAX_LIST_SCAN_PAGES) {
+      pagesScanned += 1;
       const cards = await client.issuing.cards.list({
         ...listParams,
         ...(lastScannedCardId ? { starting_after: lastScannedCardId } : {}),
@@ -338,8 +354,17 @@ const handleList = async (event: NetlifyEvent, userId: string): Promise<NetlifyR
       }
     }
 
-    const hasMoreUserCards = filteredCards.length > limit;
+    const pageFull = filteredCards.length > limit;
+    const budgetExhausted = !pageFull && hasMoreGlobalCards;
+    const hasMoreUserCards = pageFull || budgetExhausted;
     const pageCards = filteredCards.slice(0, limit);
+    // A full page resumes after its last card; an exhausted budget resumes after
+    // the last card scanned, so the next request continues the global scan.
+    const nextCursor = pageFull
+      ? pageCards[pageCards.length - 1]?.id ?? null
+      : budgetExhausted
+        ? lastScannedCardId ?? null
+        : null;
 
     const sanitizedCards = pageCards.map((card) => ({
       id: card.id,
@@ -371,7 +396,7 @@ const handleList = async (event: NetlifyEvent, userId: string): Promise<NetlifyR
     return ok({
       cards: sanitizedCards,
       has_more: hasMoreUserCards,
-      next_cursor: hasMoreUserCards ? pageCards[pageCards.length - 1]?.id ?? null : null,
+      next_cursor: nextCursor,
     });
   } catch (error) {
     console.error('Failed to list virtual cards:', error);
@@ -388,6 +413,48 @@ const handleList = async (event: NetlifyEvent, userId: string): Promise<NetlifyR
 };
 
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Insert the virtual_cards ownership row unless it already exists. Never throws. */
+const recordCardReference = async (
+  userId: string,
+  card: Pick<Stripe.Issuing.Card, 'id' | 'last4' | 'brand' | 'status'> & {
+    cardholder?: Stripe.Issuing.Card['cardholder'];
+  },
+  subscriptionId?: string,
+): Promise<boolean> => {
+  const dbClient = getServiceRoleClient();
+  if (!dbClient) {
+    console.error('[virtual-cards] Cannot record card reference: service client not configured');
+    return false;
+  }
+  try {
+    const { data: existing, error: readError } = await dbClient
+      .from('virtual_cards')
+      .select('card_id')
+      .eq('card_id', card.id)
+      .limit(1);
+    if (readError) throw readError;
+    if (Array.isArray(existing) && existing.length > 0) return true;
+
+    const cardholderId = typeof card.cardholder === 'string' ? card.cardholder : card.cardholder?.id;
+    const { error: insertError } = await dbClient.from('virtual_cards').insert({
+      user_id: userId,
+      card_id: card.id,
+      cardholder_id: cardholderId ?? null,
+      last4: card.last4,
+      brand: card.brand,
+      status: card.status,
+      subscription_id: subscriptionId && UUID_RE.test(subscriptionId) ? subscriptionId : null,
+    });
+    if (insertError) throw insertError;
+    return true;
+  } catch (error) {
+    console.error('[virtual-cards] Failed to record card reference:', (error as { message?: string })?.message ?? error);
+    return false;
+  }
+};
+
 const verifyCardOwnership = async (cardId: string, userId: string): Promise<NetlifyResult | null> => {
   const dbClient = getServiceRoleClient();
   if (!dbClient) {
@@ -399,13 +466,13 @@ const verifyCardOwnership = async (cardId: string, userId: string): Promise<Netl
     .select('card_id')
     .eq('card_id', cardId)
     .eq('user_id', userId)
-    .maybeSingle();
+    .limit(1);
 
   if (error) {
     console.error('[virtual-cards] Failed to verify card ownership:', error.message);
     return json(503, { error: 'Card ownership service temporarily unavailable' });
   }
-  return data ? null : json(403, { error: 'Access denied' });
+  return Array.isArray(data) && data.length > 0 ? null : json(403, { error: 'Access denied' });
 };
 
 const handleRetrieve = async (cardId: string, userId: string): Promise<NetlifyResult> => {

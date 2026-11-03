@@ -280,13 +280,14 @@ const handleCardCreated = async (card: Stripe.Issuing.Card) => {
       subscription_id: card.metadata?.subscription_id,
     });
 
-    if (success) {
-      console.log('Successfully stored virtual card reference for user:', userId);
-    } else {
-      console.error('Failed to store virtual card reference:', card.id);
+    if (!success) {
+      // Throw so the webhook answers 500 and Stripe redelivers the event.
+      throw new Error(`Failed to store virtual card reference: ${card.id}`);
     }
+    console.log('Successfully stored virtual card reference for user:', userId);
   } catch (error) {
     console.error('Error handling card created:', error);
+    throw error;
   }
 };
 
