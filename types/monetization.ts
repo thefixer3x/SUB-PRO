@@ -13,6 +13,7 @@ export interface SubscriptionPlan {
     analyticsHistory: number; // days
     exportFormats: string[];
     smartInsights: boolean;
+    subscriptionSharing: boolean;
     bulkUpload: boolean;
     adFree: boolean;
     prioritySupport: boolean;

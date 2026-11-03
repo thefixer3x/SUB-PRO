@@ -1,4 +1,5 @@
 import { SubscriptionPlan } from '@/types/monetization';
+import { SUBSCRIPTION_SHARING_ACCESS } from '@/config/monetization';
 
 export const SUBSCRIPTION_PLANS: Record<string, SubscriptionPlan> = {
   free: {
@@ -20,6 +21,7 @@ export const SUBSCRIPTION_PLANS: Record<string, SubscriptionPlan> = {
       analyticsHistory: 30,
       exportFormats: ['csv'],
       smartInsights: false,
+      subscriptionSharing: SUBSCRIPTION_SHARING_ACCESS.free,
       bulkUpload: false,
       adFree: false,
       prioritySupport: false,
@@ -48,6 +50,7 @@ export const SUBSCRIPTION_PLANS: Record<string, SubscriptionPlan> = {
       analyticsHistory: 365,
       exportFormats: ['csv', 'pdf', 'xlsx', 'json'],
       smartInsights: true,
+      subscriptionSharing: SUBSCRIPTION_SHARING_ACCESS.pro,
       bulkUpload: true,
       adFree: true,
       prioritySupport: false,
@@ -79,6 +82,7 @@ export const SUBSCRIPTION_PLANS: Record<string, SubscriptionPlan> = {
       analyticsHistory: 730,
       exportFormats: ['csv', 'pdf', 'xlsx', 'json', 'api'],
       smartInsights: true,
+      subscriptionSharing: SUBSCRIPTION_SHARING_ACCESS.team,
       bulkUpload: true,
       adFree: true,
       prioritySupport: true,
