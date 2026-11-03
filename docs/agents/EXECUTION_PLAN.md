@@ -54,16 +54,18 @@ All seven must hold; "mostly" is a rejection.
 
 | ID | Decision or action | Blocks | Default if no answer |
 |---|---|---|---|
-| D1 | Entitlement source: (a) read VortexCore's `public.user_tiers`, or (b) SubTrack keeps its own `profiles.subscription_tier`, written only for `project=subtrack` prices | S201, S202 | none; S201 stays blocked |
+| D1 | ~~Entitlement source~~ **DECIDED (b) 2026-11-03** — SubTrack keeps its own `profiles.subscription_tier`, written only for `project=subtrack` prices; it never reads `user_tiers` or `stripe_subscriptions` | S201, S202 | answered — does **not** block |
 | D2 | Is a $4.99 SubTrack Pro subscription meant to grant VortexCore `pro` entitlements? | S202 | — |
 | D3 | Billing address: keep it per request (current), or approve a column migration | S304 | per request |
 | A1 | Netlify env: `ALLOWED_ORIGINS=https://sub-pro.lanonasis.com,https://subtrack-pro.lanonasis.com` | production card calls from the browser | — |
 | A2 | ~~Vercel env~~ **DONE 2026-11-03** — verified via Vercel API: `STRIPE_SECRET_KEY` (dev/preview/prod), `ALLOWED_ORIGINS`, `SITE_URL`, `STRIPE_WEBHOOK_SECRET` (prod) and `SUPABASE_SECRET_KEY` all present | S201 preview test | closed |
-| A3 | Stripe: lookup keys `subtrack_pro_monthly` (`price_1RiSAL2…`) and `subtrack_enterprise_monthly` (`price_1RiSAi2…`) | S201 | orchestrator can add these via the Stripe connector on request (additive) |
+| A3 | ~~Stripe lookup keys~~ **DONE 2026-11-03 (live mode)** — `price_1RiSAL2…` → `subtrack_pro_monthly`, `price_1RiSAi2…` → `subtrack_enterprise_monthly`, endpoint `we_1RiSB62…` has `metadata.project = subtrack`. **Agents use test mode only** and create their own test-mode prices/endpoint with the same lookup keys and metadata. | S201 | closed — does **not** block |
 | A4 | Top up the Anthropic key used by the `claude-review` workflow | automated review | — |
 | A5 | `SPLITWISE_API_KEY`, `HAVEIBEENPWNED_API_KEY` on Vercel — **confirmed still MISSING 2026-11-03** (Vercel API lists neither key) | S203 preview test | — |
 
 **Decisions log.** Only the orchestrator edits this list, and only after the owner answers. A worker whose card depends on a D or A item checks here first. If the item is still open and the table gives a default, the worker proceeds under that default and says so in the PR; if there is no default, the worker blocks the card with `needs owner: <ID>`.
+
+**Board hygiene (2026-11-03).** Sixteen cards on `agent-banks-pro` were assigned to profiles that do not exist — `builder` (14), `qa` (1), `reviewer` (1) — so the dispatcher could never spawn them; this is why Sprint 1 work was re-created under `default`-assigned cards instead of dispatching, and why four duplicate Sprint 1 cards sat in `ready` against already-merged PRs. Every non-terminal card has been reassigned to a real profile: `builder` → `coda`, `qa` → `eli`, `reviewer` → `vera`. The two cards still reading `builder` (S301 `t_6b4e2fd7`, S302 `t_db135e48`) are deliberately left inert because the orchestrator is running them in-session on `agent/s301-real-subscriptions` and `agent/s302-settings-real-user`. S302 already had a card (`t_db135e48`, a child of S101 that auto-promoted when S101 merged); the orchestrator briefly created a duplicate and removed it.
 
 - **D1: (b), decided 2026-11-03.** SubTrack and VortexCore are separate apps with separate entitlements. SubTrack's tier lives in `profiles.subscription_tier`, written only by SubTrack's webhook and only for prices with `metadata.project = subtrack`. SubTrack never reads `user_tiers` or `stripe_subscriptions`.
 - **D2: no, decided 2026-11-03.** A SubTrack subscription must not grant, change or revoke VortexCore entitlements. Today VortexCore's `stripe-entitlements` does exactly that (it maps the SubTrack price ids to `pro`/`enterprise`, and a SubTrack cancellation downgrades the user's VortexCore tier). The fix belongs in the vortex-core-app repo (filter on `metadata.project = 'vortexcore'`) and is tracked outside this plan; S202 must not depend on it.
