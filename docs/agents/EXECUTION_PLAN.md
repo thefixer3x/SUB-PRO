@@ -69,10 +69,11 @@ All seven must hold; "mostly" is a rejection.
 - **D2: no, decided 2026-11-03.** A SubTrack subscription must not grant, change or revoke VortexCore entitlements. Today VortexCore's `stripe-entitlements` does exactly that (it maps the SubTrack price ids to `pro`/`enterprise`, and a SubTrack cancellation downgrades the user's VortexCore tier). The fix belongs in the vortex-core-app repo (filter on `metadata.project = 'vortexcore'`) and is tracked outside this plan; S202 must not depend on it.
 - D3: open (default "per request" applies).
 - **A1: open.** Netlify env `ALLOWED_ORIGINS` still needs to be set on the Netlify dashboard.
-- **A2: partial, 2026-11-03.** `ALLOWED_ORIGINS` and `SITE_URL` added to Vercel (production, preview, development) by the orchestrator. `STRIPE_SECRET_KEY` still missing — owner must add it before S201 can run.
+- **A2: done, 2026-11-03.** Vercel has `STRIPE_SECRET_KEY` (production, preview, development), `ALLOWED_ORIGINS` and `SITE_URL`. `STRIPE_WEBHOOK_SECRET` is set for production only: S201's preview test needs the **test-mode** signing secret of a test-mode endpoint added to Preview (owner).
 - A4: open.
 - **A5: open.** `SPLITWISE_API_KEY` and `HAVEIBEENPWNED_API_KEY` must be added to Vercel before S203 can run. Owner action.
-- **A3: open, verified 2026-11-03.** The SubTrack prices have **no** lookup keys yet (VortexCore's and company-services' do), and endpoint `we_1RiSB62…` has no `metadata.project`. Owner approves, then the orchestrator adds `subtrack_pro_monthly`, `subtrack_enterprise_monthly` and the endpoint tag.
+- **A3: done in live mode, 2026-11-03.** `price_1RiSAL2…` has lookup key `subtrack_pro_monthly`, `price_1RiSAi2…` has `subtrack_enterprise_monthly`, and endpoint `we_1RiSB62…` carries `metadata.project = subtrack`.
+- **Stripe mode for agents (owner, 2026-11-03):** Hermes workers have Stripe **test and staging** access only, never live. Test mode has its own prices and lookup keys: S201's worker creates (or reuses) test-mode SubTrack Pro and Enterprise prices with the same `lookup_key` values and the same `metadata` (`project=subtrack`, `tier`, `billing`), and a test-mode webhook endpoint for the preview URL. Live mode changes stay with the owner or the orchestrator.
 
 ---
 
