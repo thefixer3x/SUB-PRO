@@ -1,4 +1,14 @@
-import { AdConfig, SubscriptionPlan } from '@/types/monetization';
+import { AdConfig, SubscriptionPlan, SubscriptionTier } from '@/types/monetization';
+
+// Subscription sharing is its own entitlement, separate from smart insights.
+// Free plans cannot share a subscription; Pro and Team can.
+// This is the single source of truth: config/subscriptionPlans.ts reads it too, so the
+// runtime gate and this config cannot drift apart.
+export const SUBSCRIPTION_SHARING_ACCESS: Record<SubscriptionTier, boolean> = {
+  free: false,
+  pro: true,
+  team: true,
+};
 
 // Ad configuration for monetization
 export const adConfig: AdConfig = {
@@ -37,6 +47,7 @@ export const subscriptionPlans: SubscriptionPlan[] = [
       analyticsHistory: 30,
       exportFormats: ['CSV'],
       smartInsights: false,
+      subscriptionSharing: SUBSCRIPTION_SHARING_ACCESS.free,
       bulkUpload: false,
       adFree: false,
       prioritySupport: false,
@@ -63,6 +74,7 @@ export const subscriptionPlans: SubscriptionPlan[] = [
       analyticsHistory: 365,
       exportFormats: ['CSV', 'PDF', 'Excel'],
       smartInsights: true,
+      subscriptionSharing: SUBSCRIPTION_SHARING_ACCESS.pro,
       bulkUpload: true,
       adFree: true,
       prioritySupport: true,
@@ -90,6 +102,7 @@ export const subscriptionPlans: SubscriptionPlan[] = [
       analyticsHistory: 365,
       exportFormats: ['CSV', 'PDF', 'Excel'],
       smartInsights: true,
+      subscriptionSharing: SUBSCRIPTION_SHARING_ACCESS.team,
       bulkUpload: true,
       adFree: true,
       prioritySupport: true,

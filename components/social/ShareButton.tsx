@@ -11,7 +11,7 @@ interface ShareButtonProps {
 
 export const ShareButton: React.FC<ShareButtonProps> = ({ onPress, style, compact = false }) => {
   const { canAccessFeature } = useSubscription();
-  const canShare = canAccessFeature('smartInsights');
+  const canShare = canAccessFeature('subscriptionSharing');
 
   if (!canShare) return null;
 

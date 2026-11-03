@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Modal, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, Modal, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { X } from 'lucide-react-native';
 import { SharedGroupsDisplay } from '@/components/social/SharedGroupsDisplay';
 import { SharedGroupDetails } from '@/components/social/SharedGroupDetails';
 import { ShareSubscriptionModal } from '@/components/social/ShareSubscriptionModal';
+import { ShareButton } from '@/components/social/ShareButton';
 import { SharedGroup } from '@/types/social';
 import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { FeatureGate } from '@/components/monetization/FeatureGate';
@@ -11,10 +12,11 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeColors } from '@/constants/theme';
 
 export default function SharedGroupsScreen() {
-  const [userId, setUserId] = useState('user-123');
-  const { data: subscriptions = [] } = useSubscriptions();
+  const [userId] = useState('user-123');
+  const { data: subscriptions = [], isLoading: isLoadingSubscriptions } = useSubscriptions();
   const [selectedGroup, setSelectedGroup] = useState<SharedGroup | null>(null);
   const [showGroupDetails, setShowGroupDetails] = useState(false);
+  const [showSubscriptionPicker, setShowSubscriptionPicker] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [selectedSubscriptionId, setSelectedSubscriptionId] = useState<string | null>(null);
   const { colors } = useTheme();
@@ -25,8 +27,20 @@ export default function SharedGroupsScreen() {
     setShowGroupDetails(true);
   };
 
+  // A shared group is always built around one subscription, so the user picks it first.
   const handleCreateGroup = () => {
+    setShowSubscriptionPicker(true);
+  };
+
+  const handleSelectSubscription = (subscriptionId: string) => {
+    setSelectedSubscriptionId(subscriptionId);
+    setShowSubscriptionPicker(false);
     setShowShareModal(true);
+  };
+
+  const handleCloseShareModal = () => {
+    setShowShareModal(false);
+    setSelectedSubscriptionId(null);
   };
 
   const handleDeleteGroup = () => {
@@ -38,10 +52,21 @@ export default function SharedGroupsScreen() {
     return subscriptions.find(sub => sub.id === id);
   };
 
+  const selectedSubscription = selectedSubscriptionId ? getSubscriptionById(selectedSubscriptionId) : undefined;
+
+  // The chosen subscription can disappear while the share modal is open (it was deleted,
+  // or the list reloaded). Close the modal rather than sharing a subscription we no longer have.
+  useEffect(() => {
+    if (showShareModal && selectedSubscriptionId && !selectedSubscription) {
+      setShowShareModal(false);
+      setSelectedSubscriptionId(null);
+    }
+  }, [showShareModal, selectedSubscriptionId, selectedSubscription]);
+
   return (
     <SafeAreaView style={dynamicStyles.container}>
       <FeatureGate
-        feature="smartInsights"
+        feature="subscriptionSharing"
         requiredTier="pro"
         fallback={
           <View style={dynamicStyles.featureGate}>
@@ -53,7 +78,7 @@ export default function SharedGroupsScreen() {
           </View>
         }
       >
-        <SharedGroupsDisplay 
+        <SharedGroupsDisplay
           userId={userId}
           onCreateGroup={handleCreateGroup}
           onSelectGroup={handleSelectGroup}
@@ -71,7 +96,7 @@ export default function SharedGroupsScreen() {
                 <X size={24} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
-            
+
             {selectedGroup && (
               <SharedGroupDetails
                 group={selectedGroup}
@@ -83,11 +108,55 @@ export default function SharedGroupsScreen() {
           </View>
         </Modal>
 
-        {showShareModal && selectedSubscriptionId && (
+        <Modal
+          visible={showSubscriptionPicker}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowSubscriptionPicker(false)}
+        >
+          <View style={dynamicStyles.modalContainer}>
+            <View style={dynamicStyles.modalHeader}>
+              <Text style={dynamicStyles.modalTitle}>Choose a Subscription</Text>
+              <TouchableOpacity style={dynamicStyles.closeButton} onPress={() => setShowSubscriptionPicker(false)}>
+                <X size={24} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {isLoadingSubscriptions ? (
+              <View style={dynamicStyles.pickerState}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={dynamicStyles.pickerStateText}>Loading subscriptions…</Text>
+              </View>
+            ) : subscriptions.length === 0 ? (
+              <View style={dynamicStyles.pickerState}>
+                <Text style={dynamicStyles.pickerStateTitle}>No subscriptions to share</Text>
+                <Text style={dynamicStyles.pickerStateText}>
+                  Add a subscription first, then share its cost with others.
+                </Text>
+              </View>
+            ) : (
+              <ScrollView style={dynamicStyles.pickerList}>
+                {subscriptions.map(subscription => (
+                  <View key={subscription.id} style={dynamicStyles.pickerItem}>
+                    <View style={dynamicStyles.pickerItemInfo}>
+                      <Text style={dynamicStyles.pickerItemName}>{subscription.name}</Text>
+                      <Text style={dynamicStyles.pickerItemCost}>
+                        ${subscription.monthlyCost.toFixed(2)}/month
+                      </Text>
+                    </View>
+                    <ShareButton onPress={() => handleSelectSubscription(subscription.id)} />
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </Modal>
+
+        {showShareModal && selectedSubscription && (
           <ShareSubscriptionModal
             visible={showShareModal}
-            onClose={() => setShowShareModal(false)}
-            subscription={getSubscriptionById(selectedSubscriptionId)!}
+            onClose={handleCloseShareModal}
+            subscription={selectedSubscription}
             userId={userId}
           />
         )}
@@ -139,5 +208,50 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   closeButton: {
     padding: 8,
+  },
+  pickerList: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  pickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+    gap: 12,
+  },
+  pickerItemInfo: {
+    flex: 1,
+  },
+  pickerItemName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.text,
+  },
+  pickerItemCost: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  pickerState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+    gap: 12,
+  },
+  pickerStateTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    textAlign: 'center',
+  },
+  pickerStateText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
