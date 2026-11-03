@@ -374,6 +374,66 @@ describe('card ownership', () => {
     });
   });
 
+  const patchOwn = (body: unknown) =>
+    handler(
+      makeEvent({
+        httpMethod: 'PATCH',
+        path: '/embedded-finance/virtual-cards/ic_own/update',
+        body: typeof body === 'string' ? body : JSON.stringify(body),
+      }),
+    );
+
+  it('rejects blockedCategories so the default blocks cannot be removed', async () => {
+    const result = await patchOwn({ blockedCategories: [] });
+    expect(result.statusCode).toBe(400);
+    expect(mockStripeApi.issuing.cards.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects categories outside the subscription allowlist', async () => {
+    const result = await patchOwn({ allowedCategories: ['betting_casino_gambling'] });
+    expect(result.statusCode).toBe(400);
+    expect(mockStripeApi.issuing.cards.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects an empty allowedCategories list', async () => {
+    const result = await patchOwn({ allowedCategories: [] });
+    expect(result.statusCode).toBe(400);
+  });
+
+  it.each([
+    [{ spendingLimits: [{ amount: -5, interval: 'monthly' }] }],
+    [{ spendingLimits: [{ amount: 10, interval: 'forever' }] }],
+    [{ spendingLimits: [{ amount: 100000, interval: 'monthly' }] }],
+    [{ spendingLimits: [{ amount: 600, interval: 'per_authorization' }] }],
+    [{ spendingLimits: 'lots' }],
+    [{ status: 'stolen' }],
+    [{}],
+  ])('rejects invalid update %j without calling Stripe', async (body) => {
+    const result = await patchOwn(body);
+    expect(result.statusCode).toBe(400);
+    expect(mockStripeApi.issuing.cards.update).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for malformed update JSON', async () => {
+    const result = await patchOwn('{not json');
+    expect(result.statusCode).toBe(400);
+    expect(mockStripeApi.issuing.cards.update).not.toHaveBeenCalled();
+  });
+
+  it('applies valid limits and allowlisted categories in cents', async () => {
+    const result = await patchOwn({
+      spendingLimits: [{ amount: 25.5, interval: 'monthly' }],
+      allowedCategories: ['digital_goods_media', 'digital_goods_media'],
+    });
+    expect(result.statusCode).toBe(200);
+    expect(mockStripeApi.issuing.cards.update).toHaveBeenCalledWith('ic_own', {
+      spending_controls: {
+        allowed_categories: ['digital_goods_media'],
+        spending_limits: [{ amount: 2550, interval: 'monthly' }],
+      },
+    });
+  });
+
   it('only lists the cards of the signed in user', async () => {
     mockStripeApi.issuing.cards.list.mockResolvedValue({
       data: [
@@ -590,6 +650,35 @@ describe('create', () => {
 
     expect(result.statusCode).toBe(400);
     expect(mockStripeApi.issuing.cards.create).not.toHaveBeenCalled();
+  });
+
+  const validCreate = {
+    provider: 'stripe',
+    subscriptionId: 'sub_123',
+    billingAddress: { line1: '1 Test Street', city: 'Lagos', postal_code: '100001', country: 'NG' },
+  };
+
+  it('creates the card with an allowlist only (Stripe rejects allowed + blocked together)', async () => {
+    const result = await handler(makeEvent({ httpMethod: 'POST', path: '/embedded-finance/virtual-cards/create', body: JSON.stringify(validCreate) }));
+    expect(result.statusCode).toBe(200);
+    const controls = mockStripeApi.issuing.cards.create.mock.calls[0][0].spending_controls;
+    expect(controls.blocked_categories).toBeUndefined();
+    expect(controls.allowed_categories).toEqual(
+      expect.arrayContaining(['computer_software_stores', 'digital_goods_media']),
+    );
+    expect(controls.allowed_categories).not.toContain('online_services');
+  });
+
+  it('rejects a merchant category outside the allowlist', async () => {
+    const result = await handler(makeEvent({ httpMethod: 'POST', path: '/embedded-finance/virtual-cards/create', body: JSON.stringify({ ...validCreate, merchantCategory: 'manual_cash_disburse' }) }));
+    expect(result.statusCode).toBe(400);
+    expect(mockStripeApi.issuing.cardholders.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 501 for the weavr provider instead of a placeholder card', async () => {
+    const result = await handler(makeEvent({ httpMethod: 'POST', path: '/embedded-finance/virtual-cards/create', body: JSON.stringify({ ...validCreate, provider: 'weavr' }) }));
+    expect(result.statusCode).toBe(501);
+    expect(parseBody(result).last4).toBeUndefined();
   });
 
   it('omits phone_number when no phone is provided', async () => {

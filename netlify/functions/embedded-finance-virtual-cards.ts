@@ -44,6 +44,83 @@ const parseSegments = (event: NetlifyEvent): string[] => {
   return [];
 };
 
+// Merchant categories a subscription card may be limited to. Anything else
+// (gambling, cash disbursement, transfers) stays blocked by the allowlist.
+const ALLOWED_CARD_CATEGORIES = [
+  'computer_software_stores',
+  'digital_goods_media',
+  'digital_goods_applications',
+  'digital_goods_games',
+  'digital_goods_large_volume',
+  'cable_satellite_and_other_pay_television_and_radio',
+  'computer_network_services',
+  'telecommunication_services',
+  'direct_marketing_subscription',
+] as const;
+type CardCategory = (typeof ALLOWED_CARD_CATEGORIES)[number];
+const DEFAULT_ALLOWED_CATEGORIES: CardCategory[] = [
+  'computer_software_stores',
+  'digital_goods_media',
+  'digital_goods_applications',
+];
+const isAllowedCategory = (value: unknown): value is CardCategory =>
+  typeof value === 'string' && (ALLOWED_CARD_CATEGORIES as readonly string[]).includes(value);
+
+const ALLOWED_LIMIT_INTERVALS = ['per_authorization', 'daily', 'weekly', 'monthly', 'yearly'] as const;
+type LimitInterval = (typeof ALLOWED_LIMIT_INTERVALS)[number];
+const MAX_PER_AUTHORIZATION_CENTS = 50000;
+const MAX_LIMIT_CENTS = 500000;
+const MAX_SPENDING_LIMITS = 5;
+
+type UpdateControls = Stripe.Issuing.CardUpdateParams.SpendingControls;
+
+/** Validate client-supplied card controls. Returns an error message or the Stripe params. */
+const parseUpdateControls = (payload: Record<string, unknown>): string | UpdateControls | null => {
+  const { spendingLimits, allowedCategories, blockedCategories } = payload;
+  if (blockedCategories !== undefined) {
+    return 'blockedCategories is not supported; use allowedCategories';
+  }
+  if (spendingLimits === undefined && allowedCategories === undefined) return null;
+
+  const controls: UpdateControls = {};
+
+  if (allowedCategories !== undefined) {
+    if (!Array.isArray(allowedCategories) || allowedCategories.length === 0 ||
+      !allowedCategories.every(isAllowedCategory)) {
+      return 'allowedCategories must be a non-empty list of supported categories';
+    }
+    controls.allowed_categories = [...new Set(allowedCategories)] as UpdateControls['allowed_categories'];
+  }
+
+  if (spendingLimits !== undefined) {
+    if (!Array.isArray(spendingLimits) || spendingLimits.length === 0 ||
+      spendingLimits.length > MAX_SPENDING_LIMITS) {
+      return `spendingLimits must have 1-${MAX_SPENDING_LIMITS} entries`;
+    }
+    const limits: UpdateControls['spending_limits'] = [];
+    for (const raw of spendingLimits) {
+      const limit = raw as { amount?: unknown; interval?: unknown } | null;
+      const amount = limit?.amount;
+      const interval = limit?.interval;
+      if (typeof interval !== 'string' || !(ALLOWED_LIMIT_INTERVALS as readonly string[]).includes(interval)) {
+        return 'Unsupported spending limit interval';
+      }
+      if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+        return 'Spending limit amounts must be positive numbers';
+      }
+      const cents = Math.round(amount * 100);
+      const cap = interval === 'per_authorization' ? MAX_PER_AUTHORIZATION_CENTS : MAX_LIMIT_CENTS;
+      if (cents > cap) {
+        return 'Spending limit exceeds the maximum allowed';
+      }
+      limits.push({ amount: cents, interval: interval as LimitInterval });
+    }
+    controls.spending_limits = limits;
+  }
+
+  return controls;
+};
+
 const ensureStripe = () => {
   if (!stripe) {
     throw new Error('Stripe client is not configured. Set STRIPE_SECRET_KEY in the environment.');
@@ -82,6 +159,10 @@ const handleCreate = async (
     if (spendingLimit != null &&
       (typeof spendingLimit !== 'number' || !Number.isFinite(spendingLimit) || spendingLimit < 0)) {
       return badRequest('Spending limit must be non-negative');
+    }
+
+    if (merchantCategory != null && !isAllowedCategory(merchantCategory)) {
+      return badRequest('Unsupported merchant category');
     }
 
     if (provider === 'stripe') {
@@ -131,17 +212,13 @@ const handleCreate = async (
         spending_controls: {
           spending_limits: [
             { amount: effectiveAmount, interval: 'monthly' },
-            { amount: Math.min(effectiveAmount, 50000), interval: 'per_authorization' },
+            { amount: Math.min(effectiveAmount, MAX_PER_AUTHORIZATION_CENTS), interval: 'per_authorization' },
           ],
+          // Stripe rejects allowed_categories together with blocked_categories.
+          // An allowlist blocks every other category, including gambling and cash.
           allowed_categories: merchantCategory
-            ? [merchantCategory]
-            : ['computer_software_stores', 'digital_goods_media', 'online_services'],
-          blocked_categories: [
-            'betting_casino_gambling',
-            'government_licensed_online_casions_online_gambling_us_region_only',
-            'automated_cash_disburse',
-            'manual_cash_disburse',
-          ],
+            ? [merchantCategory as Stripe.Issuing.CardCreateParams.SpendingControls.AllowedCategory]
+            : [...DEFAULT_ALLOWED_CATEGORIES],
         },
         metadata: {
           subscription_id: subscriptionId,
@@ -171,23 +248,8 @@ const handleCreate = async (
     }
 
     if (provider === 'weavr') {
-      return ok({
-        id: `weavr_card_${Date.now()}`,
-        subscriptionId,
-        userId,
-        cardNumber: 'encrypted_card_number',
-        last4: '5555',
-        expiryMonth: 11,
-        expiryYear: 2027,
-        cvv: 'encrypted_cvv',
-        status: 'active',
-        spendingLimit,
-        merchantCategory,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        provider: 'weavr',
-        providerCardId: `weavr_${Date.now()}`,
-      });
+      // No Weavr integration exists yet; never return a placeholder card.
+      return json(501, { error: 'Provider not available' });
     }
 
     return badRequest('Unsupported provider');
@@ -404,39 +466,42 @@ const handleUpdate = async (cardId: string, event: NetlifyEvent, userId: string)
     const ownershipFailure = await verifyCardOwnership(cardId, userId);
     if (ownershipFailure) return ownershipFailure;
 
-    const client = ensureStripe();
-    const payload = event.body ? JSON.parse(event.body) : {};
-    const { status, spendingLimits, allowedCategories, blockedCategories } = payload ?? {};
+    let payload: Record<string, unknown>;
+    try {
+      const parsed = event.body ? JSON.parse(event.body) : {};
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return badRequest('Invalid JSON body');
+      }
+      payload = parsed as Record<string, unknown>;
+    } catch {
+      return badRequest('Invalid JSON body');
+    }
 
-    // First verify ownership
-    const existing = await client.issuing.cards.retrieve(cardId);
-    if (existing.metadata?.user_id !== userId) {
-      return json(403, { error: 'Access denied' });
+    const { status } = payload;
+    if (status !== undefined && !(typeof status === 'string' && ['active', 'inactive', 'canceled'].includes(status))) {
+      return badRequest('Unsupported status');
+    }
+    const controls = parseUpdateControls(payload);
+    if (typeof controls === 'string') {
+      return badRequest(controls);
     }
 
     const updateParams: Stripe.Issuing.CardUpdateParams = {};
-
-    if (status && ['active', 'inactive', 'canceled'].includes(status)) {
-      updateParams.status = status as Stripe.Issuing.Card.Status;
+    if (status !== undefined) {
+      updateParams.status = status as Stripe.Issuing.CardUpdateParams.Status;
+    }
+    if (controls) {
+      updateParams.spending_controls = controls;
+    }
+    if (Object.keys(updateParams).length === 0) {
+      return badRequest('Nothing to update');
     }
 
-    if (spendingLimits || allowedCategories || blockedCategories) {
-      updateParams.spending_controls = {};
-
-      if (Array.isArray(spendingLimits)) {
-        updateParams.spending_controls.spending_limits = spendingLimits.map((limit) => ({
-          amount: Math.round((limit.amount ?? 0) * 100),
-          interval: limit.interval,
-        }));
-      }
-
-      if (Array.isArray(allowedCategories)) {
-        updateParams.spending_controls.allowed_categories = allowedCategories;
-      }
-
-      if (Array.isArray(blockedCategories)) {
-        updateParams.spending_controls.blocked_categories = blockedCategories;
-      }
+    const client = ensureStripe();
+    // Second ownership check against the card's own metadata.
+    const existing = await client.issuing.cards.retrieve(cardId);
+    if (existing.metadata?.user_id !== userId) {
+      return json(403, { error: 'Access denied' });
     }
 
     const updatedCard = await client.issuing.cards.update(cardId, updateParams);
