@@ -5,6 +5,16 @@ import { FEATURE_FLAGS as HARDCODED_FLAGS } from '@/config/featureFlags';
 
 export type FeatureFlagMap = Record<string, boolean>;
 
+/**
+ * Key of the Virtual Cards screen gate.
+ *
+ * It is the same key the flag carries in `sm_feature_flags`, so the gate can be
+ * flipped without a deploy. It defaults to `false` in `config/featureFlags.ts`:
+ * the screen must not show card data until the live card list is available
+ * end to end (see docs/agents/EXECUTION_PLAN.md, card S103).
+ */
+export const VIRTUAL_CARDS_FLAG = 'virtualCardsEnabled';
+
 async function fetchFeatureFlags(): Promise<FeatureFlagMap> {
   if (!isSupabaseEnvConfigured) {
     return { ...HARDCODED_FLAGS };
@@ -89,4 +99,17 @@ export const useSupabaseFeatureFlags = () => {
     isError: query.isError,
     refetch: query.refetch,
   };
+};
+
+/**
+ * Gate for the Virtual Cards screen.
+ *
+ * It resolves from the same `sm_feature_flags` row as every other flag and
+ * falls back to `config/featureFlags.ts`, where it defaults to `false`. A
+ * missing row, a failed fetch or a missing Supabase configuration therefore all
+ * resolve to "off" — the screen never renders card data it cannot vouch for.
+ */
+export const useVirtualCardsEnabled = (): { enabled: boolean; isLoading: boolean } => {
+  const { isEnabled, isLoading } = useSupabaseFeatureFlags();
+  return { enabled: isEnabled(VIRTUAL_CARDS_FLAG), isLoading };
 };
