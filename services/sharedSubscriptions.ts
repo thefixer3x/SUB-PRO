@@ -1,5 +1,4 @@
 import { SharedGroup, GroupMember, GroupInvitation, SplitCalculation } from '@/types/social';
-import { splitwiseService } from './splitwise';
 
 class SharedSubscriptionsService {
   async createSharedGroup(data: {
@@ -24,7 +23,7 @@ class SharedSubscriptionsService {
 
       const group = await response.json();
 
-      // Create corresponding Splitwise group
+      // Create corresponding Splitwise group via server-side proxy
       try {
         const splitwiseMembers = data.members.map(member => ({
           email: member.email,
@@ -32,18 +31,30 @@ class SharedSubscriptionsService {
           last_name: member.name.split(' ').slice(1).join(' ') || '',
         }));
 
-        const splitwiseGroup = await splitwiseService.createGroup({
-          name: data.name,
-          description: data.description,
-          members: splitwiseMembers,
+        const swResponse = await fetch('/api/splitwise', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'create_group',
+            groupData: {
+              name: data.name,
+              description: data.description,
+              members: splitwiseMembers,
+            },
+          }),
         });
 
-        // Update our group with Splitwise ID
-        await this.updateGroupSplitwise(group.id, splitwiseGroup.id);
-        group.splitwiseGroupId = splitwiseGroup.id;
+        if (swResponse.ok) {
+          const swResult = await swResponse.json();
+          const splitwiseGroup = swResult.group;
+
+          // Update our group with Splitwise ID
+          await this.updateGroupSplitwise(group.id, splitwiseGroup.id);
+          group.splitwiseGroupId = splitwiseGroup.id;
+        }
+        // If Splitwise fails, continue without it (graceful degradation)
       } catch (error) {
         console.error('Failed to create Splitwise group:', error);
-        // Continue without Splitwise integration
       }
 
       return group;
@@ -130,13 +141,25 @@ class SharedSubscriptionsService {
         throw new Error('Failed to remove member');
       }
 
-      // Also remove from Splitwise if integrated
+      // Also remove from Splitwise if integrated via server-side proxy
       const group = await this.getSharedGroup(groupId);
       if (group?.splitwiseGroupId) {
         try {
           const member = await this.getGroupMember(memberId);
           if (member?.userId) {
-            await splitwiseService.removeMemberFromGroup(parseInt(group.splitwiseGroupId), parseInt(member.userId));
+            const swResponse = await fetch('/api/splitwise', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'remove_member',
+                groupId: parseInt(group.splitwiseGroupId),
+                userId: parseInt(member.userId),
+              }),
+            });
+            // Ignore failures — graceful degradation
+            if (!swResponse.ok) {
+              console.error('Failed to remove member from Splitwise:', swResponse.status);
+            }
           }
         } catch (error) {
           console.error('Failed to remove member from Splitwise:', error);
@@ -179,7 +202,7 @@ class SharedSubscriptionsService {
         throw new Error('Failed to add expense');
       }
 
-      // Also add to Splitwise if integrated
+      // Also add to Splitwise if integrated via server-side proxy
       const group = await this.getSharedGroup(data.groupId);
       if (group?.splitwiseGroupId) {
         try {
@@ -194,13 +217,24 @@ class SharedSubscriptionsService {
                 owed_share: (data.amount * m.sharePercentage) / 100,
               }));
 
-            await splitwiseService.addExpense({
-              group_id: parseInt(group.splitwiseGroupId),
-              description: data.description,
-              cost: data.amount,
-              paid_by_user: parseInt(paidByMember.userId),
-              users: splitUsers,
+            const swResponse = await fetch('/api/splitwise', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'add_expense',
+                expenseData: {
+                  group_id: parseInt(group.splitwiseGroupId),
+                  description: data.description,
+                  cost: data.amount,
+                  paid_by_user: parseInt(paidByMember.userId),
+                  users: splitUsers,
+                },
+              }),
             });
+            // Ignore failures — graceful degradation
+            if (!swResponse.ok) {
+              console.error('Failed to add expense to Splitwise:', swResponse.status);
+            }
           }
         } catch (error) {
           console.error('Failed to add expense to Splitwise:', error);
@@ -229,10 +263,21 @@ class SharedSubscriptionsService {
     try {
       const group = await this.getSharedGroup(groupId);
       
-      // Delete from Splitwise first if integrated
+      // Delete from Splitwise first if integrated via server-side proxy
       if (group?.splitwiseGroupId) {
         try {
-          await splitwiseService.deleteGroup(parseInt(group.splitwiseGroupId));
+          const swResponse = await fetch('/api/splitwise', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'delete_group',
+              groupId: parseInt(group.splitwiseGroupId),
+            }),
+          });
+          // Ignore failures — graceful degradation
+          if (!swResponse.ok) {
+            console.error('Failed to delete Splitwise group:', swResponse.status);
+          }
         } catch (error) {
           console.error('Failed to delete Splitwise group:', error);
         }

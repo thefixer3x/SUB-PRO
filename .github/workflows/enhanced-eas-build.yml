@@ -31,6 +31,9 @@ on:
         default: false
         type: boolean
 
+permissions:
+  contents: read
+
 env:
   NODE_VERSION: 22
   EAS_CLI_VERSION: latest
@@ -49,10 +52,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808476332228c1c1
         
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -111,10 +114,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808476332228c1c1
         
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -146,7 +149,7 @@ jobs:
       - name: Security audit
         run: |
           echo "🔒 Running security audit..."
-          echo "Skipping npm audit in CI until dependency noise is resolved" || true
+          npm audit --omit=dev --audit-level=high || echo "⚠️ Audit found vulnerabilities — review output above"
         continue-on-error: true
         
       - name: Pre-build Bundle Test
@@ -184,10 +187,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808476332228c1c1
         
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -285,7 +288,7 @@ jobs:
           
       - name: Upload build artifacts
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b53bb5161b
         with:
           name: build-results-${{ matrix.platform }}
           path: build-result.json
@@ -299,10 +302,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808476332228c1c1
         
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -345,7 +348,7 @@ jobs:
           
       - name: Upload update artifacts
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b53bb5161b
         with:
           name: update-results
           path: update-result.json
@@ -364,10 +367,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808476332228c1c1
         
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'

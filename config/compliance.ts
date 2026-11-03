@@ -5,7 +5,8 @@ export const COMPLIANCE_CONFIG: ComplianceConfig = {
     enabled: true,
     frequency: 'daily',
     scoreThreshold: 60, // Show warning below this score
-    haveIBeenPwnedApiKey: process.env.HAVEIBEENPWNED_API_KEY,
+    // NOTE: HIBP API key is held server-side in netlify/functions/hibp-check.ts.
+    // Client code calls /api/hibp-check for breach lookups; never read HAVEIBEENPWNED_API_KEY in client code.
   },
   dataRetention: {
     auditLogsRetentionDays: 365, // 1 year

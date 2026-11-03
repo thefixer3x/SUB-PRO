@@ -47,7 +47,9 @@ class SplitwiseService {
 
   constructor() {
     this.config = {
-      apiKey: process.env.SPLITWISE_API_KEY || '',
+      // ⚠️ DEPRECATED: Splitwise API calls are now handled via server-side proxy at /api/splitwise
+      // This client-side service no longer holds credentials. Keys are in Netlify functions.
+      apiKey: '',
       baseUrl: 'https://secure.splitwise.com/api/v3.0',
     };
   }
