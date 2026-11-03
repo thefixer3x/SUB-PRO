@@ -92,21 +92,21 @@ class DatabaseService {
 
   // Store virtual card reference (non-sensitive data only)
   async storeVirtualCardReference(userId: string, cardData: {
-    stripe_card_id: string;
+    card_id: string;
     last4: string;
     brand: string;
     status: string;
     subscription_id?: string;
   }) {
     try {
-      console.log('Storing virtual card reference:', { userId, cardId: cardData.stripe_card_id });
+      console.log('Storing virtual card reference:', { userId, cardId: cardData.card_id });
 
       // Store only non-sensitive card metadata
       const { data: cardRef, error: cardError } = await this
         .from('virtual_cards')
         .insert({
           user_id: userId,
-          stripe_card_id: cardData.stripe_card_id,
+          card_id: cardData.card_id,
           last4: cardData.last4,
           brand: cardData.brand,
           status: cardData.status,

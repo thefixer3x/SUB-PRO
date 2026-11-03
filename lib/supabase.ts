@@ -318,7 +318,8 @@ export type Database = {
         Row: {
           id: string;
           user_id: string;
-          stripe_card_id: string;
+          card_id: string;
+          cardholder_id: string | null;
           last4: string;
           brand: string;
           status: string;
@@ -329,7 +330,8 @@ export type Database = {
         Insert: {
           id?: string;
           user_id: string;
-          stripe_card_id: string;
+          card_id: string;
+          cardholder_id?: string | null;
           last4: string;
           brand: string;
           status: string;
@@ -340,7 +342,8 @@ export type Database = {
         Update: {
           id?: string;
           user_id?: string;
-          stripe_card_id?: string;
+          card_id?: string;
+          cardholder_id?: string | null;
           last4?: string;
           brand?: string;
           status?: string;
