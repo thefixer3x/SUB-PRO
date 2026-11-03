@@ -8,7 +8,11 @@ export const FEATURE_FLAGS = {
   
   // Embedded Finance umbrella feature
   EMBEDDED_FINANCE: true,
-  VIRTUAL_CARDS: true,
+  // Virtual cards are not user-ready yet: the screen ships behind a gate that
+  // stays off until the live card list is served by an authorized backend.
+  // The key matches the `sm_feature_flags.name` row, so it can be flipped
+  // without a deploy. See docs/agents/EXECUTION_PLAN.md (card S103).
+  virtualCardsEnabled: false,
   CREDIT_SERVICE: false, // Coming soon
   CANCELLATION_BOT: true,
   AI_ASSISTANT: true, // Future flag for premium users
@@ -25,11 +29,12 @@ export const FEATURE_FLAGS = {
   PARTNER_HUB: false,
 };
 
-// If running in development mode, enable core features only
+// If running in development mode, enable core features only.
+// `virtualCardsEnabled` is deliberately not enabled here: the gate must stay
+// off in development too, until the live card list is wired up (card S103).
 if (__DEV__) {
   FEATURE_FLAGS.DARK_MODE = true;
   FEATURE_FLAGS.COMMUNITY_STATS = true;
   FEATURE_FLAGS.EMBEDDED_FINANCE = true;
-  FEATURE_FLAGS.VIRTUAL_CARDS = true;
   FEATURE_FLAGS.CANCELLATION_BOT = true;
 }
