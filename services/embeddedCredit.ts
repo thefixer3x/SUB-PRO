@@ -5,6 +5,34 @@ import {
   EmbeddedCreditSubscription,
   EmbeddedCreditConfig
 } from '@/types/embeddedCredit';
+import { FEATURE_FLAGS } from '@/config/featureFlags';
+
+/**
+ * Thrown when a caller reaches for embedded credit while the feature is off.
+ *
+ * Embedded credit has no provider behind it yet: every value this service
+ * returns is simulated. Failing loudly keeps a simulated approval from ever
+ * reaching a screen (see issue #39).
+ */
+export class EmbeddedCreditDisabledError extends Error {
+  constructor(operation: string) {
+    super(`Embedded credit is disabled: "${operation}" is unavailable.`);
+    this.name = 'EmbeddedCreditDisabledError';
+  }
+}
+
+/**
+ * Whether the embedded credit feature is enabled.
+ *
+ * Reads the static flag from `config/featureFlags.ts` on purpose and not the
+ * DB-backed `sm_feature_flags` table: a row flip in the database must never be
+ * able to put a simulated credit approval in front of a user. The flag ships
+ * off (`CREDIT_SERVICE: false`) and the development overrides in that file do
+ * not turn it on.
+ */
+export function isEmbeddedCreditEnabled(): boolean {
+  return FEATURE_FLAGS.CREDIT_SERVICE === true;
+}
 
 class EmbeddedCreditService {
   private config: EmbeddedCreditConfig = {
@@ -21,7 +49,21 @@ class EmbeddedCreditService {
     },
   };
 
+  /**
+   * Single choke point for the feature flag.
+   *
+   * Every method below returns simulated data (fake limits, fake settlements,
+   * fake approvals). While the flag is off they must not hand any of it out,
+   * so each one calls this first and throws instead.
+   */
+  private assertEnabled(operation: string): void {
+    if (!isEmbeddedCreditEnabled()) {
+      throw new EmbeddedCreditDisabledError(operation);
+    }
+  }
+
   async getCreditAccount(userId: string): Promise<EmbeddedCreditAccount | null> {
+    this.assertEnabled('getCreditAccount');
     // TODO: Replace with actual API call
     return {
       id: `credit_${userId}`,
@@ -40,6 +82,7 @@ class EmbeddedCreditService {
   }
 
   async createCreditAccount(userId: string, creditLimit?: number): Promise<EmbeddedCreditAccount> {
+    this.assertEnabled('createCreditAccount');
     // TODO: Replace with actual API call to create credit account
     // This would involve credit checks, KYC verification, etc.
     const account: EmbeddedCreditAccount = {
@@ -65,6 +108,7 @@ class EmbeddedCreditService {
     monthlyAmount: number,
     vendorName: string
   ): Promise<EmbeddedCreditSubscription> {
+    this.assertEnabled('enableSubscriptionCredit');
     // TODO: Replace with actual API call
     const creditSubscription: EmbeddedCreditSubscription = {
       id: `credit_sub_${Date.now()}`,
@@ -88,6 +132,7 @@ class EmbeddedCreditService {
     amount: number,
     vendorName: string
   ): Promise<EmbeddedCreditTransaction> {
+    this.assertEnabled('processSubscriptionPayment');
     // TODO: Replace with actual payment processing
     const transaction: EmbeddedCreditTransaction = {
       id: `txn_${Date.now()}`,
@@ -106,6 +151,7 @@ class EmbeddedCreditService {
   }
 
   async getMonthlySettlement(accountId: string, month?: string): Promise<MonthlySettlement | null> {
+    this.assertEnabled('getMonthlySettlement');
     // TODO: Replace with actual API call
     // Mock current month settlement
     const now = new Date();
@@ -132,6 +178,7 @@ class EmbeddedCreditService {
     limit = 50,
     offset = 0
   ): Promise<EmbeddedCreditTransaction[]> {
+    this.assertEnabled('getTransactionHistory');
     // TODO: Replace with actual API call
     // Mock transaction history
     const mockTransactions: EmbeddedCreditTransaction[] = [
@@ -177,11 +224,13 @@ class EmbeddedCreditService {
   }
 
   async toggleAutoPay(accountId: string, enabled: boolean): Promise<void> {
+    this.assertEnabled('toggleAutoPay');
     // TODO: Replace with actual API call
     console.log(`Auto-pay ${enabled ? 'enabled' : 'disabled'} for account ${accountId}`);
   }
 
   async updatePaymentMethod(accountId: string, paymentMethodId: string): Promise<void> {
+    this.assertEnabled('updatePaymentMethod');
     // TODO: Replace with actual API call
     console.log(`Payment method updated for account ${accountId}: ${paymentMethodId}`);
   }
@@ -191,6 +240,7 @@ class EmbeddedCreditService {
     reasons?: string[];
     suggestedCreditLimit?: number;
   }> {
+    this.assertEnabled('checkEligibility');
     // TODO: Replace with actual credit check API
     // Mock eligibility check
     return {
@@ -212,6 +262,7 @@ class EmbeddedCreditService {
   }
 
   getConfig(): EmbeddedCreditConfig {
+    this.assertEnabled('getConfig');
     return { ...this.config };
   }
 }

@@ -9,6 +9,7 @@ import {
 import type { ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { AppState, type AppStateStatus } from 'react-native';
+import * as Crypto from 'expo-crypto';
 import {
   supabase,
   type Database,
@@ -67,7 +68,11 @@ const mockDelay = (duration = 450) =>
 const createMockUser = (email: string, fullName?: string): User => {
   const now = new Date().toISOString();
   return {
-    id: `mock-user-${Math.random().toString(36).slice(2, 10)}`,
+    // The mock user id is used as an ownership key by card and subscription
+    // APIs, so it must not be guessable: `Math.random()` is not a CSPRNG and
+    // CodeQL flags it as insecure randomness in a security context.
+    // `expo-crypto` provides a real CSPRNG on native and web.
+    id: `mock-user-${Crypto.randomUUID()}`,
     app_metadata: { provider: 'email', providers: ['email'] },
     aud: 'authenticated',
     created_at: now,
