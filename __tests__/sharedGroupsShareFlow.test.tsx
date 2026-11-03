@@ -110,4 +110,35 @@ describe('Shared Groups share flow', () => {
       expect(screen.queryByText('Share Subscription')).toBeNull();
     });
   });
+
+  it('reloads the shared groups list when the share modal closes', async () => {
+    const { act } = require('@testing-library/react-native');
+    const { sharedSubscriptionsService } = require('@/services/sharedSubscriptions');
+    const { ShareSubscriptionModal } = require('@/components/social/ShareSubscriptionModal');
+    const loadGroups = sharedSubscriptionsService.getUserSharedGroups as jest.Mock;
+    loadGroups.mockClear();
+
+    renderScreen();
+
+    fireEvent.press(await screen.findByText('Create a Shared Group'));
+    await waitFor(() => {
+      expect(screen.getByText('Choose a Subscription')).toBeTruthy();
+    });
+    fireEvent.press(screen.getAllByText('Share')[0]);
+    await waitFor(() => {
+      expect(screen.getByText('Share Subscription')).toBeTruthy();
+    });
+
+    const callsBeforeClose = loadGroups.mock.calls.length;
+
+    // The modal may have created a group before closing, so closing it must refetch the
+    // list rather than leave the stale snapshot SharedGroupsDisplay captured on mount.
+    act(() => {
+      screen.UNSAFE_getByType(ShareSubscriptionModal).props.onClose();
+    });
+
+    await waitFor(() => {
+      expect(loadGroups.mock.calls.length).toBeGreaterThan(callsBeforeClose);
+    });
+  });
 });

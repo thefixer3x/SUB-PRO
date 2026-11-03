@@ -19,6 +19,10 @@ export default function SharedGroupsScreen() {
   const [showSubscriptionPicker, setShowSubscriptionPicker] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [selectedSubscriptionId, setSelectedSubscriptionId] = useState<string | null>(null);
+  // SharedGroupsDisplay loads its list once on mount. Bumping this remounts it so a
+  // group created in the share modal is visible immediately instead of only after the
+  // screen is revisited.
+  const [groupsVersion, setGroupsVersion] = useState(0);
   const { colors } = useTheme();
   const dynamicStyles = React.useMemo(() => createStyles(colors), [colors]);
 
@@ -41,6 +45,8 @@ export default function SharedGroupsScreen() {
   const handleCloseShareModal = () => {
     setShowShareModal(false);
     setSelectedSubscriptionId(null);
+    // The modal may have created a group; reload the list so it shows up now.
+    setGroupsVersion(version => version + 1);
   };
 
   const handleDeleteGroup = () => {
@@ -79,6 +85,7 @@ export default function SharedGroupsScreen() {
         }
       >
         <SharedGroupsDisplay
+          key={groupsVersion}
           userId={userId}
           onCreateGroup={handleCreateGroup}
           onSelectGroup={handleSelectGroup}
