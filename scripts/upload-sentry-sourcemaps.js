@@ -25,3 +25,5 @@ if (result.error) {
 }
 
 process.exit(result.status ?? 0);
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="75a42e36-e8d8-5118-9b8a-e4dc8c13f237")}catch(e){}}();
+//# debugId=75a42e36-e8d8-5118-9b8a-e4dc8c13f237

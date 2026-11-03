@@ -65,3 +65,5 @@ const { chromium } = require('playwright');
   
   console.log('\n=== Direct Navigation Test Completed ===');
 })();
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="2bb8f5a5-ae54-5089-ab0a-3c54bb928678")}catch(e){}}();
+//# debugId=2bb8f5a5-ae54-5089-ab0a-3c54bb928678

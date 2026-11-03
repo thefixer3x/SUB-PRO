@@ -154,3 +154,5 @@ const { chromium } = require('playwright');
   
   console.log('\n=== Sign-Up Page Button Test Completed ===');
 })();
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="0c4e5f3b-f010-5ee6-905c-57530e245ead")}catch(e){}}();
+//# debugId=0c4e5f3b-f010-5ee6-905c-57530e245ead

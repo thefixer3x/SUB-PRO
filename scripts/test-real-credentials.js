@@ -132,3 +132,5 @@ const { chromium } = require('playwright');
   console.log('\n=== Sign-Up Functionality Test Completed ===');
   console.log('With real Supabase credentials, the authentication should now work properly!');
 })();
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="d0ec3b8a-4482-59a8-99ca-5e1c291758a7")}catch(e){}}();
+//# debugId=d0ec3b8a-4482-59a8-99ca-5e1c291758a7

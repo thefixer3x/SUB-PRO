@@ -28,3 +28,5 @@ const { webkit } = require('@playwright/test');
   await page.waitForTimeout(5000);
   await browser.close();
 })();
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="dba39c90-9c48-5201-aed3-0fdfd4e59195")}catch(e){}}();
+//# debugId=dba39c90-9c48-5201-aed3-0fdfd4e59195

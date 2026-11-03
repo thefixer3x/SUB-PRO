@@ -35,3 +35,5 @@ const webSecureStore = {
 };
 
 module.exports = webSecureStore;
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="d7188abf-6769-5a02-9cb5-739384e527ef")}catch(e){}}();
+//# debugId=d7188abf-6769-5a02-9cb5-739384e527ef

@@ -53,3 +53,5 @@ const { chromium } = require('playwright');
   
   console.log('\nTest completed. Check the screenshot to see what is being rendered.');
 })();
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="4d79baba-64da-5584-9e3d-e75c27a51a9f")}catch(e){}}();
+//# debugId=4d79baba-64da-5584-9e3d-e75c27a51a9f

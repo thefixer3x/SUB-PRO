@@ -134,3 +134,5 @@ if (require.main === module) {
 }
 
 module.exports = { testProfilesTable };
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="72df8bfe-b490-5b95-bc5c-a68ad06bdd25")}catch(e){}}();
+//# debugId=72df8bfe-b490-5b95-bc5c-a68ad06bdd25

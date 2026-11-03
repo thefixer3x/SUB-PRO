@@ -86,3 +86,5 @@ const { chromium } = require('playwright');
   
   console.log('\n=== Sign-In Page Access Test Completed ===');
 })();
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="9ee5c164-b1af-5210-9673-01f02d2ad002")}catch(e){}}();
+//# debugId=9ee5c164-b1af-5210-9673-01f02d2ad002

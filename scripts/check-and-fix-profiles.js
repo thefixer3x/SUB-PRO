@@ -309,3 +309,5 @@ if (require.main === module) {
 }
 
 module.exports = { checkProfilesTable, fixMissingEmails, fixInvalidTimestamps };
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="f6320a9b-2192-5eac-a6cf-448c0a6c7e84")}catch(e){}}();
+//# debugId=f6320a9b-2192-5eac-a6cf-448c0a6c7e84

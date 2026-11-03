@@ -22,3 +22,5 @@ if (supabaseUrl && supabaseAnonKey) {
   console.log('   EXPO_PUBLIC_SUPABASE_URL=your_supabase_project_url');
   console.log('   EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key');
 }
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="40411c93-4376-5931-9bc5-5428ff3104e3")}catch(e){}}();
+//# debugId=40411c93-4376-5931-9bc5-5428ff3104e3

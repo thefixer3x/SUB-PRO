@@ -35,3 +35,5 @@ if (!isSupabaseEnvConfigured) {
 
 console.log('');
 console.log('=== End Debug Test ===');
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="c24292ea-44d4-55c9-9b2f-7d9b0f7890ce")}catch(e){}}();
+//# debugId=c24292ea-44d4-55c9-9b2f-7d9b0f7890ce

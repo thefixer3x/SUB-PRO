@@ -68,3 +68,5 @@ if (problems.length > 0) {
 } else {
   console.log('\nSupabase public config looks valid.');
 }
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="80c31bd0-0d52-5306-987e-a65bf21af157")}catch(e){}}();
+//# debugId=80c31bd0-0d52-5306-987e-a65bf21af157

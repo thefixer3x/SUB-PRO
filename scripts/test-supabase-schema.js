@@ -213,3 +213,5 @@ if (require.main === module) {
 }
 
 module.exports = { testSupabaseSchema };
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="fc4bdfa7-86c3-566a-b632-eb7b47a48375")}catch(e){}}();
+//# debugId=fc4bdfa7-86c3-566a-b632-eb7b47a48375

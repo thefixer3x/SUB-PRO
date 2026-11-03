@@ -187,3 +187,5 @@ const { chromium } = require('playwright');
   
   console.log('\n=== Button Click Test Completed ===');
 })();
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="1da216b9-c45e-554f-9ac5-1c22e6aeb470")}catch(e){}}();
+//# debugId=1da216b9-c45e-554f-9ac5-1c22e6aeb470
