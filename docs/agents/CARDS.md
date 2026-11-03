@@ -1,4 +1,6 @@
-# Agent work cards
+# Agent work cards (history)
+
+> **Superseded for open work by [`EXECUTION_PLAN.md`](EXECUTION_PLAN.md)** (2026-11-03). Hermes seeds from the plan now. Cards here stay as the record of what C01–C13 and M00–M05 meant; the plan says which are done and which were folded into sprint cards.
 
 Each card is one objective. Read `docs/agents/WORKER_GUIDE.md` first; its rules override anything here. Card IDs (C01…) are stable; Hermes card titles start with them. `scripts/hermes/seed-cards.sh` creates these cards on a Hermes Kanban board.
 
