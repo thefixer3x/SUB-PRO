@@ -44,6 +44,11 @@ jest.mock('@supabase/supabase-js', () => {
       rowLimit = value;
       return builder;
     });
+    builder.insert = jest.fn(async (row: Row) => {
+      mockState.inserted.push({ table, row });
+      ((mockState.tables as Record<string, Row[]>)[table] ??= []).push(row);
+      return { data: null, error: null };
+    });
     builder.maybeSingle = jest.fn(async () => {
       const rows = (mockState.tables as Record<string, Row[]>)[table] ?? [];
       const filtered = rows.filter((row) =>
@@ -420,6 +425,12 @@ describe('card ownership', () => {
     expect(mockStripeApi.issuing.cards.update).not.toHaveBeenCalled();
   });
 
+  it('rejects a positive amount that rounds to zero cents', async () => {
+    const result = await patchOwn({ spendingLimits: [{ amount: 0.001, interval: 'monthly' }] });
+    expect(result.statusCode).toBe(400);
+    expect(mockStripeApi.issuing.cards.update).not.toHaveBeenCalled();
+  });
+
   it('applies valid limits and allowlisted categories in cents', async () => {
     const result = await patchOwn({
       spendingLimits: [{ amount: 25.5, interval: 'monthly' }],
@@ -432,6 +443,23 @@ describe('card ownership', () => {
         spending_limits: [{ amount: 2550, interval: 'monthly' }],
       },
     });
+  });
+
+  it('stops scanning after the page budget and returns a resume cursor', async () => {
+    let page = 0;
+    mockStripeApi.issuing.cards.list.mockImplementation(async () => {
+      page += 1;
+      return { data: [{ id: `ic_foreign_${page}`, status: 'active', metadata: { user_id: OTHER_USER_ID } }], has_more: true };
+    });
+
+    const result = await handler(makeEvent({ path: '/embedded-finance/virtual-cards/list' }));
+
+    expect(result.statusCode).toBe(200);
+    expect(mockStripeApi.issuing.cards.list).toHaveBeenCalledTimes(5);
+    const body = parseBody(result);
+    expect(body.cards).toHaveLength(0);
+    expect(body.has_more).toBe(true);
+    expect(body.next_cursor).toBe('ic_foreign_5');
   });
 
   it('only lists the cards of the signed in user', async () => {
@@ -679,6 +707,33 @@ describe('create', () => {
     const result = await handler(makeEvent({ httpMethod: 'POST', path: '/embedded-finance/virtual-cards/create', body: JSON.stringify({ ...validCreate, provider: 'weavr' }) }));
     expect(result.statusCode).toBe(501);
     expect(parseBody(result).last4).toBeUndefined();
+  });
+
+  it('rejects a monthly spending limit above the cap on create', async () => {
+    const result = await handler(makeEvent({ httpMethod: 'POST', path: '/embedded-finance/virtual-cards/create', body: JSON.stringify({ ...validCreate, spendingLimit: 100000 }) }));
+    expect(result.statusCode).toBe(400);
+    expect(mockStripeApi.issuing.cards.create).not.toHaveBeenCalled();
+  });
+
+  it('records the ownership row at creation so the owner can manage the card at once', async () => {
+    const result = await handler(makeEvent({ httpMethod: 'POST', path: '/embedded-finance/virtual-cards/create', body: JSON.stringify(validCreate) }));
+    expect(result.statusCode).toBe(200);
+    const rows = mockState.inserted.filter((entry) => entry.table === 'virtual_cards');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].row).toMatchObject({ user_id: SESSION_USER_ID, card_id: 'ic_new' });
+
+    mockStripeApi.issuing.cards.retrieve.mockResolvedValue({
+      id: 'ic_new', status: 'active', type: 'virtual', brand: 'visa', last4: '4242',
+      currency: 'usd', created: 1700000000, metadata: { user_id: SESSION_USER_ID }, spending_controls: {},
+    });
+    const retrieved = await handler(makeEvent({ path: '/embedded-finance/virtual-cards/ic_new' }));
+    expect(retrieved.statusCode).toBe(200);
+  });
+
+  it('does not insert a second ownership row when one already exists', async () => {
+    mockState.tables.virtual_cards = [{ card_id: 'ic_new', user_id: SESSION_USER_ID }];
+    await handler(makeEvent({ httpMethod: 'POST', path: '/embedded-finance/virtual-cards/create', body: JSON.stringify(validCreate) }));
+    expect(mockState.inserted.filter((entry) => entry.table === 'virtual_cards')).toHaveLength(0);
   });
 
   it('omits phone_number when no phone is provided', async () => {

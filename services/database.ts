@@ -101,6 +101,20 @@ class DatabaseService {
     try {
       console.log('Storing virtual card reference:', { userId, cardId: cardData.card_id });
 
+      // Idempotent: card creation may already have stored this row.
+      const { data: existing, error: readError } = await this
+        .from('virtual_cards')
+        .select('card_id')
+        .eq('card_id', cardData.card_id)
+        .limit(1);
+      if (readError) {
+        console.error('Error checking virtual card reference:', readError);
+        return false;
+      }
+      if (Array.isArray(existing) && existing.length > 0) {
+        return true;
+      }
+
       // Store only non-sensitive card metadata
       const { data: cardRef, error: cardError } = await this
         .from('virtual_cards')
