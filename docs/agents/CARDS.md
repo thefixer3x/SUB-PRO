@@ -109,6 +109,51 @@ Each card is one objective. Read `docs/agents/WORKER_GUIDE.md` first; its rules 
   - Leave OTA signing and ESLint major versions as notes.
 - **Done when:** lint and tests pass, and each sub-item is ticked in the PR.
 
+## Wave 4: Vercel migration (plan: `docs/agents/VERCEL_MIGRATION.md`)
+
+Vercel (`sub-pro.lanonasis.com`) is the canonical web and payments host. Netlify is deprecated. From now on, server code goes in `server/` (shared logic) and `api/` (Vercel handlers), never in new `netlify/functions/` files. **This overrides the Netlify paths in C02, C06 and C08:** C02's work lands in M00/M02, C06 uses `api/create-checkout-session.ts` and `api/stripe/webhook.ts` from M02, and C08 (already merged as Netlify functions) is redone in M03. Routes follow the route map in the migration plan, section 3.
+
+### M00: Consolidate PRs #57 and #59 into one PR (P0)
+- **Role:** builder
+- **Scope:** branch from `agent/c01-virtual-cards-auth` (#57, it keeps the banking-proxy auth); bring over the useful parts of `fix/review-comments-c01-c03` (#59); close #59.
+- **Do:**
+  - Keep from #59: case-insensitive bearer parsing, 401 for bad tokens vs 503 for an auth outage, body `userId`/`email` ignored, optional phone, non-negative spending limit.
+  - Fix while merging: the 401/503 branch must not dereference a null `error`; ownership checks query `virtual_cards.card_id` (production has no `stripe_card_id` column on that table) with `.maybeSingle()` so another user's card gives 403, not 500; Stripe search values escape `'` as `\'` (one backslash in the final query); no dynamic `import()` inside handlers.
+  - `profiles.billing_address` does not exist in production. Do not read it; take a validated address from the request instead, or block on an owner-approved migration.
+  - Drop commit `96d6027`'s injected Sentry snippets from source files (`index.js`, `metro.config.js`, `babel.config.js`, `jest.config.js`, `scripts/*`, `utils/*`, `docs/archive/*`). Debug IDs belong in build output only (`sentry-cli sourcemaps inject dist/`). Keep the placeholder-only `.env.example`.
+  - C03 is not met by either PR: gate `claude.yml` on `author_association` in OWNER, MEMBER, COLLABORATOR; gate the review workflow the same way (not just "not first-time contributor"); pin `anthropics/claude-code-action` to a commit SHA instead of `@main`.
+- **Done when:** `npx jest netlify` passes (today #57 fails 10 tests, including the other-user card ownership tests, and #59 fails 17), `npm run type-check` has no new errors, and #59 is closed with a link to the new PR.
+
+### M01: Fix `virtual_cards` column drift on main (P0)
+- **Role:** builder
+- **Scope:** `services/database.ts`, `lib/supabase.ts` (virtual_cards types), tests.
+- **Do:** insert into `virtual_cards.card_id` (not `stripe_card_id`); keep `card_authorizations.stripe_card_id`. Regenerate the `virtual_cards` and `profiles` types from the live schema (read-only `generate_typescript_types`), so code stops using columns that do not exist.
+- **Done when:** a test asserts the insert payload uses `card_id`, and the types match the live columns.
+
+### M02: Shared `server/` module and Vercel checkout + webhook (P1)
+- **Role:** builder · **Depends on:** M00, M01, owner entitlement decision (migration plan section 4)
+- **Scope:** new `server/auth.ts`, `server/cors.ts`, `server/stripe.ts`, `server/supabase-admin.ts`, `api/create-checkout-session.ts`, `api/stripe/webhook.ts`, `vercel.json`, `.vercelignore`, ESLint config, tests.
+- **Do:** follow section 3 of the migration plan. Web-standard `Request` handlers; webhook verifies the raw body; skip events whose price `metadata.project !== 'subtrack'`; checkout resolves price by lookup key `subtrack_pro_monthly` and takes user id/email from the session only. Make the Netlify checkout and webhook functions thin adapters over `server/`. Remove the Vercel rewrite to Netlify and exclude `api/` from the SPA rewrite.
+- **Done when:** unit tests cover signature failure (400), foreign-project event skipped (200, no DB write), subscription created for a SubTrack price (DB write under option (b) only; under option (a) no subscription write and Issuing events still handled), and checkout ignoring body ids; a Vercel preview serves `POST /api/stripe/webhook` (not `index.html`).
+- **Owner action:** add `STRIPE_SECRET_KEY`, `ALLOWED_ORIGINS`, `SITE_URL` to Vercel; add lookup key `subtrack_pro_monthly` to the SubTrack Pro monthly price.
+
+### M03: Port virtual cards, banking proxy, HIBP and Splitwise to Vercel (P1)
+- **Role:** builder · **Depends on:** M02
+- **Scope:** `api/embedded-finance/virtual-cards/[...path].ts`, `api/banking/proxy.ts`, `api/hibp-check.ts`, `api/splitwise.ts`, client base URLs and paths in `services/virtualCards.ts`, `services/mcpBankingService.ts`, `services/sharedSubscriptions.ts`, `config/compliance.ts`.
+- **Do:** move the logic into `server/` and add Vercel handlers; replace the broken C08 Netlify functions (`hibp-check.ts`, `splitwise-api.ts`) rather than fixing their imports. Follow the route map (migration plan section 3): native bases end in `/api`; change the native banking path from `/banking-proxy` to `/banking/proxy`; web uses relative `/api/...`.
+- **Done when:** the C01/C08 test suites run against the `api/` handlers and pass, and a test (or preview check) shows every client request URL in the route map reaches its handler, with unknown `/api/*` paths returning 404, not `index.html`.
+
+### M04: Stripe webhook cutover to Vercel (owner, P1)
+- **Role:** owner (builder prepares the checklist in the PR)
+- **Depends on:** M02
+- **Do:** tag endpoint `we_1RiSB62KF4vMCpn8afHaBbrF` with `metadata.project=subtrack`; after a Stripe test-mode run on the preview passes, set its URL to `https://sub-pro.lanonasis.com/api/stripe/webhook`; send a test event and confirm 200 in Vercel logs. Rollback: set the URL back to the Netlify address.
+- **Owner decision first:** entitlement source, see migration plan section 4 (recommended: read `user_tiers`).
+
+### M05: Retire Netlify (P2)
+- **Role:** builder + owner · **Depends on:** M03, M04, and 7 days of clean webhook deliveries
+- **Do:** follow migration plan section 5: legacy-path rewrites in `vercel.json` and `subtrack-pro.lanonasis.com` served by Vercel (no 301), deep-link files on both hosts; then `git mv netlify/ netlify.toml docs/archive/netlify/` and update `WORKER_GUIDE.md` section 1 and the card scopes. Owner moves the `subtrack-pro` DNS to Vercel and stops Netlify builds.
+- **Done when:** every legacy URL in plan section 5 returns the same handler response on Vercel as the new `/api` URL (test or preview check), no file outside `docs/archive/` references Netlify except the documented rewrites, and the web build and tests pass.
+
 ## Review and QA (one per merged PR)
 
 ### R00: Review each agent PR
@@ -121,6 +166,6 @@ Each card is one objective. Read `docs/agents/WORKER_GUIDE.md` first; its rules 
 
 ## Owner-only (not cards for agents)
 
-- Make sure Netlify has `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (the same signing secret as webhook `we_1RiSB…`), `STRIPE_PRICE_PRO_MONTH`, `SITE_URL` and `ALLOWED_ORIGINS`.
+- Until M04 cutover, Netlify keeps `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO_MONTH`, `SITE_URL` and `ALLOWED_ORIGINS`. Vercel needs the same set before M02 ships (it already has `STRIPE_WEBHOOK_SECRET`).
 - Accept the Apple developer agreement. Create the new Google Play account after the rebrand (#42, #43).
 - Apply C09's SQL after review. Baseline migrations with `supabase db pull` (#37).

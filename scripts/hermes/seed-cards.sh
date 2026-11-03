@@ -95,6 +95,13 @@ create_card C10 "Expo Doctor patch alignment"                      "$BUILDER" "$
 create_card C11 "CI supply chain: pins, Dependabot, CodeQL"        "$BUILDER" "$P2" 38 C03
 create_card C12 "Retire unserved app/api routes"                   "$BUILDER" "$P2" 36
 create_card C13 "Hardening bundle"                                 "$BUILDER" "$P3" 41
+# Wave 4: Vercel migration (docs/agents/VERCEL_MIGRATION.md)
+create_card M00 "Consolidate PRs #57 and #59 into one PR"          "$BUILDER" "$P0" 27
+create_card M01 "Fix virtual_cards column drift on main"           "$BUILDER" "$P0" -
+create_card M02 "Shared server/ module + Vercel checkout and webhook" "$BUILDER" "$P1" 28 M00 M01
+create_card M03 "Port cards, banking, HIBP, Splitwise to Vercel"   "$BUILDER" "$P1" 35 M02
+create_card M04 "Stripe webhook cutover to Vercel (owner)"         "$BUILDER" "$P1" 34 M02
+create_card M05 "Retire Netlify"                                    "$BUILDER" "$P2" - M03 M04
 # Review and QA
 create_card R00 "Review each agent PR against WORKER_GUIDE"        "$REVIEWER" "$P1" -
 create_card Q01 "End-to-end smoke test after Wave 2"               "$QA"      "$P1" - C05 C06
