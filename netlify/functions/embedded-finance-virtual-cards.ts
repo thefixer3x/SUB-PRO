@@ -191,6 +191,9 @@ const handleCreate = async (
   }
 };
 
+const escapeStripeSearchValue = (value: string): string =>
+  value.replace(/'/g, String.raw`\'`);
+
 const ensureCustomer = async (
   client: Stripe,
   params: { userId: string; userEmail?: string; userName?: string; subscriptionId: string }
@@ -200,7 +203,7 @@ const ensureCustomer = async (
   try {
     if (userEmail) {
       const existing = await client.customers.search({
-        query: `email:'${userEmail.replace(/'/g, "\\'")}' OR metadata['userId']:'${userId.replace(/'/g, "\\'")}'`,
+        query: `email:'${escapeStripeSearchValue(userEmail)}' OR metadata['userId']:'${escapeStripeSearchValue(userId)}'`,
         limit: 1,
       });
 

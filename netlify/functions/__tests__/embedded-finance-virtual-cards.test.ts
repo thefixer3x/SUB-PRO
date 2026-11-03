@@ -482,7 +482,7 @@ describe('create', () => {
 
   it('escapes the values used in the Stripe customer search', async () => {
     mockState.authUser = {
-      id: SESSION_USER_ID,
+      id: "session'o",
       email: "o'brien@example.com",
       user_metadata: {},
     };
@@ -501,8 +501,7 @@ describe('create', () => {
     );
 
     const searchParams = mockStripeApi.customers.search.mock.calls[0][0];
-    expect(searchParams.query).toContain("email:'o\\'brien@example.com'");
-    expect(searchParams.query).toContain(`metadata['userId']:'${SESSION_USER_ID}'`);
+    expect(searchParams.query).toBe("email:'o\\'brien@example.com' OR metadata['userId']:'session\\'o'");
     expect(searchParams.query).not.toContain('attacker@example.com');
   });
 
