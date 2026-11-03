@@ -51,6 +51,15 @@ updates:
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
       - dependency-name: "@react-native-async-storage/async-storage"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "@stripe/stripe-react-native"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "@sentry/react-native"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # Must equal the react version; moves with react.
+      - dependency-name: "react-test-renderer"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # Pinned by package.json overrides for react-native-reanimated.
+      - dependency-name: "@babel/plugin-transform-shorthand-properties"
       # 0.x font packages: a minor bump can change exports.
       - dependency-name: "@expo-google-fonts/*"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
