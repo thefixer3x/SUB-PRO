@@ -90,8 +90,13 @@ Vercel environment (owner sets these; names only, never values in the repo): `ST
 After 7 days of clean webhook deliveries on Vercel and at least one successful real checkout:
 
 1. `git mv netlify/ netlify.toml docs/archive/netlify/`.
-2. Owner: stop Netlify builds for the `subtrack-pro` site and point `subtrack-pro.lanonasis.com` at a 301 redirect to `sub-pro.lanonasis.com` (Vercel domain redirect, or DNS).
-3. Remove Netlify from `.easignore`/docs, update `WORKER_GUIDE.md` section 1, and drop the Netlify deploy-preview status check from branch protection.
+2. Keep installed apps working. Native builds keep the API base URL they were built with, which may point at `subtrack-pro.lanonasis.com/.netlify/functions`, and `app.json` registers `subtrack-pro.lanonasis.com` for deep links (`applinks`, Android intent filter). So:
+   - Add `subtrack-pro.lanonasis.com` to the Vercel project as a domain that **serves** the app (not a 301: a redirect turns POSTs into GETs and breaks checkout and webhooks).
+   - Add `vercel.json` rewrites from the legacy paths to the new handlers: `/.netlify/functions/create-checkout-session` → `/api/create-checkout-session`, `/.netlify/functions/banking-proxy` and `/banking-proxy` → `/api/banking/proxy`, `/.netlify/functions/embedded-finance-virtual-cards/:path*` and `/embedded-finance/virtual-cards/:path*` → `/api/embedded-finance/virtual-cards/:path*`, `/stripe/webhook` → `/api/stripe/webhook`.
+   - Serve `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json` from Vercel on both hosts, and add `sub-pro.lanonasis.com` to `app.json` associated domains in the next native build.
+   - Keep these rewrites until every supported native build uses the new base URL (owner sets the support window; check the EAS `EXPO_PUBLIC_*_BASE_URL` values per environment first).
+3. Owner: then stop Netlify builds for the `subtrack-pro` site; its DNS now points at Vercel.
+4. Remove Netlify from `.easignore`/docs, update `WORKER_GUIDE.md` section 1, and drop the Netlify deploy-preview status check from branch protection.
 
 ## 6. Cards
 

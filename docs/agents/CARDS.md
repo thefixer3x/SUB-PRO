@@ -151,8 +151,8 @@ Vercel (`sub-pro.lanonasis.com`) is the canonical web and payments host. Netlify
 
 ### M05: Retire Netlify (P2)
 - **Role:** builder + owner · **Depends on:** M03, M04, and 7 days of clean webhook deliveries
-- **Do:** `git mv netlify/ netlify.toml docs/archive/netlify/`; update `WORKER_GUIDE.md` section 1 and the card scopes; owner stops Netlify builds and 301-redirects `subtrack-pro.lanonasis.com` to `sub-pro.lanonasis.com`.
-- **Done when:** no file outside `docs/archive/` references Netlify, and the web build and tests pass.
+- **Do:** follow migration plan section 5: legacy-path rewrites in `vercel.json` and `subtrack-pro.lanonasis.com` served by Vercel (no 301), deep-link files on both hosts; then `git mv netlify/ netlify.toml docs/archive/netlify/` and update `WORKER_GUIDE.md` section 1 and the card scopes. Owner moves the `subtrack-pro` DNS to Vercel and stops Netlify builds.
+- **Done when:** every legacy URL in plan section 5 returns the same handler response on Vercel as the new `/api` URL (test or preview check), no file outside `docs/archive/` references Netlify except the documented rewrites, and the web build and tests pass.
 
 ## Review and QA (one per merged PR)
 
