@@ -282,15 +282,25 @@ describe('checkout: authentication', () => {
   });
 
   it('returns 503 when Supabase env is missing', async () => {
-    const origUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-    const origKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-    process.env.EXPO_PUBLIC_SUPABASE_URL = '';
-    process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY = '';
-    const req = makeRequestObject({ method: 'POST', headers: { Authorization: 'Bearer valid-token' } });
-    const res = await checkoutHandler(req);
-    expect(res.status).toBe(503);
-    process.env.EXPO_PUBLIC_SUPABASE_URL = origUrl!;
-    process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY = origKey!;
+    // server/auth.ts falls back to EXPO_PUBLIC_*, NEXT_PUBLIC_*, SUPABASE_,
+    // SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL, etc. Another test file sets
+    // SUPABASE_URL, so blanking only the EXPO_PUBLIC aliases silently failed.
+    const keys = [
+      'EXPO_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL',
+      'SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY',
+      'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+      'SUPABASE_ANON_KEY', 'EXPO_PUBLIC_SUPABASE_ANON_KEY',
+      'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+    ];
+    const vals = keys.map((k) => process.env[k] ?? '');
+    keys.forEach((k) => delete process.env[k]);
+    try {
+      const req = makeRequestObject({ method: 'POST', headers: { Authorization: 'Bearer valid-token' } });
+      const res = await checkoutHandler(req);
+      expect(res.status).toBe(503);
+    } finally {
+      keys.forEach((k, i) => { process.env[k] = vals[i]!; });
+    }
   });
 });
 
