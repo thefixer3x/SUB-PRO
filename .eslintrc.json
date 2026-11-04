@@ -13,8 +13,8 @@
     "@typescript-eslint/no-wrapper-object-types": "off",
     "no-restricted-imports": ["error", {
       "patterns": [{
-        "group": ["services/database"],
-        "message": "Import services/database only in netlify/functions/ (server-side). For client code, use the Supabase client directly via lib/supabase."
+        "group": ["server/*", "services/database"],
+        "message": "Import server/* or services/database only in netlify/functions/ or api/ (server-side). For client code, use the Supabase client directly via lib/supabase."
       }]
     }]
   }

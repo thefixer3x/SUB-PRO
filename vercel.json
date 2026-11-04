@@ -6,11 +6,7 @@
   "trailingSlash": false,
   "rewrites": [
     {
-      "source": "/api/create-checkout-session",
-      "destination": "https://subtrack-pro.lanonasis.com/.netlify/functions/create-checkout-session"
-    },
-    {
-      "source": "/((?!_expo|static|favicon.ico|manifest.json|service-worker.js).*)",
+      "source": "/((?!api/|_expo|static|favicon.ico|manifest.json|service-worker.js).*)",
       "destination": "/index.html"
     }
   ],

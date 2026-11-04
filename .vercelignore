@@ -6,6 +6,7 @@ supabase/
 __tests__/
 .github/
 netlify/
+node_modules/
 
 # Signing credentials and service-account files must never be uploaded
 *.p8
