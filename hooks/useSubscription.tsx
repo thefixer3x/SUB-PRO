@@ -17,15 +17,48 @@ interface SubscriptionContextType {
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
+/**
+ * Pure tier gate. Denies by default: an unknown, loading or invalid tier
+ * grants nothing. Exported so tests exercise the real implementation rather
+ * than a copy of it.
+ */
+export const canAccessFeatureForTier = (
+  tier: SubscriptionTier | undefined,
+  feature: keyof typeof SUBSCRIPTION_PLANS.free.limits,
+  usage: { subscriptions: number; teamMembers: number },
+): boolean => {
+  if (!tier) return false;
+
+  const plan = SUBSCRIPTION_PLANS[tier];
+  if (!plan) return false;
+
+  const limit = plan.limits[feature];
+
+  if (limit === null || limit === true) return true;
+  if (limit === false) return false;
+
+  if (feature === 'maxSubscriptions') {
+    return typeof limit === 'number' && usage.subscriptions < limit;
+  }
+  if (feature === 'maxTeamMembers') {
+    return typeof limit === 'number' && usage.teamMembers < limit;
+  }
+
+  return true;
+};
+
 export const useSubscription = () => {
   const context = useContext(SubscriptionContext);
   if (!context) {
+    // Outside a provider the tier is unknown, so access is DENIED. Granting
+    // here would hand out paid entitlements to any component rendered outside
+    // the SubscriptionProvider.
     return {
       currentTier: 'free' as SubscriptionTier,
       subscription: null,
-      isLoading: false,
+      isLoading: true,
       error: null,
-      canAccessFeature: () => true,
+      canAccessFeature: () => false,
       getRemainingLimit: () => null,
       upgradeRequired: () => {},
       refreshTier: () => {},
@@ -51,7 +84,10 @@ export const useSubscriptionData = () => {
       setError(null);
 
       if (!user?.id) {
-        setCurrentTier('free' as SubscriptionTier);
+        // No signed-in user, so the tier is genuinely unknown. Leave it
+        // undefined rather than assuming 'free' — canAccessFeature denies on
+        // an unknown tier, and a signed-out visitor must not get entitlements.
+        setCurrentTier(undefined);
         setIsLoading(false);
         return;
       }
@@ -85,28 +121,9 @@ export const useSubscriptionData = () => {
     loadSubscriptionData();
   }, [loadSubscriptionData]);
 
-  const canAccessFeature = (feature: keyof typeof SUBSCRIPTION_PLANS.free.limits): boolean => {
-    // Deny by default when tier is unknown, loading, or the read errored.
-    if (!currentTier) return false;
-
-    const plan = SUBSCRIPTION_PLANS[currentTier];
-    if (!plan) return false;
-
-    const limit = plan.limits[feature];
-
-    if (limit === null || limit === true) return true;
-    if (limit === false) return false;
-
-    // Numeric limits
-    if (feature === 'maxSubscriptions') {
-      return limit === null || (typeof limit === 'number' && currentUsage.subscriptions < limit);
-    }
-    if (feature === 'maxTeamMembers') {
-      return limit === null || (typeof limit === 'number' && currentUsage.teamMembers < limit);
-    }
-
-    return true;
-  };
+  // Deny by default when the tier is unknown, loading, or the read errored.
+  const canAccessFeature = (feature: keyof typeof SUBSCRIPTION_PLANS.free.limits): boolean =>
+    canAccessFeatureForTier(currentTier, feature, currentUsage);
 
   const getRemainingLimit = (feature: keyof typeof SUBSCRIPTION_PLANS.free.limits): number | null => {
     const plan = SUBSCRIPTION_PLANS[currentTier ?? 'free'];

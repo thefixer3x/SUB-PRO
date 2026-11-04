@@ -6,43 +6,55 @@
  * function, and the billing/success component.
  * Mocks are in jest.setup.ts.
  */
-import { renderHook } from '@testing-library/react-native';
+import React from 'react';
+import { renderHook, waitFor } from '@testing-library/react-native';
 
 /* ── Direct canAccessFeature logic test (no React, no Supabase) ─────── */
 import { SUBSCRIPTION_PLANS } from '@/config/subscriptionPlans';
 import { SubscriptionTier } from '@/types/monetization';
+import { canAccessFeatureForTier } from '@/hooks/useSubscription';
 
 describe('deny-by-default logic (unit)', () => {
-  function canAccessFeatureLogic(
-    tier: SubscriptionTier | undefined,
-    feature: keyof typeof SUBSCRIPTION_PLANS.free.limits,
-  ): boolean {
-    if (!tier) return false;
-    const plan = SUBSCRIPTION_PLANS[tier];
-    if (!plan) return false;
-    const limit = plan.limits[feature];
-    if (limit === null || limit === true) return true;
-    if (limit === false) return false;
-    return true;
-  }
+  // Imports the REAL exported gate. A local copy of the logic here would
+  // still pass if the implementation regressed, so it must not be duplicated.
+  const usage = { subscriptions: 0, teamMembers: 0 };
 
   it('denies when tier is undefined (unknown/loading)', () => {
-    expect(canAccessFeatureLogic(undefined, 'maxSubscriptions')).toBe(false);
-    expect(canAccessFeatureLogic(undefined, 'subscriptionSharing')).toBe(false);
+    expect(canAccessFeatureForTier(undefined, 'maxSubscriptions', usage)).toBe(false);
+    expect(canAccessFeatureForTier(undefined, 'subscriptionSharing', usage)).toBe(false);
   });
 
   it('denies when tier is not a known plan', () => {
-    expect(canAccessFeatureLogic('unknown' as SubscriptionTier, 'maxSubscriptions')).toBe(false);
+    expect(
+      canAccessFeatureForTier('unknown' as SubscriptionTier, 'maxSubscriptions', usage),
+    ).toBe(false);
   });
 
   it('grants for known tiers with allowed features', () => {
-    expect(canAccessFeatureLogic('pro', 'maxSubscriptions')).toBe(true);
-    expect(canAccessFeatureLogic('pro', 'subscriptionSharing')).toBe(true);
+    expect(canAccessFeatureForTier('pro', 'maxSubscriptions', usage)).toBe(true);
+    expect(canAccessFeatureForTier('pro', 'subscriptionSharing', usage)).toBe(true);
   });
 
   it('denies for features explicitly disabled', () => {
-    expect(canAccessFeatureLogic('free', 'subscriptionSharing')).toBe(false);
-    expect(canAccessFeatureLogic('free', 'smartInsights')).toBe(false);
+    expect(canAccessFeatureForTier('free', 'subscriptionSharing', usage)).toBe(false);
+    expect(canAccessFeatureForTier('free', 'smartInsights', usage)).toBe(false);
+  });
+
+  it('denies numeric limits once the usage is reached', () => {
+    const freeLimit = SUBSCRIPTION_PLANS.free.limits.maxSubscriptions;
+    if (typeof freeLimit !== 'number') throw new Error('expected a numeric free limit');
+    expect(
+      canAccessFeatureForTier('free', 'maxSubscriptions', {
+        subscriptions: freeLimit - 1,
+        teamMembers: 0,
+      }),
+    ).toBe(true);
+    expect(
+      canAccessFeatureForTier('free', 'maxSubscriptions', {
+        subscriptions: freeLimit,
+        teamMembers: 0,
+      }),
+    ).toBe(false);
   });
 });
 
@@ -74,7 +86,6 @@ describe('real hook deny-by-default', () => {
       },
     });
 
-    const { waitFor } = require('@testing-library/react-native');
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     }, { timeout: 5000 });
@@ -83,17 +94,53 @@ describe('real hook deny-by-default', () => {
     expect(result.current.canAccessFeature('subscriptionSharing')).toBe(false);
   });
 
-  it('returns safe defaults when used outside provider', () => {
+  it('DENIES every feature when used outside provider', () => {
     const { result } = renderHook(() => {
       const mod = require('@/hooks/useSubscription');
       return mod.useSubscription();
     });
 
+    // Outside a provider the tier is unknown, so access must be denied.
+    // Granting here would hand paid entitlements to any component rendered
+    // outside SubscriptionProvider.
+    expect(result.current.canAccessFeature('subscriptionSharing')).toBe(false);
+    expect(result.current.canAccessFeature('maxSubscriptions')).toBe(false);
+    expect(result.current.canAccessFeature('smartInsights')).toBe(false);
     expect(result.current.currentTier).toBe('free');
-    expect(result.current.isLoading).toBe(false);
+    expect(result.current.isLoading).toBe(true);
     expect(result.current.subscription).toBe(null);
     expect(result.current.error).toBe(null);
     expect(typeof result.current.refreshTier).toBe('function');
+  });
+
+  it('DENIES features when there is no signed-in user', async () => {
+    // A signed-out visitor must not inherit free-tier entitlements before any
+    // tier has actually been read. The global AuthContext mock always returns
+    // a user, so override useAuth for this case.
+    const authMod = require('@/contexts/AuthContext');
+    const spy = jest.spyOn(authMod, 'useAuth').mockReturnValue({
+      user: null,
+      session: null,
+    } as ReturnType<typeof authMod.useAuth>);
+
+    try {
+      const { result } = renderHook(() => {
+        const mod = require('@/hooks/useSubscription');
+        return mod.useSubscriptionData();
+      }, {
+        wrapper: ({ children }: { children: React.ReactNode }) => {
+          const mod = require('@/hooks/useSubscription');
+          return <mod.SubscriptionProvider>{children}</mod.SubscriptionProvider>;
+        },
+      });
+
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      expect(result.current.currentTier).toBeUndefined();
+      expect(result.current.canAccessFeature('subscriptionSharing')).toBe(false);
+      expect(result.current.canAccessFeature('maxSubscriptions')).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('subscription is null on first load (no mock object)', () => {
