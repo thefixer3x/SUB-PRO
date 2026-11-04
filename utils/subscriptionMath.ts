@@ -120,13 +120,18 @@ export interface PotentialSavings {
 /**
  * Compute potential monthly savings from real subscription data.
  *
- * Two computable rules:
+ * Both rules are computed ONLY from amounts the user actually holds. Nothing
+ * here estimates a discount the user has not been quoted.
+ *
  * 1. Duplicate category — two or more active subscriptions in the same
- *    category can often be consolidated (family plans, overlapping services).
- *    Savings = sum of (second_highest_cost − lowest_cost) per duplicated category.
- * 2. Annual optimization — monthly subscriptions that COULD be annual.
- *    We apply a 20 % discount factor (typical for SaaS annual plans) to
- *    estimate monthly savings from switching.
+ *    category can often be consolidated into one plan. Keeping only the
+ *    cheapest plan in the group and dropping the rest saves the sum of every
+ *    dropped plan's monthly-equivalent cost.
+ * 2. Annual optimization — the user holds the SAME service on more than one
+ *    billing cycle (e.g. a monthly plan and an annual plan for the same
+ *    product). Switching to the cheaper cycle saves the difference between
+ *    the two real per-month prices. A monthly plan with no annual counterpart
+ *    produces no saving, because no annual price exists to compare against.
  */
 export function calculatePotentialSavings(
   subscriptions: Subscription[],
@@ -134,10 +139,52 @@ export function calculatePotentialSavings(
   const reasons: SavingsReason[] = [];
   let totalMonthly = 0;
 
-  // Rule 1 — duplicate categories
+  const active = subscriptions.filter((s) => s.status === 'Active');
+
+  // Rule 2 first — the same service held on more than one billing cycle.
+  // Only compares cycles the user actually holds; no assumed discount.
+  const byService = new Map<string, Subscription[]>();
+  for (const sub of active) {
+    const key = `${sub.name.toLowerCase()}|${sub.category}`;
+    const list = byService.get(key) ?? [];
+    list.push(sub);
+    byService.set(key, list);
+  }
+
+  // A service that Rule 2 already charged for is excluded from Rule 1,
+  // otherwise the same money would be counted twice (dropping a monthly plan
+  // and switching to the annual one are the same saving). A service whose
+  // cycles cost the same per month produces no Rule 2 saving, so both of its
+  // legs stay in Rule 1 — dropping one of them is a genuine duplicate.
+  const cycleSwitched = new Set<string>();
+
+  for (const [key, subs] of byService) {
+    if (subs.length < 2) continue;
+
+    const monthlyCosts = subs.map((s) => normalizeToMonthly(s.monthlyCost, s.billingCycle));
+    const cheapest = Math.min(...monthlyCosts);
+    const dearest = Math.max(...monthlyCosts);
+    const saving = dearest - cheapest;
+
+    if (saving > 0) {
+      const rounded = Math.round(saving * 100) / 100;
+      totalMonthly += rounded;
+      cycleSwitched.add(key);
+      const cheaper = subs[monthlyCosts.indexOf(cheapest)];
+      reasons.push({
+        type: 'annual_optimization',
+        category: cheaper.category,
+        description: `Switch ${cheaper.name} to its cheaper billing cycle`,
+        monthlyAmount: rounded,
+      });
+    }
+  }
+
+  // Rule 1 — duplicate categories: consolidate into the cheapest plan.
   const byCategory = new Map<string, Subscription[]>();
-  for (const sub of subscriptions) {
-    if (sub.status !== 'Active') continue;
+  for (const sub of active) {
+    const key = `${sub.name.toLowerCase()}|${sub.category}`;
+    if (cycleSwitched.has(key)) continue;
     const list = byCategory.get(sub.category) ?? [];
     list.push(sub);
     byCategory.set(sub.category, list);
@@ -145,41 +192,19 @@ export function calculatePotentialSavings(
 
   for (const [category, subs] of byCategory) {
     if (subs.length < 2) continue;
-    // sort descending by monthly-equivalent cost
-    const sorted = subs
-      .map((s) => ({
-        name: s.name,
-        monthly: normalizeToMonthly(s.monthlyCost, s.billingCycle),
-      }))
-      .sort((a, b) => b.monthly - a.monthly);
 
-    // savings = 2nd most expensive − cheapest in this group
-    const saving = sorted[sorted.length - 2].monthly - sorted[sorted.length - 1].monthly;
+    const costs = subs.map((s) => normalizeToMonthly(s.monthlyCost, s.billingCycle));
+    const sortedCosts = [...costs].sort((a, b) => a - b);
+    // Keep the cheapest plan; everything else is what consolidation saves.
+    const saving = sortedCosts.slice(1).reduce((sum, c) => sum + c, 0);
+
     if (saving > 0) {
-      totalMonthly += saving;
+      const rounded = Math.round(saving * 100) / 100;
+      totalMonthly += rounded;
       reasons.push({
         type: 'duplicate_category',
         category,
         description: `Consolidate ${category} services into one plan`,
-        monthlyAmount: Math.round(saving * 100) / 100,
-      });
-    }
-  }
-
-  // Rule 2 — monthly → annual optimization (20 % typical annual discount)
-  for (const sub of subscriptions) {
-    if (sub.status !== 'Active') continue;
-    if (sub.billingCycle !== 'Monthly') continue;
-    const monthlyEquivalent = normalizeToMonthly(sub.monthlyCost, sub.billingCycle);
-    // 20 % annual discount applied to the monthly cost
-    const monthlySaving = monthlyEquivalent * 0.2;
-    const rounded = Math.round(monthlySaving * 100) / 100;
-    if (rounded > 0) {
-      totalMonthly += rounded;
-      reasons.push({
-        type: 'annual_optimization',
-        category: sub.category,
-        description: `Switch ${sub.name} to annual billing`,
         monthlyAmount: rounded,
       });
     }

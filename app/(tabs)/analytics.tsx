@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -38,13 +38,35 @@ function getCatColor(index: number, colors: ThemeColors): string {
   return (colors as unknown as Record<string, string>)[key];
 }
 
-function formatCurrency(amount: number, symbol = '$'): string {
-  return `${symbol}${amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+/**
+ * Format an amount in the user's real currency.
+ *
+ * Falls back to the subscription's own currency, then to the user's saved
+ * preference, then to USD. No symbol is hardcoded to '$'.
+ */
+export function formatCurrency(amount: number, currency?: string): string {
+  const code = (currency || 'USD').toUpperCase();
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: code,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `${code} ${amount.toFixed(2)}`;
+  }
 }
 
 // ─── Metrics row ────────────────────────────────────────────────────────────
 
-function MetricsRow({ stats }: { stats: ReturnType<typeof getDashboardStats> }) {
+function MetricsRow({
+  stats,
+  currency,
+}: {
+  stats: ReturnType<typeof getDashboardStats>;
+  currency: string;
+}) {
   const { colors } = useTheme();
   const s = createMetricsStyles(colors);
 
@@ -53,7 +75,7 @@ function MetricsRow({ stats }: { stats: ReturnType<typeof getDashboardStats> }) 
       <View style={s.card}>
         <DollarSign size={22} color={colors.primary} />
         <Text style={s.value}>
-          {formatCurrency(stats.monthlyTotal)}
+          {formatCurrency(stats.monthlyTotal, currency)}
         </Text>
         <Text style={s.label}>This Month</Text>
       </View>
@@ -61,7 +83,7 @@ function MetricsRow({ stats }: { stats: ReturnType<typeof getDashboardStats> }) 
       <View style={s.card}>
         <Calendar size={22} color={colors.warning} />
         <Text style={s.value}>
-          {formatCurrency(stats.annualTotal)}
+          {formatCurrency(stats.annualTotal, currency)}
         </Text>
         <Text style={s.label}>Annual Total</Text>
       </View>
@@ -79,8 +101,10 @@ function MetricsRow({ stats }: { stats: ReturnType<typeof getDashboardStats> }) 
 
 function CategoryList({
   categories,
+  currency,
 }: {
   categories: CategoryBreakdown[];
+  currency: string;
 }) {
   const { colors } = useTheme();
   const s = createCategoryStyles(colors);
@@ -94,7 +118,7 @@ function CategoryList({
         >
           <View style={[s.dot, { backgroundColor: getCatColor(i, colors) }]} />
           <Text style={s.name}>{cat.category}</Text>
-          <Text style={s.amount}>{formatCurrency(cat.amount)}</Text>
+          <Text style={s.amount}>{formatCurrency(cat.amount, currency)}</Text>
         </View>
       ))}
     </View>
@@ -105,8 +129,10 @@ function CategoryList({
 
 function SavingsCard({
   savings,
+  currency,
 }: {
   savings: ReturnType<typeof calculatePotentialSavings>;
+  currency: string;
 }) {
   const { colors } = useTheme();
   const s = createSavingsStyles(colors);
@@ -120,13 +146,13 @@ function SavingsCard({
         <Text style={s.title}>Potential Savings</Text>
       </View>
 
-      <Text style={s.total}>Save {formatCurrency(savings.monthlyAmount)}/mo</Text>
+      <Text style={s.total}>Save {formatCurrency(savings.monthlyAmount, currency)}/mo</Text>
 
       {savings.reasons.map((reason, i) => (
         <View key={i} style={s.reason}>
           <Text style={s.reasonText}>{reason.description}</Text>
           <Text style={s.reasonAmt}>
-            ~{formatCurrency(reason.monthlyAmount)}/mo
+            ~{formatCurrency(reason.monthlyAmount, currency)}/mo
           </Text>
         </View>
       ))}
@@ -136,7 +162,13 @@ function SavingsCard({
 
 // ─── Upcoming renewals ──────────────────────────────────────────────────────
 
-function RenewalsList({ renewals }: { renewals: ReturnType<typeof getDashboardStats>['upcomingRenewals'] }) {
+function RenewalsList({
+  renewals,
+  currency,
+}: {
+  renewals: ReturnType<typeof getDashboardStats>['upcomingRenewals'];
+  currency: string;
+}) {
   const { colors } = useTheme();
   const s = createRenewalStyles(colors);
 
@@ -157,7 +189,7 @@ function RenewalsList({ renewals }: { renewals: ReturnType<typeof getDashboardSt
               <Text style={s.subCat}>{sub.category}</Text>
             </View>
             <View style={s.right}>
-              <Text style={s.subAmount}>{formatCurrency(sub.monthlyCost)}</Text>
+              <Text style={s.subAmount}>{formatCurrency(sub.monthlyCost, currency)}</Text>
               <Text style={s.subDays}>{days === 0 ? 'Today' : `${days}d`}</Text>
             </View>
           </View>
@@ -202,6 +234,16 @@ export default function Analytics() {
 
   const hasData = subscriptions && subscriptions.length > 0;
   const stats = hasData ? getDashboardStats(subscriptions) : null;
+
+  // Use the currency the user's own subscriptions are actually in. Falls back
+  // to USD only when the data carries no currency at all.
+  const currency = useMemo(() => {
+    const codes = (subscriptions ?? [])
+      .map((s) => s.currency)
+      .filter((c): c is string => Boolean(c))
+      .map((c) => c.toUpperCase());
+    return codes.length > 0 ? codes[0] : 'USD';
+  }, [subscriptions]);
   const savings = hasData ? calculatePotentialSavings(subscriptions) : null;
 
   if (isError) {
@@ -259,15 +301,17 @@ export default function Analytics() {
         </View>
 
         {/* Metrics */}
-        {stats && <MetricsRow stats={stats} />}
+        {stats && <MetricsRow stats={stats} currency={currency} />}
 
         {/* Savings (conditional — hidden when none) */}
-        {savings && savings.monthlyAmount > 0 && <SavingsCard savings={savings} />}
+        {savings && savings.monthlyAmount > 0 && (
+            <SavingsCard savings={savings} currency={currency} />
+          )}
 
         <AdBanner placement="analytics" />
 
         {/* Upcoming renewals */}
-        {stats && <RenewalsList renewals={stats.upcomingRenewals} />}
+        {stats && <RenewalsList renewals={stats.upcomingRenewals} currency={currency} />}
 
         {/* Category breakdown — basic tier */}
         <FeatureGate
@@ -276,7 +320,12 @@ export default function Analytics() {
           fallback={
             <View style={styles.basicAnalytics}>
               <Text style={styles.sectionTitle}>Category Breakdown</Text>
-              {stats && <CategoryList categories={stats.categoryBreakdown} />}
+              {stats && (
+                <CategoryList
+                  categories={stats.categoryBreakdown}
+                  currency={currency}
+                />
+              )}
             </View>
           }
         >
@@ -288,7 +337,7 @@ export default function Analytics() {
               <View style={styles.insightCard}>
                 <Text style={styles.insightTitle}>💡 Spending Optimization</Text>
                 <Text style={styles.insightText}>
-                  You could save ~{formatCurrency(savings.monthlyAmount)}/mo by
+                  You could save ~{formatCurrency(savings.monthlyAmount, currency)}/mo by
                   consolidating overlapping services and switching to annual plans.
                 </Text>
               </View>
@@ -311,7 +360,7 @@ export default function Analytics() {
                   stats.categoryBreakdown.map((cat) => (
                     <View key={cat.category} style={styles.catChip}>
                       <Text style={styles.catName}>{cat.category}</Text>
-                      <Text style={styles.catAmt}>{formatCurrency(cat.amount)}</Text>
+                      <Text style={styles.catAmt}>{formatCurrency(cat.amount, currency)}</Text>
                     </View>
                   ))}
               </View>

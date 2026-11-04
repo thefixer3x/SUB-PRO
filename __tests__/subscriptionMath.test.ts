@@ -5,6 +5,7 @@ import {
   calculateUpcomingRenewals,
   calculateCategoryBreakdown,
   detectMixedCurrencies,
+  calculatePotentialSavings,
   DashboardStats,
   getDashboardStats,
 } from '../utils/subscriptionMath';
@@ -218,7 +219,27 @@ describe('getDashboardStats (integration)', () => {
 
 // ─── calculatePotentialSavings ─────────────────────────────────────────────
 
-import { calculatePotentialSavings } from '../utils/subscriptionMath';
+
+describe('currency handling', () => {
+  it('keeps each subscription in its own currency', () => {
+    const subs = [
+      sub({ name: 'EUR Plan', monthlyCost: 10, currency: 'EUR' }),
+      sub({ name: 'USD Plan', monthlyCost: 10, currency: 'USD' }),
+    ];
+    expect(subs[0].currency).toBe('EUR');
+    expect(subs[1].currency).toBe('USD');
+    // Mixed currencies must be detectable so the screen can warn about them.
+    expect(detectMixedCurrencies(subs)).toBe(true);
+  });
+
+  it('does not treat a single currency as mixed', () => {
+    const subs = [
+      sub({ name: 'A', monthlyCost: 10, currency: 'NGN' }),
+      sub({ name: 'B', monthlyCost: 10, currency: 'NGN' }),
+    ];
+    expect(detectMixedCurrencies(subs)).toBe(false);
+  });
+});
 
 describe('calculatePotentialSavings', () => {
   it('returns empty when no subscriptions', () => {
@@ -227,7 +248,7 @@ describe('calculatePotentialSavings', () => {
     expect(result.reasons).toEqual([]);
   });
 
-  it('returns empty when only one active subscription (no duplicate, non-monthly)', () => {
+  it('returns empty when only one active subscription', () => {
     const subs = [sub({ name: 'Netflix', monthlyCost: 15.99, billingCycle: 'Annually', category: 'Entertainment' })];
     const result = calculatePotentialSavings(subs);
     expect(result.monthlyAmount).toBe(0);
@@ -240,24 +261,23 @@ describe('calculatePotentialSavings', () => {
       sub({ name: 'Max', monthlyCost: 14.99, billingCycle: 'Annually', category: 'Entertainment' }),
     ];
     const result = calculatePotentialSavings(subs);
-    // Netflix: 15.99/12 = 1.3325, Max: 14.99/12 = 1.2492
-    // savings = 1.3325 − 1.2492 = 0.0833 → rounds to 0.08
-    expect(result.monthlyAmount).toBeCloseTo(0.08, 2);
+    // Keep the cheaper plan (14.99/12 = 1.2492); drop the other → save 1.3325
+    expect(result.monthlyAmount).toBeCloseTo(1.33, 2);
     expect(result.reasons).toHaveLength(1);
     expect(result.reasons[0].type).toBe('duplicate_category');
     expect(result.reasons[0].category).toBe('Entertainment');
   });
 
-  it('detects multiple subscriptions in same category (3+)', () => {
+  it('sums every dropped plan when 3+ subscriptions share a category (Rule 1)', () => {
     const subs = [
       sub({ name: 'Netflix', monthlyCost: 15.99, billingCycle: 'Annually', category: 'Entertainment' }),
       sub({ name: 'Max', monthlyCost: 14.99, billingCycle: 'Annually', category: 'Entertainment' }),
       sub({ name: 'Disney+', monthlyCost: 10.99, billingCycle: 'Annually', category: 'Entertainment' }),
     ];
     const result = calculatePotentialSavings(subs);
-    // sorted: 1.3325, 1.2492, 0.9158
-    // savings = 1.2492 − 0.9158 = 0.3333 → rounds to 0.33
-    expect(result.monthlyAmount).toBeCloseTo(0.33, 2);
+    // Keep only the cheapest (10.99/12 = 0.9158); drop the other two
+    // 1.3325 + 1.2492 = 2.5817 → 2.58
+    expect(result.monthlyAmount).toBeCloseTo(2.58, 2);
     expect(result.reasons).toHaveLength(1);
     expect(result.reasons[0].description).toContain('Entertainment');
   });
@@ -270,10 +290,10 @@ describe('calculatePotentialSavings', () => {
       sub({ name: 'Notion', monthlyCost: 6, billingCycle: 'Annually', category: 'Productivity' }),
     ];
     const result = calculatePotentialSavings(subs);
-    // Entertainment: 18/12 − 12/12 = 1.50 − 1.00 = 0.50
-    // Productivity: 12/12 − 6/12 = 1.00 − 0.50 = 0.50
-    // Total: 1.00
-    expect(result.monthlyAmount).toBeCloseTo(1.0, 2);
+    // Entertainment: keep 18/12 = 1.50, drop 24/12 = 2.00 → 2.00
+    // Productivity: keep 6/12 = 0.50, drop 12/12 = 1.00 → 1.00
+    // Total: 3.00
+    expect(result.monthlyAmount).toBeCloseTo(3.0, 2);
     expect(result.reasons).toHaveLength(2);
   });
 
@@ -283,30 +303,55 @@ describe('calculatePotentialSavings', () => {
       sub({ name: 'OldService', monthlyCost: 12, billingCycle: 'Annually', category: 'Entertainment', status: 'Inactive' }),
     ];
     const result = calculatePotentialSavings(subs);
-    // OldService is inactive → only Netflix in category → no duplicate
     expect(result.monthlyAmount).toBe(0);
     expect(result.reasons).toEqual([]);
   });
 
-  it('ignores zero-saving duplicates (same price)', () => {
+  it('saves one full plan when duplicates cost the same', () => {
     const subs = [
       sub({ name: 'A', monthlyCost: 12, billingCycle: 'Annually', category: 'Entertainment' }),
       sub({ name: 'B', monthlyCost: 12, billingCycle: 'Annually', category: 'Entertainment' }),
     ];
     const result = calculatePotentialSavings(subs);
-    // 1 − 1 = 0 → no savings
-    expect(result.monthlyAmount).toBe(0);
-    expect(result.reasons).toEqual([]);
+    // Both cost 1.00/mo. Keeping one and dropping the other still saves 1.00.
+    expect(result.monthlyAmount).toBeCloseTo(1.0, 2);
+    expect(result.reasons).toHaveLength(1);
+    expect(result.reasons[0].type).toBe('duplicate_category');
   });
 
-  it('estimates savings for monthly subscriptions (Rule 2)', () => {
+  it('reports NO saving for a monthly plan with no annual counterpart (Rule 2)', () => {
+    // There is no annual price in the data model, so nothing can be computed
+    // for a service the user only holds on one cycle.
     const subs = [
       sub({ name: 'Netflix', monthlyCost: 15.99, billingCycle: 'Monthly', category: 'Entertainment' }),
     ];
     const result = calculatePotentialSavings(subs);
-    expect(result.monthlyAmount).toBeCloseTo(3.20, 2);
-    expect(result.reasons[0].type).toBe('annual_optimization');
-    expect(result.reasons[0].description).toContain('Netflix');
+    expect(result.monthlyAmount).toBe(0);
+    expect(result.reasons).toEqual([]);
+  });
+
+  it('compares real per-month prices when the same service is held on two cycles (Rule 2)', () => {
+    const subs = [
+      sub({ name: 'Netflix', monthlyCost: 15.99, billingCycle: 'Monthly', category: 'Entertainment' }),
+      sub({ name: 'Netflix', monthlyCost: 120, billingCycle: 'Annually', category: 'Entertainment' }),
+    ];
+    const result = calculatePotentialSavings(subs);
+    // Annual = 120/12 = 10.00 per month vs monthly 15.99 → saves 5.99
+    expect(result.monthlyAmount).toBeCloseTo(5.99, 2);
+    const reason = result.reasons.find((r) => r.type === 'annual_optimization');
+    expect(reason).toBeDefined();
+    expect(reason?.description).toContain('Netflix');
+  });
+
+  it('finds the same saving regardless of the order the cycles appear in', () => {
+    const subs = [
+      sub({ name: 'Netflix', monthlyCost: 120, billingCycle: 'Annually', category: 'Entertainment' }),
+      sub({ name: 'Netflix', monthlyCost: 15.99, billingCycle: 'Monthly', category: 'Entertainment' }),
+    ];
+    // Cheapest is 10.00 (annual), dearest 15.99 (monthly) → the saving is real
+    // but it is the SAME saving as above; the point is it is derived, not assumed.
+    const result = calculatePotentialSavings(subs);
+    expect(result.monthlyAmount).toBeCloseTo(5.99, 2);
   });
 
   it('excludes already-annual subscriptions from annual optimization', () => {
@@ -323,16 +368,39 @@ describe('calculatePotentialSavings', () => {
       sub({ name: 'Netflix', monthlyCost: 15.99, billingCycle: 'Monthly', category: 'Entertainment' }),
       sub({ name: 'Max', monthlyCost: 14.99, billingCycle: 'Monthly', category: 'Entertainment' }),
       sub({ name: 'Spotify', monthlyCost: 9.99, billingCycle: 'Monthly', category: 'Entertainment' }),
+      sub({ name: 'Spotify', monthlyCost: 119.88, billingCycle: 'Annually', category: 'Entertainment' }),
       sub({ name: 'Notion', monthlyCost: 8.99, billingCycle: 'Monthly', category: 'Productivity' }),
     ];
     const result = calculatePotentialSavings(subs);
-    // Duplicate (Entertainment): 14.99 − 9.99 = 5.00
-    // Annual: 15.99×0.2=3.20 + 14.99×0.2=3.00 + 9.99×0.2=2.00 + 8.99×0.2=1.80 = 10.00
-    // Total: 15.00
-    expect(result.monthlyAmount).toBeCloseTo(15.00, 2);
-    expect(result.reasons).toHaveLength(5);
+    // Annual (Spotify): 119.88/12 = 9.99 vs 9.99 monthly → no difference,
+    //   so Rule 2 produces nothing and BOTH Spotify legs stay in Rule 1.
+    // Duplicate (Entertainment): keep the cheapest at 9.99, drop the rest —
+    //   Netflix 15.99 + Max 14.99 + the second Spotify leg 9.99 = 40.97
+    // Notion: only one → nothing
+    expect(result.monthlyAmount).toBeCloseTo(40.97, 2);
     expect(result.reasons.some((r) => r.type === 'duplicate_category')).toBe(true);
-    expect(result.reasons.some((r) => r.type === 'annual_optimization')).toBe(true);
+    expect(result.reasons.some((r) => r.type === 'annual_optimization')).toBe(false);
+  });
+
+  it('never reports a saving that is not derived from the amounts held', () => {
+    // Every reported reason's monthlyAmount must be explainable from the
+    // subscription amounts in the input. A monthly plan with no annual
+    // counterpart must yield no annual_optimization reason at all.
+    const subs = [
+      sub({ name: 'Solo Service', monthlyCost: 7.77, billingCycle: 'Monthly', category: 'Utilities' }),
+      sub({ name: 'Another', monthlyCost: 3.33, billingCycle: 'Monthly', category: 'Utilities' }),
+    ];
+    const result = calculatePotentialSavings(subs);
+
+    const inputAmounts = [7.77, 3.33];
+    for (const reason of result.reasons) {
+      const explained = inputAmounts.some(
+        (a) => Math.abs(reason.monthlyAmount - a) < 0.005 || Math.abs(reason.monthlyAmount - (a + inputAmounts[0])) < 0.005,
+      );
+      expect(explained).toBe(true);
+    }
+    expect(result.reasons.some((r) => r.type === 'annual_optimization')).toBe(false);
+    expect(result.monthlyAmount).toBeCloseTo(7.77, 2);
   });
 
   it('handles mixed billing cycles in duplicate detection', () => {
@@ -341,11 +409,9 @@ describe('calculatePotentialSavings', () => {
       sub({ name: 'Disney+', monthlyCost: 120, billingCycle: 'Annually', category: 'Entertainment' }),
     ];
     const result = calculatePotentialSavings(subs);
-    // Duplicate (Entertainment): 15.99 − 120/12 = 15.99 − 10.00 = 5.99
-    // Annual (Netflix monthly): 15.99 × 0.2 = 3.20
-    // Total: 9.19
-    expect(result.monthlyAmount).toBeCloseTo(9.19, 2);
-    expect(result.reasons).toHaveLength(2);
+    // Keep the cheaper (120/12 = 10.00), drop the other (15.99) → 15.99
+    expect(result.monthlyAmount).toBeCloseTo(15.99, 2);
+    expect(result.reasons).toHaveLength(1);
     expect(result.reasons[0].type).toBe('duplicate_category');
   });
 });
