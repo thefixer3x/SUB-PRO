@@ -31,7 +31,7 @@ export default function UpgradeScreen() {
         
         <Text style={styles.currentPlanName}>{plan.name}</Text>
         <Text style={styles.currentPlanPrice}>
-          ${plan.price}{currentTier === 'team' && '/user'}/month
+          ${plan.price}/month
         </Text>
         
         <View style={styles.currentPlanFeatures}>
@@ -95,7 +95,7 @@ export default function UpgradeScreen() {
               <View style={styles.planInfo}>
                 <Text style={styles.planName}>{plan.name}</Text>
                 <Text style={styles.planPrice}>
-                  ${plan.price}{tier === 'team' && '/user'}/month
+                  ${plan.price}/month
                 </Text>
               </View>
               

@@ -4,6 +4,8 @@
 
 **Orchestrator:** Claude Code reviews every PR against the card's **Accept when** list before anything merges. Workers never merge.
 
+**Hermes is paused (owner, 2026-11-04).** No agent picks up cards from this file until the owner says so. Claude Code builds, reviews and merges the remaining cards one small PR at a time. Open Hermes PRs (#87, #88, #89) are reviewed and finished by the orchestrator; the `agent/s304-real-virtual-card-management` branch is not a deliverable.
+
 ---
 
 ## 0. How to run a card (read once)
@@ -55,7 +57,8 @@ All seven must hold; "mostly" is a rejection.
 | ID | Decision or action | Blocks | Default if no answer |
 |---|---|---|---|
 | D1 | ~~Entitlement source~~ **DECIDED (b) 2026-11-03** — SubTrack keeps its own `profiles.subscription_tier`, written only for `project=subtrack` prices; it never reads `user_tiers` or `stripe_subscriptions` | S201, S202 | answered — does **not** block |
-| D2 | Is a $4.99 SubTrack Pro subscription meant to grant VortexCore `pro` entitlements? | S202 | — |
+| D2 | ~~Cross-app entitlement~~ **DECIDED no 2026-11-03** — a SubTrack subscription never grants VortexCore entitlements | S202 | answered |
+| D4 | ~~Plan prices~~ **DECIDED 2026-11-04 (live mode)** — Pro **$10/month** (`price_1UY1Vm2…`, lookup key `subtrack_pro_monthly`), Team **$20/month flat** (`price_1UY1Vo2…`, lookup key `subtrack_team_monthly`, `metadata.tier = team`). Old $4.99 and $9.99 prices archived (no active subscribers). The old $9.99 price carried `tier = enterprise`, which the webhook does not accept; the Team price fixes that. Test mode needs the same two lookup keys and metadata. | S202 | answered |
 | D3 | Billing address: keep it per request (current), or approve a column migration | S304 | per request |
 | A1 | Netlify env: `ALLOWED_ORIGINS=https://sub-pro.lanonasis.com,https://subtrack-pro.lanonasis.com` | production card calls from the browser | — |
 | A2 | ~~Vercel env~~ **DONE 2026-11-03** — verified via Vercel API: `STRIPE_SECRET_KEY` (dev/preview/prod), `ALLOWED_ORIGINS`, `SITE_URL`, `STRIPE_WEBHOOK_SECRET` (prod) and `SUPABASE_SECRET_KEY` all present | S201 preview test | closed |

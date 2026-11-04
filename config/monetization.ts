@@ -58,7 +58,7 @@ export const subscriptionPlans: SubscriptionPlan[] = [
     id: 'pro',
     name: 'Pro',
     description: 'Most popular for individuals',
-    price: 4.99,
+    price: 10.00,
     billingCycle: 'monthly',
     features: [
       'Unlimited subscriptions',
@@ -86,7 +86,7 @@ export const subscriptionPlans: SubscriptionPlan[] = [
     id: 'team',
     name: 'Team',
     description: 'For teams and families',
-    price: 9.99,
+    price: 20.00,
     billingCycle: 'monthly',
     features: [
       'Everything in Pro',
@@ -217,7 +217,7 @@ export const getUpsellSuggestion = (tier: string, featureAttempted: string): {
   if (tier === 'free') {
     return {
       suggestedTier: 'pro',
-      benefit: `Unlock ${featureAttempted} and remove ads for just $4.99/month`,
+      benefit: `Unlock ${featureAttempted} and remove ads for just $10/month`,
       urgency: 'high'
     };
   }
@@ -225,7 +225,7 @@ export const getUpsellSuggestion = (tier: string, featureAttempted: string): {
   if (tier === 'pro') {
     return {
       suggestedTier: 'team',
-      benefit: `Add team collaboration and get ${featureAttempted} for $9.99/month`,
+      benefit: `Add team collaboration and get ${featureAttempted} for $20/month`,
       urgency: 'medium'
     };
   }
