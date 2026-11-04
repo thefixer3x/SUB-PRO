@@ -196,6 +196,7 @@ Read `VERCEL_MIGRATION.md` sections 1–4 first. All new server code goes in `se
   - On the Vercel preview, `curl -s -o /dev/null -w '%{http_code}' -X POST <preview>/api/stripe/webhook` returns 400 (not 200 with HTML).
   - `curl <preview>/api/nope` returns 404.
   - `grep -rn "Access-Control-Allow-Origin.*\*" api server netlify` returns nothing.
+- **OPEN A SINGLE PR AT THE END.** Do not commit, push, or open PRs on intermediate sub-steps. Every commit to `main` triggers an Expo workflow build + OTA publish (Android APK + iOS IPA), which rapidly hits rate limits with multiple PRs. Work locally through all development, testing, and iteration. When the full card is done, commit once, push once, open one PR against `main`, and then stop — await bulk review from LANA before merging.
 
 ### S202: One Free→Pro upgrade flow (= C06) (P1)
 - **Role:** builder · **Depends on:** S201, D2 · **Issue:** #34
@@ -242,6 +243,7 @@ Runs **in parallel with Sprint 2**, except where `Depends on` says otherwise.
   - A new user sees the empty state.
   - Unit tests cover the totals math: a yearly plan /12, a weekly plan ×52/12, mixed currencies flagged rather than summed.
   - No literal currency amounts remain in `index.tsx`.
+- **OPEN A SINGLE PR AT THE END.** Do not commit, push, or open PRs on intermediate sub-steps. Every commit to `main` triggers an Expo workflow build + OTA publish (Android APK + iOS IPA), which rapidly hits rate limits with multiple PRs. Work locally through all development, testing, and iteration. When the full card is done, commit once, push once, open one PR against `main`, and then stop — await bulk review from LANA before merging.
 
 ### S302: Settings show the real user, every row works, preferences persist (P2)
 - **Role:** builder · **Depends on:** S101 (same file) · **Issue:** report item 5
@@ -255,6 +257,7 @@ Runs **in parallel with Sprint 2**, except where `Depends on` says otherwise.
   - `grep -nE "user-123|user@example.com|onPress=\{\(\) => \{\}\}" app/\(tabs\)/settings.tsx` returns nothing.
   - A test shows preferences survive a remount.
   - The PR has a table of the rows and their outcomes.
+- **OPEN A SINGLE PR AT THE END.** Do not commit, push, or open PRs on intermediate sub-steps. Every commit to `main` triggers an Expo workflow build + OTA publish (Android APK + iOS IPA), which rapidly hits rate limits with multiple PRs. Work locally through all development, testing, and iteration. When the full card is done, commit once, push once, open one PR against `main`, and then stop — await bulk review from LANA before merging.
 
 ### S303: Analytics built on real data (P2)
 - **Role:** builder · **Depends on:** S301 (reuses `utils/subscriptionMath.ts`) · **Issue:** report item 4
