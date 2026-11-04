@@ -104,9 +104,18 @@ export const useSubscriptionData = () => {
         setError(queryError as Error);
         setCurrentTier(undefined);
       } else {
-        const row = data as { subscription_tier?: string } | null;
-        const tier = row?.subscription_tier as SubscriptionTier | null | undefined;
-        setCurrentTier(tier ?? 'free' as SubscriptionTier);
+        const row = data as { subscription_tier?: string | null } | null;
+        const raw = row?.subscription_tier;
+        // No tier stored means the account was never upgraded: free. A value
+        // that is not a known plan (for example the retired 'enterprise') is
+        // unknown, so it stays undefined and every paid feature is denied.
+        if (raw == null) {
+          setCurrentTier('free');
+        } else if (Object.prototype.hasOwnProperty.call(SUBSCRIPTION_PLANS, raw)) {
+          setCurrentTier(raw as SubscriptionTier);
+        } else {
+          setCurrentTier(undefined);
+        }
         setSubscription(null);
       }
     } catch (err) {
