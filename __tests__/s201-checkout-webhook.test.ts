@@ -331,6 +331,72 @@ describe('checkout: user identity', () => {
   });
 });
 
+describe('checkout: plan selection (D4)', () => {
+  const PRICES: Record<string, { id: string; metadata: Record<string, string> }> = {
+    subtrack_pro_monthly: { id: 'price_pro_10', metadata: { project: 'subtrack', tier: 'pro' } },
+    subtrack_team_monthly: { id: 'price_team_20', metadata: { project: 'subtrack', tier: 'team' } },
+  };
+
+  const post = (body?: string) =>
+    checkoutHandler(
+      makeRequestObject({
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid-token', 'Content-Type': 'application/json', origin: ALLOWED_ORIGIN },
+        body,
+      }),
+    );
+
+  const lineItemPrice = () => {
+    const call = (mockStripeApi.checkout.sessions.create as jest.Mock).mock.calls[0][0] as {
+      line_items: Array<{ price: string }>;
+    };
+    return call.line_items[0].price;
+  };
+
+  beforeEach(() => {
+    mockStripeApi.prices.list.mockImplementation(async ({ lookup_keys }: { lookup_keys: string[] }) => ({
+      data: PRICES[lookup_keys[0]] ? [PRICES[lookup_keys[0]]] : [],
+      has_more: false,
+    }));
+  });
+
+  it('defaults to Pro when the body names no plan', async () => {
+    const res = await post();
+    expect(res.status).toBe(200);
+    expect(mockStripeApi.prices.list).toHaveBeenCalledWith(expect.objectContaining({ lookup_keys: ['subtrack_pro_monthly'] }));
+    expect(lineItemPrice()).toBe('price_pro_10');
+  });
+
+  it('charges the Team price when plan is team', async () => {
+    const res = await post(JSON.stringify({ plan: 'team' }));
+    expect(res.status).toBe(200);
+    expect(mockStripeApi.prices.list).toHaveBeenCalledWith(expect.objectContaining({ lookup_keys: ['subtrack_team_monthly'] }));
+    expect(lineItemPrice()).toBe('price_team_20');
+  });
+
+  it.each(['enterprise', 'free', '__proto__', 'price_pro_10', 42])('rejects plan %p with 400 and creates no session', async (plan) => {
+    const res = await post(JSON.stringify({ plan }));
+    expect(res.status).toBe(400);
+    expect(mockStripeApi.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malformed body with 400', async () => {
+    const res = await post('{not json');
+    expect(res.status).toBe(400);
+    expect(mockStripeApi.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses a price not tagged for this app and plan', async () => {
+    mockStripeApi.prices.list.mockResolvedValueOnce({
+      data: [{ id: 'price_vortex', metadata: { project: 'vortexcore', tier: 'team' } }],
+      has_more: false,
+    });
+    const res = await post(JSON.stringify({ plan: 'team' }));
+    expect(res.status).toBe(500);
+    expect(mockStripeApi.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+});
+
 describe('checkout: redirect URLs', () => {
   it('rejects when success/cancel URLs are off-allowlist', async () => {
     const origSiteUrl = process.env.SITE_URL;
