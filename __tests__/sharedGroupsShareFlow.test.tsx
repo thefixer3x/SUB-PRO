@@ -13,6 +13,10 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
 }));
 
+jest.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 'test-user-1' }, isInitializing: false, authLoading: false }),
+}));
+
 // Only the signed-in tier is injected here: the entitlement itself is resolved from the
 // real plan table, exactly as useSubscription().canAccessFeature does.
 jest.mock('@/hooks/useSubscription', () => {

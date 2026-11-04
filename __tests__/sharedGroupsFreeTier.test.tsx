@@ -8,6 +8,10 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
 }));
 
+jest.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 'test-user-1' }, isInitializing: false, authLoading: false }),
+}));
+
 jest.mock('@/hooks/useSubscriptions', () => ({
   useSubscriptions: () => ({
     data: [
