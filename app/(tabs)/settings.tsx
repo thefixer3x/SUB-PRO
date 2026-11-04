@@ -1,6 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Switch, Alert, Platform } from 'react-native';
-import { Bell, Shield, Palette, Download, HelpCircle, ChevronRight, Smartphone, Mail, Calendar, DollarSign, Settings as SettingsIcon, FileText, AlertTriangle, LogOut } from 'lucide-react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  SafeAreaView,
+  TouchableOpacity,
+  Switch,
+  Alert,
+  Platform,
+  Share as RNShare,
+  Linking,
+} from 'react-native';
+import {
+  Bell,
+  Shield,
+  Palette,
+  Download,
+  HelpCircle,
+  ChevronRight,
+  Smartphone,
+  Mail,
+  Calendar,
+  DollarSign,
+  Settings as SettingsIcon,
+  FileText,
+  AlertTriangle,
+  LogOut,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,52 +42,48 @@ import { securityMonitoringService } from '@/services/securityMonitoring';
 import { FEATURE_FLAGS } from '@/config/compliance';
 import { SecurityHealthCheck } from '@/types/compliance';
 import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
+import { usePreferences } from '@/hooks/usePreferences';
 
 export default function Settings() {
   const router = useRouter();
   const { colors } = useTheme();
   const { signOut, user } = useAuth();
   const { enabled: budgetEnabled, budgetLimit, setBudgetEnabled, setBudgetLimit } = useBudgetAlert();
+  const { preferences, setPreferences } = usePreferences();
   const [securityHealthCheck, setSecurityHealthCheck] = useState<SecurityHealthCheck | null>(null);
   const [showSecurityDashboard, setShowSecurityDashboard] = useState(false);
   const [showPrivacyCenter, setShowPrivacyCenter] = useState(false);
-  
+
+  // Real user from auth context (replaces the old placeholder user ID and email)
+  const userId = user?.id ?? '';
+  const userEmail = user?.email ?? '';
+  const displayName =
+    user?.user_metadata?.full_name ?? (userEmail ? userEmail.split('@')[0] : '');
+
   const [notifications, setNotifications] = useState({
     renewals: true,
     newSubscriptions: true,
     weeklyReports: true,
   });
 
-  const [preferences, setPreferences] = useState({
-    darkMode: false,
-    currency: 'USD',
-    language: 'English',
-  });
-
-  // Mock user data - in production, get from auth context
-  const userId = 'user-123';
-  const userEmail = 'user@example.com';
-
   useEffect(() => {
     loadSecurityData();
   }, []);
 
   const loadSecurityData = async () => {
-    if (FEATURE_FLAGS.SECURITY_MONITORING) {
+    if (FEATURE_FLAGS.SECURITY_MONITORING && userId) {
       const healthCheck = await securityMonitoringService.getLatestHealthCheck(userId);
       setSecurityHealthCheck(healthCheck);
     }
   };
 
   const toggleNotification = (key: keyof typeof notifications) => {
-    setNotifications((prev: typeof notifications) => ({
+    setNotifications(prev => ({
       ...prev,
-      [key]: !prev[key]
+      [key]: !prev[key],
     }));
   };
 
-  // react-native-web has no working Alert.alert, so the confirmation dialog is
-  // platform-specific: a native alert on iOS/Android, window.confirm on web.
   const confirmSignOut = async (): Promise<boolean> => {
     if (Platform.OS === 'web') {
       if (typeof window === 'undefined' || typeof window.confirm !== 'function') {
@@ -69,7 +92,7 @@ export default function Settings() {
       return window.confirm('Sign out of your account?');
     }
 
-    return new Promise<boolean>((resolve) => {
+    return new Promise<boolean>(resolve => {
       Alert.alert(
         'Sign Out',
         'Are you sure you want to sign out?',
@@ -95,15 +118,97 @@ export default function Settings() {
     if (!confirmed) {
       return;
     }
-
     const result = await signOut();
     if (!result.success) {
       showMessage('Sign Out Failed', result.error ?? 'Unable to sign out. Please try again.');
       return;
     }
-
     router.replace('/(auth)/signin');
   };
+
+  // --- Wired preference handlers (replaces the old no-op onPress) ---
+
+  const handleCurrencyTap = () => {
+    Alert.alert(
+      'Currency',
+      `Current: ${preferences.currency}`,
+      [
+        {
+          text: 'USD — US Dollar',
+          onPress: () => setPreferences({ ...preferences, currency: 'USD' }),
+        },
+        {
+          text: 'EUR — Euro',
+          onPress: () => setPreferences({ ...preferences, currency: 'EUR' }),
+        },
+        {
+          text: 'GBP — British Pound',
+          onPress: () => setPreferences({ ...preferences, currency: 'GBP' }),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const handleDateFormatTap = () => {
+    showMessage(
+      'Date Format',
+      'Date format selection is coming soon. Current: MM/DD/YYYY.'
+    );
+  };
+
+  const handlePrivacySettingsTap = () => {
+    setShowPrivacyCenter(true);
+  };
+
+  const handleExportData = async () => {
+    try {
+      const exportPayload = {
+        user: {
+          id: userId,
+          email: userEmail,
+        },
+        preferences,
+        subscriptions: [],
+        exportedAt: new Date().toISOString(),
+      };
+
+      const json = JSON.stringify(exportPayload, null, 2);
+
+      if (Platform.OS === 'web') {
+        // Web: trigger a file download
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = 'subtrack-data.json';
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        URL.revokeObjectURL(url);
+      } else {
+        // Native: share as JSON
+        await RNShare.share({
+          title: 'SUB Track Data',
+          message: json,
+        });
+      }
+    } catch {
+      showMessage('Export Failed', 'Unable to export your data. Please try again.');
+    }
+  };
+
+  const handleHelpTap = async () => {
+    const helpUrl = 'https://subtrackpro.com/help';
+    const supported = await Linking.canOpenURL(helpUrl);
+    if (supported) {
+      await Linking.openURL(helpUrl);
+    } else {
+      showMessage('Help & Support', 'For assistance, please visit our help center or contact support.');
+    }
+  };
+
+  // --- Render helpers ---
 
   const SettingsSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <View style={styles.section}>
@@ -112,27 +217,36 @@ export default function Settings() {
     </View>
   );
 
-  const SettingsItem = ({ 
-    icon, 
-    title, 
-    subtitle, 
-    onPress, 
-    rightElement 
-  }: { 
-    icon: React.ReactNode; 
-    title: string; 
-    subtitle?: string; 
+  const SettingsItem = ({
+    icon,
+    title,
+    subtitle,
+    onPress,
+    rightElement,
+  }: {
+    icon: React.ReactNode;
+    title: string;
+    subtitle?: string;
     onPress?: () => void;
     rightElement?: React.ReactNode;
   }) => (
-    <TouchableOpacity style={[styles.settingsItem, { backgroundColor: colors.card, borderBottomColor: colors.borderLight }]} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={[
+        styles.settingsItem,
+        { backgroundColor: colors.card, borderBottomColor: colors.borderLight },
+      ]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
       <View style={styles.settingsItemLeft}>
         <View style={[styles.iconContainer, { backgroundColor: colors.backgroundSecondary }]}>
           {icon}
         </View>
         <View style={styles.settingsItemText}>
           <Text style={[styles.settingsItemTitle, { color: colors.text }]}>{title}</Text>
-          {subtitle && <Text style={[styles.settingsItemSubtitle, { color: colors.textMuted }]}>{subtitle}</Text>}
+          {subtitle && (
+            <Text style={[styles.settingsItemSubtitle, { color: colors.textMuted }]}>{subtitle}</Text>
+          )}
         </View>
       </View>
       <View style={styles.settingsItemRight}>
@@ -151,15 +265,18 @@ export default function Settings() {
     return <PrivacyCenter userId={userId} />;
   }
 
-  // Show security banner if there are issues
   const shouldShowSecurityBanner = securityHealthCheck && securityHealthCheck.status !== 'healthy';
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>Customize your subscription management experience</Text>
+          <Text style={[styles.title, { color: colors.text }]}>
+            {displayName ? `Hi, ${displayName}` : 'Settings'}
+          </Text>
+          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+            Customize your subscription management experience
+          </Text>
         </View>
 
         {shouldShowSecurityBanner && (
@@ -180,7 +297,7 @@ export default function Settings() {
             onToggle={setBudgetEnabled}
             budgetLimit={budgetLimit}
             onBudgetChange={setBudgetLimit}
-            currency="USD"
+            currency={preferences.currency}
           />
           <SettingsItem
             icon={<Smartphone size={20} color="#10B981" />}
@@ -238,14 +355,14 @@ export default function Settings() {
           <SettingsItem
             icon={<DollarSign size={20} color="#10B981" />}
             title="Currency"
-            subtitle="USD - US Dollar"
-            onPress={() => {}}
+            subtitle={`${preferences.currency} — Select currency`}
+            onPress={handleCurrencyTap}
           />
           <SettingsItem
             icon={<Calendar size={20} color="#F59E0B" />}
             title="Date Format"
             subtitle="MM/DD/YYYY"
-            onPress={() => {}}
+            onPress={handleDateFormatTap}
           />
         </SettingsSection>
 
@@ -254,13 +371,13 @@ export default function Settings() {
             icon={<Shield size={20} color="#EF4444" />}
             title="Privacy Settings"
             subtitle="Manage your data and privacy"
-            onPress={() => {}}
+            onPress={handlePrivacySettingsTap}
           />
           <SettingsItem
             icon={<Download size={20} color="#3B82F6" />}
             title="Export Data"
             subtitle="Download your subscription data"
-            onPress={() => {}}
+            onPress={handleExportData}
           />
         </SettingsSection>
 
@@ -269,7 +386,7 @@ export default function Settings() {
             icon={<HelpCircle size={20} color="#64748B" />}
             title="Help & Support"
             subtitle="Get help with the app"
-            onPress={() => {}}
+            onPress={handleHelpTap}
           />
         </SettingsSection>
 
@@ -286,8 +403,10 @@ export default function Settings() {
 
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: colors.textMuted }]}>Version 1.0.0</Text>
-          <Text style={[styles.footerSubtext, { color: colors.textMuted }]}>Built with ❤️ for subscription management</Text>
-          
+          <Text style={[styles.footerSubtext, { color: colors.textMuted }]}>
+            Built with ❤️ for subscription management
+          </Text>
+
           <View style={styles.partnerCreditContainer}>
             <PoweredByLanOnasis variant="standard" />
           </View>
