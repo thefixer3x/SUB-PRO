@@ -1,9 +1,50 @@
-import { renderHook } from '@testing-library/react-native';
+import { act, renderHook } from '@testing-library/react-native';
+import React, { createContext, useContext, type ReactNode } from 'react';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { SUBSCRIPTION_PLANS } from '@/config/subscriptionPlans';
 import { hasFeatureAccess, subscriptionPlans } from '@/config/monetization';
 import { SubscriptionProvider, useSubscription } from '@/hooks/useSubscription';
+
+/* ── Minimal local context for tests (real AuthContext lacks named exports) ── */
+type AuthContextValue = {
+  session: null;
+  user: { id: string; email: string } | null;
+  isInitializing: boolean;
+  authLoading: boolean;
+  isDemoMode: boolean;
+  isDemoModeEnabled: boolean;
+  signIn: () => Promise<{ success: boolean }>;
+  signUp: () => Promise<{ success: boolean }>;
+  signOut: () => Promise<{ success: boolean }>;
+  signInAsGuest: () => Promise<{ success: boolean }>;
+  refreshSession: () => Promise<void>;
+};
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+/* ── AuthContext wrapper for tests ───────────────────────────────────── */
+const DUMMY_USER = {
+  id: 'user-1',
+  email: 'user@example.com',
+} as any;
+
+const authValue: AuthContextValue = {
+  session: null,
+  user: DUMMY_USER,
+  isInitializing: false,
+  authLoading: false,
+  isDemoMode: false,
+  isDemoModeEnabled: false,
+  signIn: async () => ({ success: false }),
+  signUp: async () => ({ success: false }),
+  signOut: async () => ({ success: true }),
+  signInAsGuest: async () => ({ success: false }),
+  refreshSession: async () => {},
+};
+
+const AuthWrapper: React.FC<{ children: ReactNode }> = ({ children }) => (
+  <AuthContext.Provider value={authValue}>{children}</AuthContext.Provider>
+);
 
 const SHARING_CODE_FILES = [
   'app/(tabs)/shared-groups.tsx',
@@ -41,9 +82,18 @@ describe('subscriptionSharing entitlement', () => {
   });
 
   it('denies sharing through useSubscription().canAccessFeature for a free account', () => {
-    const { result } = renderHook(() => useSubscription(), { wrapper: SubscriptionProvider });
+    // When the user has no profile row yet (or tier is still loading),
+    // canAccessFeature must deny by default — even if the user is technically "free".
+    const { result } = renderHook(() => useSubscription(), {
+      wrapper: ({ children }) => (
+        <AuthWrapper>
+          <SubscriptionProvider>{children}</SubscriptionProvider>
+        </AuthWrapper>
+      ),
+    });
 
-    expect(result.current.currentTier).toBe('free');
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.currentTier).toBeUndefined();
     expect(result.current.canAccessFeature('subscriptionSharing')).toBe(false);
   });
 

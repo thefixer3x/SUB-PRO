@@ -27,3 +27,85 @@ jest.mock('expo-crypto', () => {
     randomUUID: () => nodeCrypto.randomUUID(),
   };
 });
+
+// Global mock for @/lib/supabase — used by useSubscription hook tests.
+// Each test file can override with its own jest.mock for different profile rows.
+jest.mock('@/lib/supabase', () => ({
+  supabase: {
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: () => ({ data: null, error: null }),
+        }),
+      }),
+    }),
+  },
+  isSupabaseEnvConfigured: true,
+  createClient: jest.fn(() => ({
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: () => ({ data: null, error: null }),
+        }),
+      }),
+    }),
+  })),
+}));
+
+// Global mock for AuthContext — used by useSubscription hook tests.
+jest.mock('@/contexts/AuthContext', () => {
+  const AuthContext = {
+    Provider: ({ children, value }: { children: React.ReactNode; value: Record<string, unknown> }) =>
+      children as React.ReactElement | null,
+  };
+  return {
+    AuthContext,
+    useAuth: () => ({
+      user: { id: 'test-user', email: 'test@test.com' },
+      session: null,
+    }),
+    AuthProvider: ({ children }: { children: React.ReactNode }) =>
+      children as React.ReactElement | null,
+  };
+});
+
+// Global mock for expo-router — used by billing/success component tests.
+jest.mock('expo-router', () => ({
+  useLocalSearchParams: () => ({}),
+  router: { replace: jest.fn(), push: jest.fn() },
+  Link: jest.fn().mockReturnValue(null),
+}));
+
+// Global mock for ThemeContext — used by billing/success component tests.
+jest.mock('@/contexts/ThemeContext', () => {
+  const setThemeModeMock = jest.fn(async (mode: string) => {
+    await require('@react-native-async-storage/async-storage').setItem('app_theme_mode', mode);
+  });
+  const toggleThemeMock = jest.fn();
+  return {
+    ThemeProvider: ({ children }: { children: React.ReactNode }) =>
+      children as React.ReactElement | null,
+    useTheme: () => ({
+      themeMode: 'system' as const,
+      themeName: 'light' as const,
+      colors: { background: '#fff', text: '#000', textSecondary: '#666', textMuted: '#999', primary: '#3b82f6' },
+      setThemeMode: setThemeModeMock,
+      toggleTheme: toggleThemeMock,
+      isLoading: false,
+    }),
+    useThemeColors: () => ({
+      background: '#fff', text: '#000', textSecondary: '#666', textMuted: '#999', primary: '#3b82f6',
+    }),
+    createThemedStyles: <T extends Record<string, any>>(styleFactory: (colors: any) => T) =>
+      (_colors: any) => styleFactory(_colors),
+    _setThemeModeMock: setThemeModeMock,
+    _toggleThemeMock: toggleThemeMock,
+  };
+});
+
+// Global mock for safe-area-context
+jest.mock('react-native-safe-area-context', () => ({
+  SafeAreaView: ({ children }: { children: React.ReactNode }) =>
+    children as React.ReactElement | null,
+  useSafeAreaInsets: jest.fn(() => ({ top: 0, bottom: 0, left: 0, right: 0 })),
+}));

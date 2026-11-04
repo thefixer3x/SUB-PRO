@@ -1,53 +1,61 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { CheckCircle } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useSubscriptionData } from '@/hooks/useSubscription';
 
 export default function BillingSuccess() {
   const { session_id } = useLocalSearchParams<{ session_id?: string }>();
   const { colors } = useTheme();
+  const { refreshTier } = useSubscriptionData();
+
+  // Refresh the user's tier from profiles so Pro features appear immediately
+  // after the Stripe webhook writes the new tier.
+  useEffect(() => {
+    refreshTier();
+  }, [refreshTier]);
 
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
-    content: { 
-      flex: 1, 
-      alignItems: 'center', 
-      justifyContent: 'center', 
-      padding: 24 
+    content: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 24,
     },
-    title: { 
-      fontSize: 28, 
-      fontWeight: 'bold', 
-      marginTop: 24, 
+    title: {
+      fontSize: 28,
+      fontWeight: 'bold',
+      marginTop: 24,
       color: colors.text,
       textAlign: 'center',
     },
-    subtitle: { 
-      fontSize: 16, 
-      color: colors.textSecondary, 
-      marginTop: 8, 
+    subtitle: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      marginTop: 8,
       textAlign: 'center',
       paddingHorizontal: 32,
     },
-    sessionId: { 
-      fontSize: 12, 
-      color: colors.textMuted, 
+    sessionId: {
+      fontSize: 12,
+      color: colors.textMuted,
       marginTop: 16,
       fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     },
-    button: { 
-      backgroundColor: colors.primary, 
-      paddingHorizontal: 32, 
-      paddingVertical: 14, 
-      borderRadius: 12, 
-      marginTop: 32 
+    button: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 32,
+      paddingVertical: 14,
+      borderRadius: 12,
+      marginTop: 32,
     },
-    buttonText: { 
-      color: '#FFFFFF', 
-      fontSize: 16, 
-      fontWeight: '600' 
+    buttonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
     },
   });
 

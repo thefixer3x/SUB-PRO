@@ -5,6 +5,9 @@ import { AppState, type AppStateEvent, type AppStateStatus } from 'react-native'
 import { supabase as mockedSupabase } from '@/lib/supabase';
 import type { Session, User } from '@supabase/supabase-js';
 
+// Use the REAL AuthContext for these tests, not the global mock.
+jest.unmock('@/contexts/AuthContext');
+
 type AuthValue = ReturnType<typeof useAuth>;
 
 const unsubscribeMock = jest.fn();
