@@ -1,69 +1,61 @@
-import { requireUser, type NetlifyEvent, type NetlifyResult } from './_shared/auth';
-import { getRequestOrigin, handlePreflight, isOriginAllowed, jsonResponse } from './_shared/cors';
-
 /**
- * Server-side proxy for Have I Been Pwned (HIBP) breach lookups.
- * Holds HAVEIBEENPWNED_API_KEY server-side; never exposed to the client.
- * Checks only the signed-in user's own email address.
- * Card S203 (docs/agents/EXECUTION_PLAN.md) moves this to api/hibp-check.ts.
+ * Thin adapter: netlify/functions/hibp-check.ts → api/hibp-check.ts.
+ *
+ * Converts the Netlify event format into a Request and delegates to the
+ * Vercel handler.  This file can be retired once Netlify is fully retired.
  */
-export const handler = async (event: NetlifyEvent): Promise<NetlifyResult> => {
-  if (event.httpMethod === 'OPTIONS') {
-    return handlePreflight(event);
+
+import vercelHandler from '../../api/hibp-check';
+
+interface NetlifyEvent {
+  httpMethod: string;
+  headers: Record<string, string | undefined>;
+  body: string | null;
+}
+
+interface NetlifyResult {
+  statusCode: number;
+  headers?: Record<string, string | undefined>;
+  body: string;
+}
+
+const toRequest = (event: NetlifyEvent): Request => {
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(event.headers ?? {})) {
+    if (value) headers.set(key, value);
   }
-
-  const origin = getRequestOrigin(event);
-  if (!isOriginAllowed(origin)) {
-    return jsonResponse(403, { error: 'Origin not allowed' });
-  }
-
-  if (!['POST', 'GET'].includes(event.httpMethod)) {
-    return jsonResponse(405, { error: 'Method not allowed' }, origin);
-  }
-
-  const auth = await requireUser(event);
-  if (!auth.ok) {
-    return auth.response;
-  }
-
-  const apiKey = process.env.HAVEIBEENPWNED_API_KEY;
-  if (!apiKey) {
-    return jsonResponse(503, { error: 'Breach check is not configured' }, origin);
-  }
-
-  const email = auth.user.email;
-  if (!email) {
-    return jsonResponse(400, { error: 'Account has no email address' }, origin);
-  }
-
-  try {
-    const response = await fetch(
-      `https://haveibeenpwned.com/api/v3/breachedaccount/${encodeURIComponent(email)}?truncateResponse=false`,
-      { headers: { 'hibp-api-key': apiKey, 'user-agent': 'SubTrackPro/1.0' } },
-    );
-
-    if (response.status === 404) {
-      return jsonResponse(200, { breached: false }, origin);
-    }
-    if (!response.ok) {
-      return jsonResponse(502, { error: 'Breach service unavailable' }, origin);
-    }
-
-    const breaches = (await response.json()) as Record<string, unknown>[];
-    return jsonResponse(
-      200,
-      {
-        breached: true,
-        breaches: breaches.map((b) => ({
-          name: b.Name,
-          breachDate: b.BreachDate,
-          addedDate: b.AddedDate,
-          dataClasses: b.DataClasses,
-        })),
-      },
-      origin,
-    );
-  } catch {
-    return jsonResponse(500, { error: 'Internal server error' }, origin);
-  }
+  return new Request('https://placeholder/api/hibp-check', {
+    method: event.httpMethod,
+    headers,
+    body: event.body ?? undefined,
+  });
 };
+
+const fromResponse = async (
+  response: Response,
+  event: NetlifyEvent,
+): Promise<NetlifyResult> => {
+  const body = await response.text();
+  const headers: Record<string, string | undefined> = {};
+  response.headers.forEach((value, key) => {
+    headers[key] = value;
+  });
+  if (!event.headers?.origin) {
+    delete headers['Access-Control-Allow-Origin'];
+  }
+  return {
+    statusCode: response.status,
+    headers,
+    body,
+  };
+};
+
+export const handler = async (
+  event: NetlifyEvent,
+): Promise<NetlifyResult> => {
+  const request = toRequest(event);
+  const response = await vercelHandler(request);
+  return fromResponse(response, event);
+};
+
+export default handler;

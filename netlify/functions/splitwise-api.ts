@@ -1,29 +1,61 @@
-import { requireUser, type NetlifyEvent, type NetlifyResult } from './_shared/auth';
-import { getRequestOrigin, handlePreflight, isOriginAllowed, jsonResponse } from './_shared/cors';
-
 /**
- * Splitwise proxy: disabled.
+ * Thin adapter: netlify/functions/splitwise-api.ts → api/splitwise.ts.
  *
- * The earlier version forwarded create/delete/remove-member calls to Splitwise with
- * one shared app key and no check that the caller owns the group, so any signed-in
- * user could act on any group. Nothing in the app calls this endpoint today.
- * Card S203 (docs/agents/EXECUTION_PLAN.md) rebuilds it as api/splitwise.ts with
- * per-user authorisation; until then it answers 501 to signed-in users.
+ * Converts the Netlify event format into a Request and delegates to the
+ * Vercel handler.  This file can be retired once Netlify is fully retired.
  */
-export const handler = async (event: NetlifyEvent): Promise<NetlifyResult> => {
-  if (event.httpMethod === 'OPTIONS') {
-    return handlePreflight(event);
-  }
 
-  const origin = getRequestOrigin(event);
-  if (!isOriginAllowed(origin)) {
-    return jsonResponse(403, { error: 'Origin not allowed' });
-  }
+import vercelHandler from '../../api/splitwise';
 
-  const auth = await requireUser(event);
-  if (!auth.ok) {
-    return auth.response;
-  }
+interface NetlifyEvent {
+  httpMethod: string;
+  headers: Record<string, string | undefined>;
+  body: string | null;
+}
 
-  return jsonResponse(501, { error: 'Splitwise integration is not available yet' }, origin);
+interface NetlifyResult {
+  statusCode: number;
+  headers?: Record<string, string | undefined>;
+  body: string;
+}
+
+const toRequest = (event: NetlifyEvent): Request => {
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(event.headers ?? {})) {
+    if (value) headers.set(key, value);
+  }
+  return new Request('https://placeholder/api/splitwise', {
+    method: event.httpMethod,
+    headers,
+    body: event.body ?? undefined,
+  });
 };
+
+const fromResponse = async (
+  response: Response,
+  event: NetlifyEvent,
+): Promise<NetlifyResult> => {
+  const body = await response.text();
+  const headers: Record<string, string | undefined> = {};
+  response.headers.forEach((value, key) => {
+    headers[key] = value;
+  });
+  if (!event.headers?.origin) {
+    delete headers['Access-Control-Allow-Origin'];
+  }
+  return {
+    statusCode: response.status,
+    headers,
+    body,
+  };
+};
+
+export const handler = async (
+  event: NetlifyEvent,
+): Promise<NetlifyResult> => {
+  const request = toRequest(event);
+  const response = await vercelHandler(request);
+  return fromResponse(response, event);
+};
+
+export default handler;
