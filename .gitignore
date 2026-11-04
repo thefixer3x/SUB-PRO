@@ -58,3 +58,6 @@ cohesive-mender-459104-c3-abc562777578.json
 
 # Generated build output
 build-result.json
+
+# Local git worktrees created by the orchestrator
+.worktrees/
