@@ -49,6 +49,18 @@ export default async function handler(request: Request): Promise<Response> {
     return new Response('Method Not Allowed', { status: 405 });
   }
 
+  // A browser request from an origin outside the allowlist is rejected
+  // outright. The original Netlify function did this for every method, not
+  // just the preflight; without it a hostile page could drive the API with
+  // the victim's session.
+  const requestOrigin = getRequestOrigin(Object.fromEntries(request.headers.entries()));
+  if (!isOriginAllowed(requestOrigin)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     const auth = await requireUser(request);
     if (!auth.ok) {
@@ -74,6 +86,10 @@ export default async function handler(request: Request): Promise<Response> {
         body = JSON.parse(await request.text());
       } catch {
         return json(400, { error: 'Invalid JSON body' }, origin);
+      }
+
+      if (body.provider === 'weavr') {
+        return json(501, { error: 'Provider not available' }, origin);
       }
 
       const validationError = vc.validateCreateCard(body);
@@ -153,7 +169,7 @@ export default async function handler(request: Request): Promise<Response> {
       }
 
       const result = await vc.updateCard(cardId, userId, updates);
-      if (!result.ok) return json(400, { error: result.error }, origin);
+      if (!result.ok) return json(result.status ?? 400, { error: result.error }, origin);
       return json(200, result.data, origin);
     }
 

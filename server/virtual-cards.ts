@@ -185,6 +185,11 @@ export const validateCreateCard = (
   payload: Record<string, unknown>,
 ): string | null => {
   const { subscriptionId, spendingLimit, merchantCategory } = payload;
+  // The weavr provider is not wired up. Reject it explicitly rather than
+  // silently creating a Stripe card — the original function answered 501.
+  if (payload.provider === 'weavr') {
+    return 'Provider not available';
+  }
   if (!subscriptionId || typeof subscriptionId !== 'string') {
     return 'Missing required fields';
   }
@@ -536,11 +541,13 @@ export const updateCard = async (
   updates: UpdateCardInput,
 ): Promise<
   | { ok: true; data: UpdateCardOutput }
-  | { ok: false; error: string }
+  | { ok: false; error: string; status?: number }
 > => {
   try {
+    // An ownership failure is a 403, not a 400: the request was well formed
+    // but the card belongs to someone else.
     const ownershipError = await verifyCardOwnership(cardId, userId);
-    if (ownershipError) return { ok: false, error: ownershipError };
+    if (ownershipError) return { ok: false, error: ownershipError, status: 403 };
 
     const controls = parseUpdateControls(updates);
     if (typeof controls === 'string') return { ok: false, error: controls };
@@ -554,7 +561,7 @@ export const updateCard = async (
     const client = ensureStripe();
     const existing = await client.issuing.cards.retrieve(cardId);
     if (existing.metadata?.user_id !== userId) {
-      return { ok: false, error: 'Access denied' };
+      return { ok: false, error: 'Access denied', status: 403 };
     }
 
     const updateParams: Stripe.Issuing.CardUpdateParams = {};

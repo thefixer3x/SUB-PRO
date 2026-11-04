@@ -10,6 +10,20 @@
 
 import vercelHandler from '../../api/banking/proxy';
 
+/**
+ * Canonical (title-cased) spellings for the headers the server layer emits.
+ * The Web Headers API lowercases every name on iteration, but the Netlify
+ * function contract has always returned canonical names.
+ */
+const CANONICAL_HEADER_NAMES: Record<string, string> = {
+  'Access-Control-Allow-Origin': 'access-control-allow-origin',
+  'Access-Control-Allow-Methods': 'access-control-allow-methods',
+  'Access-Control-Allow-Headers': 'access-control-allow-headers',
+  'Access-Control-Max-Age': 'access-control-max-age',
+  'Content-Type': 'content-type',
+  Vary: 'vary',
+};
+
 interface NetlifyEvent {
   httpMethod: string;
   headers: Record<string, string | undefined>;
@@ -43,6 +57,15 @@ const fromResponse = async (
   response.headers.forEach((value, key) => {
     headers[key] = value;
   });
+  // The Web Headers API lowercases every name. The Netlify contract (and
+  // every existing caller) reads canonical, title-cased header names, so
+  // restore the casing the server layer used.
+  for (const [canonical, lower] of Object.entries(CANONICAL_HEADER_NAMES)) {
+    if (headers[lower] !== undefined) {
+      headers[canonical] = headers[lower];
+      delete headers[lower];
+    }
+  }
   if (!event.headers?.origin) {
     delete headers['Access-Control-Allow-Origin'];
   }

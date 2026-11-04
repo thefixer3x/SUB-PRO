@@ -38,6 +38,17 @@ export default async function handler(request: Request): Promise<Response> {
     });
   }
 
+  // A browser request from an origin outside the allowlist is rejected
+  // outright, before authentication. The original Netlify functions did
+  // this for every method, not just the preflight.
+  const requestOrigin = getRequestOrigin(Object.fromEntries(request.headers.entries()));
+  if (!isOriginAllowed(requestOrigin)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     const auth = await requireUser(request);
     if (!auth.ok) {
