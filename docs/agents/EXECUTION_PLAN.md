@@ -61,7 +61,7 @@ All seven must hold; "mostly" is a rejection.
 | A2 | ~~Vercel env~~ **DONE 2026-11-03** — verified via Vercel API: `STRIPE_SECRET_KEY` (dev/preview/prod), `ALLOWED_ORIGINS`, `SITE_URL`, `STRIPE_WEBHOOK_SECRET` (prod) and `SUPABASE_SECRET_KEY` all present | S201 preview test | closed |
 | A3 | ~~Stripe lookup keys~~ **DONE 2026-11-03 (live mode)** — `price_1RiSAL2…` → `subtrack_pro_monthly`, `price_1RiSAi2…` → `subtrack_enterprise_monthly`, endpoint `we_1RiSB62…` has `metadata.project = subtrack`. **Agents use test mode only** and create their own test-mode prices/endpoint with the same lookup keys and metadata. | S201 | closed — does **not** block |
 | A4 | Top up the Anthropic key used by the `claude-review` workflow | automated review | — |
-| A5 | `SPLITWISE_API_KEY`, `HAVEIBEENPWNED_API_KEY` on Vercel — **confirmed still MISSING 2026-11-03** (Vercel API lists neither key) | S203 preview test | — |
+| A5 | `SPLITWISE_API_KEY`, `HAVEIBEENPWNED_API_KEY` on Vercel — **confirmed still MISSING 2026-11-04** (pulled all three environments: absent from production, preview and development) | S203 | — |
 
 **Decisions log.** Only the orchestrator edits this list, and only after the owner answers. A worker whose card depends on a D or A item checks here first. If the item is still open and the table gives a default, the worker proceeds under that default and says so in the PR; if there is no default, the worker blocks the card with `needs owner: <ID>`.
 
@@ -160,7 +160,14 @@ All four cards run **in parallel**. None touches `netlify/`, `api/` or `server/`
 | Card | PR | Merged | Notes |
 |---|---|---|---|
 | S301 | #84 | merged | Real subscriptions via Supabase, `utils/subscriptionMath.ts` pure functions, loading/empty/error states, no hardcoded currency. 151 tests, 0 errors. |
-| S302 | #85 | merged | Real session user in Settings, all 5 rows wired, `hooks/usePreferences.ts` with AsyncStorage persistence. 130 tests, 0 errors. S301 dependency resolved by merge order. |**
+| S302 | #85 | merged | Real session user in Settings, all 5 rows wired, `hooks/usePreferences.ts` with AsyncStorage persistence. 130 tests, 0 errors. S301 dependency resolved by merge order. |
+| S201 | #86 | merged | `server/` module (auth, cors, stripe, supabase-admin) + Vercel `api/` handlers; Netlify functions reduced to thin adapters. D1=(b) enforced. 172 tests, 0 errors, 5/5 mutations killed. |
+
+**Environmental blocker (2026-11-04): Vercel `SENTRY_AUTH_TOKEN` expired.** Fresh Vercel builds fail at the post-build sourcemap upload (`sentry-cli sourcemaps upload` → `Token expired (http status: 401)`), after `expo export` has already succeeded. The app build itself is fine.
+- Not caused by S201: the S302 deployment (`dpl_FncQrvjwFBdbFxqCEHs8KK57dwun`) redeploys successfully, and `main` deployments at 01:05–01:19 were READY, while both S201 deployments (01:39, 01:47) failed. The redeploy difference is build-cache: the S302 redeploy restored its cache and skipped the sentry step; S201's fresh build ran it and hit the expired token.
+- **Fix (owner):** rotate `SENTRY_AUTH_TOKEN` on the Vercel project (`sub-pro`, org `onasis-team`), or set `SENTRY_LOG_LEVEL=debug` / remove the `scripts/upload-sentry-sourcemaps.js` step from the `vercel-build` script.
+- Every fresh Vercel deployment is blocked until this is fixed — including production promotion.
+- Preview curl checks (`POST /api/stripe/webhook` → 400, `/api/nope` → 404) also need an authenticated Vercel session: Vercel Deployment Protection (SSO) 302s all unauthenticated requests on preview deployments, confirmed on both a known-good READY deployment and the S201 preview.**
 
 Orchestrator verification for every merged card above: `npm run type-check` 0 errors, `npm run lint` 0 errors, `npx jest --testPathIgnorePatterns '/.claude/'` all pass (S103: 119/119/16 suites; S102: 127/127/19 suites), web export ok, diff clean of secrets and outside Scope. The `claude-review` check fails on every PR (known **A4** external-service issue, not a technical gate — PR #72 was merged with the same failure).
 
@@ -352,3 +359,4 @@ Rejection list:
 - Mock or demo data reachable without demo mode; any hardcoded card data.
 - Server code added under `netlify/functions/` (except the thin adapters S201/S203 allow).
 - Secrets, emails, tokens or local paths anywhere in the diff, PR or card comments.
+| A6 | `SENTRY_AUTH_TOKEN` on Vercel — **EXPIRED 2026-11-04** (`Token expired (http status: 401)` at the post-build sourcemap upload, after `expo export` succeeds). Blocks every fresh Vercel build, including production promotion. Fix: rotate the token, or remove the `scripts/upload-sentry-sourcemaps.js` step from the `vercel-build` script. | all Vercel deploys | **blocks new deploys** |
