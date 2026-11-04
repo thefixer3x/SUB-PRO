@@ -102,3 +102,91 @@ export function getDashboardStats(
     mixedCurrencies: detectMixedCurrencies(subscriptions),
   };
 }
+
+// ─── Potential Savings ───────────────────────────────────────────────────────
+
+export interface SavingsReason {
+  type: 'duplicate_category' | 'annual_optimization';
+  category: string;
+  description: string;
+  monthlyAmount: number;
+}
+
+export interface PotentialSavings {
+  monthlyAmount: number;
+  reasons: SavingsReason[];
+}
+
+/**
+ * Compute potential monthly savings from real subscription data.
+ *
+ * Two computable rules:
+ * 1. Duplicate category — two or more active subscriptions in the same
+ *    category can often be consolidated (family plans, overlapping services).
+ *    Savings = sum of (second_highest_cost − lowest_cost) per duplicated category.
+ * 2. Annual optimization — monthly subscriptions that COULD be annual.
+ *    We apply a 20 % discount factor (typical for SaaS annual plans) to
+ *    estimate monthly savings from switching.
+ */
+export function calculatePotentialSavings(
+  subscriptions: Subscription[],
+): PotentialSavings {
+  const reasons: SavingsReason[] = [];
+  let totalMonthly = 0;
+
+  // Rule 1 — duplicate categories
+  const byCategory = new Map<string, Subscription[]>();
+  for (const sub of subscriptions) {
+    if (sub.status !== 'Active') continue;
+    const list = byCategory.get(sub.category) ?? [];
+    list.push(sub);
+    byCategory.set(sub.category, list);
+  }
+
+  for (const [category, subs] of byCategory) {
+    if (subs.length < 2) continue;
+    // sort descending by monthly-equivalent cost
+    const sorted = subs
+      .map((s) => ({
+        name: s.name,
+        monthly: normalizeToMonthly(s.monthlyCost, s.billingCycle),
+      }))
+      .sort((a, b) => b.monthly - a.monthly);
+
+    // savings = 2nd most expensive − cheapest in this group
+    const saving = sorted[sorted.length - 2].monthly - sorted[sorted.length - 1].monthly;
+    if (saving > 0) {
+      totalMonthly += saving;
+      reasons.push({
+        type: 'duplicate_category',
+        category,
+        description: `Consolidate ${category} services into one plan`,
+        monthlyAmount: Math.round(saving * 100) / 100,
+      });
+    }
+  }
+
+  // Rule 2 — monthly → annual optimization (20 % typical annual discount)
+  for (const sub of subscriptions) {
+    if (sub.status !== 'Active') continue;
+    if (sub.billingCycle !== 'Monthly') continue;
+    const monthlyEquivalent = normalizeToMonthly(sub.monthlyCost, sub.billingCycle);
+    // 20 % annual discount applied to the monthly cost
+    const monthlySaving = monthlyEquivalent * 0.2;
+    const rounded = Math.round(monthlySaving * 100) / 100;
+    if (rounded > 0) {
+      totalMonthly += rounded;
+      reasons.push({
+        type: 'annual_optimization',
+        category: sub.category,
+        description: `Switch ${sub.name} to annual billing`,
+        monthlyAmount: rounded,
+      });
+    }
+  }
+
+  return {
+    monthlyAmount: Math.round(totalMonthly * 100) / 100,
+    reasons,
+  };
+}

@@ -215,3 +215,137 @@ describe('getDashboardStats (integration)', () => {
     expect(stats.upcomingRenewals[0]?.name).toBe('Netflix');
   });
 });
+
+// ─── calculatePotentialSavings ─────────────────────────────────────────────
+
+import { calculatePotentialSavings } from '../utils/subscriptionMath';
+
+describe('calculatePotentialSavings', () => {
+  it('returns empty when no subscriptions', () => {
+    const result = calculatePotentialSavings([]);
+    expect(result.monthlyAmount).toBe(0);
+    expect(result.reasons).toEqual([]);
+  });
+
+  it('returns empty when only one active subscription (no duplicate, non-monthly)', () => {
+    const subs = [sub({ name: 'Netflix', monthlyCost: 15.99, billingCycle: 'Annually', category: 'Entertainment' })];
+    const result = calculatePotentialSavings(subs);
+    expect(result.monthlyAmount).toBe(0);
+    expect(result.reasons).toEqual([]);
+  });
+
+  it('detects two subscriptions in the same category (Rule 1)', () => {
+    const subs = [
+      sub({ name: 'Netflix', monthlyCost: 15.99, billingCycle: 'Annually', category: 'Entertainment' }),
+      sub({ name: 'Max', monthlyCost: 14.99, billingCycle: 'Annually', category: 'Entertainment' }),
+    ];
+    const result = calculatePotentialSavings(subs);
+    // Netflix: 15.99/12 = 1.3325, Max: 14.99/12 = 1.2492
+    // savings = 1.3325 − 1.2492 = 0.0833 → rounds to 0.08
+    expect(result.monthlyAmount).toBeCloseTo(0.08, 2);
+    expect(result.reasons).toHaveLength(1);
+    expect(result.reasons[0].type).toBe('duplicate_category');
+    expect(result.reasons[0].category).toBe('Entertainment');
+  });
+
+  it('detects multiple subscriptions in same category (3+)', () => {
+    const subs = [
+      sub({ name: 'Netflix', monthlyCost: 15.99, billingCycle: 'Annually', category: 'Entertainment' }),
+      sub({ name: 'Max', monthlyCost: 14.99, billingCycle: 'Annually', category: 'Entertainment' }),
+      sub({ name: 'Disney+', monthlyCost: 10.99, billingCycle: 'Annually', category: 'Entertainment' }),
+    ];
+    const result = calculatePotentialSavings(subs);
+    // sorted: 1.3325, 1.2492, 0.9158
+    // savings = 1.2492 − 0.9158 = 0.3333 → rounds to 0.33
+    expect(result.monthlyAmount).toBeCloseTo(0.33, 2);
+    expect(result.reasons).toHaveLength(1);
+    expect(result.reasons[0].description).toContain('Entertainment');
+  });
+
+  it('accumulates duplicate savings across multiple categories', () => {
+    const subs = [
+      sub({ name: 'Netflix', monthlyCost: 24, billingCycle: 'Annually', category: 'Entertainment' }),
+      sub({ name: 'Max', monthlyCost: 18, billingCycle: 'Annually', category: 'Entertainment' }),
+      sub({ name: 'Asana', monthlyCost: 12, billingCycle: 'Annually', category: 'Productivity' }),
+      sub({ name: 'Notion', monthlyCost: 6, billingCycle: 'Annually', category: 'Productivity' }),
+    ];
+    const result = calculatePotentialSavings(subs);
+    // Entertainment: 18/12 − 12/12 = 1.50 − 1.00 = 0.50
+    // Productivity: 12/12 − 6/12 = 1.00 − 0.50 = 0.50
+    // Total: 1.00
+    expect(result.monthlyAmount).toBeCloseTo(1.0, 2);
+    expect(result.reasons).toHaveLength(2);
+  });
+
+  it('ignores inactive subscriptions in duplicate detection', () => {
+    const subs = [
+      sub({ name: 'Netflix', monthlyCost: 18, billingCycle: 'Annually', category: 'Entertainment' }),
+      sub({ name: 'OldService', monthlyCost: 12, billingCycle: 'Annually', category: 'Entertainment', status: 'Inactive' }),
+    ];
+    const result = calculatePotentialSavings(subs);
+    // OldService is inactive → only Netflix in category → no duplicate
+    expect(result.monthlyAmount).toBe(0);
+    expect(result.reasons).toEqual([]);
+  });
+
+  it('ignores zero-saving duplicates (same price)', () => {
+    const subs = [
+      sub({ name: 'A', monthlyCost: 12, billingCycle: 'Annually', category: 'Entertainment' }),
+      sub({ name: 'B', monthlyCost: 12, billingCycle: 'Annually', category: 'Entertainment' }),
+    ];
+    const result = calculatePotentialSavings(subs);
+    // 1 − 1 = 0 → no savings
+    expect(result.monthlyAmount).toBe(0);
+    expect(result.reasons).toEqual([]);
+  });
+
+  it('estimates savings for monthly subscriptions (Rule 2)', () => {
+    const subs = [
+      sub({ name: 'Netflix', monthlyCost: 15.99, billingCycle: 'Monthly', category: 'Entertainment' }),
+    ];
+    const result = calculatePotentialSavings(subs);
+    expect(result.monthlyAmount).toBeCloseTo(3.20, 2);
+    expect(result.reasons[0].type).toBe('annual_optimization');
+    expect(result.reasons[0].description).toContain('Netflix');
+  });
+
+  it('excludes already-annual subscriptions from annual optimization', () => {
+    const subs = [
+      sub({ name: 'Adobe', monthlyCost: 120, billingCycle: 'Annually', category: 'Creative' }),
+    ];
+    const result = calculatePotentialSavings(subs);
+    expect(result.monthlyAmount).toBe(0);
+    expect(result.reasons).toEqual([]);
+  });
+
+  it('mixes duplicate and annual rules', () => {
+    const subs = [
+      sub({ name: 'Netflix', monthlyCost: 15.99, billingCycle: 'Monthly', category: 'Entertainment' }),
+      sub({ name: 'Max', monthlyCost: 14.99, billingCycle: 'Monthly', category: 'Entertainment' }),
+      sub({ name: 'Spotify', monthlyCost: 9.99, billingCycle: 'Monthly', category: 'Entertainment' }),
+      sub({ name: 'Notion', monthlyCost: 8.99, billingCycle: 'Monthly', category: 'Productivity' }),
+    ];
+    const result = calculatePotentialSavings(subs);
+    // Duplicate (Entertainment): 14.99 − 9.99 = 5.00
+    // Annual: 15.99×0.2=3.20 + 14.99×0.2=3.00 + 9.99×0.2=2.00 + 8.99×0.2=1.80 = 10.00
+    // Total: 15.00
+    expect(result.monthlyAmount).toBeCloseTo(15.00, 2);
+    expect(result.reasons).toHaveLength(5);
+    expect(result.reasons.some((r) => r.type === 'duplicate_category')).toBe(true);
+    expect(result.reasons.some((r) => r.type === 'annual_optimization')).toBe(true);
+  });
+
+  it('handles mixed billing cycles in duplicate detection', () => {
+    const subs = [
+      sub({ name: 'Netflix', monthlyCost: 15.99, billingCycle: 'Monthly', category: 'Entertainment' }),
+      sub({ name: 'Disney+', monthlyCost: 120, billingCycle: 'Annually', category: 'Entertainment' }),
+    ];
+    const result = calculatePotentialSavings(subs);
+    // Duplicate (Entertainment): 15.99 − 120/12 = 15.99 − 10.00 = 5.99
+    // Annual (Netflix monthly): 15.99 × 0.2 = 3.20
+    // Total: 9.19
+    expect(result.monthlyAmount).toBeCloseTo(9.19, 2);
+    expect(result.reasons).toHaveLength(2);
+    expect(result.reasons[0].type).toBe('duplicate_category');
+  });
+});
