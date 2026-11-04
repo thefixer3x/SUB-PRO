@@ -153,7 +153,14 @@ All four cards run **in parallel**. None touches `netlify/`, `api/` or `server/`
 | S103 | #80 | `67bae8c` | Virtual Cards shows no invented card data. PR body corrected to "Part of #44" so the umbrella tracker is not auto-closed. |
 | S102 | #83 | `baaa3e9` | Shared Groups own `subscriptionSharing` gate + working share flow. Worker exited without pushing; orchestrator finished the card, and fixed two review findings (stale group list after create → CodeRabbit major; unused import → CodeQL). |
 
-**Sprint 1 complete 2026-11-03 — 4/4 merged.**
+**Sprint 1 complete 2026-11-03 — 4/4 merged.
+
+**Sprint 3 status (2026-11-04):**
+
+| Card | PR | Merged | Notes |
+|---|---|---|---|
+| S301 | #84 | merged | Real subscriptions via Supabase, `utils/subscriptionMath.ts` pure functions, loading/empty/error states, no hardcoded currency. 151 tests, 0 errors. |
+| S302 | #85 | merged | Real session user in Settings, all 5 rows wired, `hooks/usePreferences.ts` with AsyncStorage persistence. 130 tests, 0 errors. S301 dependency resolved by merge order. |**
 
 Orchestrator verification for every merged card above: `npm run type-check` 0 errors, `npm run lint` 0 errors, `npx jest --testPathIgnorePatterns '/.claude/'` all pass (S103: 119/119/16 suites; S102: 127/127/19 suites), web export ok, diff clean of secrets and outside Scope. The `claude-review` check fails on every PR (known **A4** external-service issue, not a technical gate — PR #72 was merged with the same failure).
 
