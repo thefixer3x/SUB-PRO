@@ -422,10 +422,12 @@ describe('server/banking: proxyRequest', () => {
     fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ accounts: [] }) });
     const result = await bankServer.proxyRequest(
       { path: '/banking/connect', method: 'POST', payload: { bankCode: 'ABCD' } },
-      'test_key', 'https://api.test.com',
+      'test_key', 'https://api.test.com', 'user-abc',
     );
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data).toEqual({ accounts: [] });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect((init.headers as Record<string, string>)['X-User-ID']).toBe('user-abc');
   });
 
   it('returns 504 on timeout', async () => {
@@ -434,7 +436,7 @@ describe('server/banking: proxyRequest', () => {
     fetchMock.mockRejectedValueOnce(err);
     const result = await bankServer.proxyRequest(
       { path: '/banking/connect', method: 'POST', payload: {} },
-      'test_key', 'https://api.test.com',
+      'test_key', 'https://api.test.com', 'user-abc',
     );
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -616,6 +618,24 @@ describe('api/banking/proxy: handler', () => {
     const res = await bankHandler(req);
     expect(res.status).toBe(200);
     expect(JSON.parse(await res.text())).toEqual({ connected: true });
+  });
+
+  it('scopes the upstream call to the session user, ignoring any user id in the body', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ connected: true }) });
+    const req = new Request('https://placeholder/api/banking/proxy', {
+      method: 'POST',
+      headers: { origin: ALLOWED_ORIGIN, authorization: 'Bearer valid-token', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        path: '/banking/connect',
+        method: 'POST',
+        userId: '22222222-2222-4222-8222-222222222222',
+        payload: { userId: '22222222-2222-4222-8222-222222222222' },
+      }),
+    });
+    const res = await bankHandler(req);
+    expect(res.status).toBe(200);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect((init.headers as Record<string, string>)['X-User-ID']).toBe(_authUser.id);
   });
 
   it('rejects non-POST method', async () => {

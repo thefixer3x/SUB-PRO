@@ -34,12 +34,16 @@ export const proxyRequest = async (
   validated: ValidatedBankingProxyRequest,
   mcpApiKey: string,
   mcpBaseUrl: string,
+  authenticatedUserId: string,
 ): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; status: number; error: string }> => {
   const url = `${mcpBaseUrl}${validated.path}`;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${mcpApiKey}`,
+    // The service key is shared, so the upstream scopes every call to this
+    // user. It must come from the verified session, never from the body.
+    'X-User-ID': authenticatedUserId,
   };
 
   try {

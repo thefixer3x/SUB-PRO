@@ -78,7 +78,7 @@ export default async function handler(request: Request): Promise<Response> {
       });
     }
 
-    const result = await proxyRequest(validation.value, mcpApiKey, mcpBaseUrl);
+    const result = await proxyRequest(validation.value, mcpApiKey, mcpBaseUrl, auth.user.id);
 
     if (!result.ok) {
       return new Response(JSON.stringify({ error: result.error }), {
