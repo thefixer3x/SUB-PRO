@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, ActivityIndicator } from 'react-native';
 import { UpgradeRibbon } from '@/components/monetization/UpgradeRibbon';
 import { AdBanner } from '@/components/monetization/AdBanner';
 import { FeatureGate } from '@/components/monetization/FeatureGate';
@@ -7,7 +7,23 @@ import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSubscriptions } from '@/hooks/useSubscriptions';
+import { getDashboardStats } from '@/utils/subscriptionMath';
 import { ThemeColors } from '@/constants/theme';
+
+/** Format a number as a locale-aware currency string, defaulting to USD. */
+function fmtCurrency(amount: number, currency = 'USD'): string {
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `${currency} ${amount.toFixed(2)}`;
+  }
+}
 
 export default function Dashboard() {
   const { currentTier } = useSubscription();
@@ -19,6 +35,14 @@ export default function Dashboard() {
     || user?.email?.split('@')[0]
     || 'there';
 
+  const userId = user?.id;
+  const { data: subscriptions, isLoading, error } = useSubscriptions(userId);
+
+  const stats = React.useMemo(
+    () => (subscriptions ? getDashboardStats(subscriptions) : null),
+    [subscriptions],
+  );
+
   return (
     <SafeAreaView style={dynamicStyles.container}>
       <ScrollView style={dynamicStyles.content} showsVerticalScrollIndicator={false} contentContainerStyle={dynamicStyles.scrollContent}>
@@ -29,61 +53,72 @@ export default function Dashboard() {
 
         <UpgradeRibbon />
 
-        <View style={dynamicStyles.metricsGrid}>
-          <View style={dynamicStyles.metricCard}>
-            <Text style={dynamicStyles.metricValue}>12</Text>
-            <Text style={dynamicStyles.metricLabel}>Active Subscriptions</Text>
+        {/* Metrics */}
+        {isLoading ? (
+          <View style={dynamicStyles.metricsGrid}>
+            <ActivityIndicator size="small" color={colors.primary} />
           </View>
-          
-          <View style={dynamicStyles.metricCard}>
-            <Text style={dynamicStyles.metricValue}>$247.89</Text>
-            <Text style={dynamicStyles.metricLabel}>Monthly Spending</Text>
+        ) : error ? (
+          <View style={dynamicStyles.metricsGrid}>
+            <Text style={dynamicStyles.errorText}>Failed to load subscriptions</Text>
           </View>
-          
-          <View style={dynamicStyles.metricCard}>
-            <Text style={dynamicStyles.metricValue}>$2,974.68</Text>
-            <Text style={dynamicStyles.metricLabel}>Yearly Total</Text>
+        ) : stats ? (
+          <View style={dynamicStyles.metricsGrid}>
+            <View style={dynamicStyles.metricCard}>
+              <Text style={dynamicStyles.metricValue}>{stats.activeCount}</Text>
+              <Text style={dynamicStyles.metricLabel}>Active Subscriptions</Text>
+            </View>
+
+            <View style={dynamicStyles.metricCard}>
+              <Text style={dynamicStyles.metricValue}>{fmtCurrency(stats.monthlyTotal)}</Text>
+              <Text style={dynamicStyles.metricLabel}>Monthly Spending</Text>
+            </View>
+
+            <View style={dynamicStyles.metricCard}>
+              <Text style={dynamicStyles.metricValue}>{fmtCurrency(stats.annualTotal)}</Text>
+              <Text style={dynamicStyles.metricLabel}>Yearly Total</Text>
+            </View>
+
+            <View style={dynamicStyles.metricCard}>
+              <Text style={dynamicStyles.metricValue}>{stats.upcomingRenewals.length}</Text>
+              <Text style={dynamicStyles.metricLabel}>Expiring Soon</Text>
+            </View>
           </View>
-          
-          <View style={dynamicStyles.metricCard}>
-            <Text style={dynamicStyles.metricValue}>3</Text>
-            <Text style={dynamicStyles.metricLabel}>Expiring Soon</Text>
+        ) : (
+          /* Empty state — new user with no subscriptions */
+          <View style={dynamicStyles.emptyState}>
+            <Text style={dynamicStyles.emptyTitle}>No subscriptions yet</Text>
+            <Text style={dynamicStyles.emptySubtitle}>
+              Add your first subscription to start tracking spending.
+            </Text>
           </View>
-        </View>
+        )}
 
         <AdBanner placement="home" />
 
+        {/* Recent activity — show upcoming renewals */}
         <View style={dynamicStyles.section}>
-          <Text style={dynamicStyles.sectionTitle}>Recent Activity</Text>
-          
-          <View style={dynamicStyles.activityList}>
-            <View style={dynamicStyles.activityItem}>
-              <View style={dynamicStyles.activityDot} />
-              <View style={dynamicStyles.activityContent}>
-                <Text style={dynamicStyles.activityTitle}>Netflix subscription renewed</Text>
-                <Text style={dynamicStyles.activityTime}>2 hours ago</Text>
-              </View>
-              <Text style={dynamicStyles.activityAmount}>$15.99</Text>
+          <Text style={dynamicStyles.sectionTitle}>Upcoming Renewals</Text>
+
+          {isLoading ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : stats && stats.upcomingRenewals.length > 0 ? (
+            <View style={dynamicStyles.renewalsList}>
+              {stats.upcomingRenewals.map((sub) => (
+                <View key={sub.id} style={dynamicStyles.renewalItem}>
+                  <Text style={dynamicStyles.renewalService}>{sub.name}</Text>
+                  <Text style={dynamicStyles.renewalDate}>
+                    {new Date(sub.renewalDate).toLocaleDateString()}
+                  </Text>
+                  <Text style={dynamicStyles.renewalAmount}>
+                    {fmtCurrency(sub.monthlyCost, sub.currency)}
+                  </Text>
+                </View>
+              ))}
             </View>
-            
-            <View style={dynamicStyles.activityItem}>
-              <View style={dynamicStyles.activityDot} />
-              <View style={dynamicStyles.activityContent}>
-                <Text style={dynamicStyles.activityTitle}>Added Spotify Premium</Text>
-                <Text style={dynamicStyles.activityTime}>1 day ago</Text>
-              </View>
-              <Text style={dynamicStyles.activityAmount}>$9.99</Text>
-            </View>
-            
-            <View style={dynamicStyles.activityItem}>
-              <View style={dynamicStyles.activityDot} />
-              <View style={dynamicStyles.activityContent}>
-                <Text style={dynamicStyles.activityTitle}>Canceled Adobe Creative Cloud</Text>
-                <Text style={dynamicStyles.activityTime}>3 days ago</Text>
-              </View>
-              <Text style={[dynamicStyles.activityAmount, dynamicStyles.canceledAmount]}>-$52.99</Text>
-            </View>
-          </View>
+          ) : (
+            <Text style={dynamicStyles.emptyText}>No renewals in the next 7 days</Text>
+          )}
         </View>
 
         <FeatureGate
@@ -91,50 +126,43 @@ export default function Dashboard() {
           requiredTier="pro"
           fallback={
             <View style={dynamicStyles.section}>
-              <Text style={dynamicStyles.sectionTitle}>Upcoming Renewals</Text>
-              <View style={dynamicStyles.renewalsList}>
-                <View style={dynamicStyles.renewalItem}>
-                  <Text style={dynamicStyles.renewalService}>Disney+</Text>
-                  <Text style={dynamicStyles.renewalDate}>Tomorrow</Text>
-                  <Text style={dynamicStyles.renewalAmount}>$7.99</Text>
-                </View>
-                <View style={dynamicStyles.renewalItem}>
-                  <Text style={dynamicStyles.renewalService}>GitHub Pro</Text>
-                  <Text style={dynamicStyles.renewalDate}>In 3 days</Text>
-                  <Text style={dynamicStyles.renewalAmount}>$4.00</Text>
-                </View>
-                <View style={dynamicStyles.renewalItem}>
-                  <Text style={dynamicStyles.renewalService}>Notion Pro</Text>
-                  <Text style={dynamicStyles.renewalDate}>In 1 week</Text>
-                  <Text style={dynamicStyles.renewalAmount}>$8.00</Text>
-                </View>
-              </View>
+              <Text style={dynamicStyles.sectionTitle}>Insights</Text>
+              <Text style={dynamicStyles.emptyText}>Upgrade to Pro for AI-powered insights.</Text>
             </View>
           }
         >
           <View style={dynamicStyles.section}>
             <Text style={dynamicStyles.sectionTitle}>Smart Insights</Text>
-            
-            <View style={dynamicStyles.insightCard}>
-              <Text style={dynamicStyles.insightTitle}>Optimization Opportunity</Text>
-              <Text style={dynamicStyles.insightText}>
-                You have 3 similar streaming services. Consolidating to a family plan could save you $23/month.
-              </Text>
-            </View>
-            
-            <View style={dynamicStyles.insightCard}>
-              <Text style={dynamicStyles.insightTitle}>Spending Trend</Text>
-              <Text style={dynamicStyles.insightText}>
-                Your subscription spending increased by 15% this month, mainly due to new productivity tools.
-              </Text>
-            </View>
-            
-            <View style={dynamicStyles.insightCard}>
-              <Text style={dynamicStyles.insightTitle}>Renewal Alert</Text>
-              <Text style={dynamicStyles.insightText}>
-                You have $47.98 in renewals coming up in the next 7 days.
-              </Text>
-            </View>
+
+            {stats && stats.categoryBreakdown.length > 0 && (
+              <View style={dynamicStyles.insightCard}>
+                <Text style={dynamicStyles.insightTitle}>Top Category</Text>
+                <Text style={dynamicStyles.insightText}>
+                  {stats.categoryBreakdown[0]?.category} is your largest expense at{' '}
+                  {fmtCurrency(stats.categoryBreakdown[0]?.amount ?? 0)}.
+                </Text>
+              </View>
+            )}
+
+            {stats && stats.mixedCurrencies && (
+              <View style={dynamicStyles.insightCard}>
+                <Text style={dynamicStyles.insightTitle}>Multiple Currencies</Text>
+                <Text style={dynamicStyles.insightText}>
+                  You have subscriptions in more than one currency. Totals are normalised to monthly USD.
+                </Text>
+              </View>
+            )}
+
+            {stats && (
+              <View style={dynamicStyles.insightCard}>
+                <Text style={dynamicStyles.insightTitle}>Renewal Alert</Text>
+                <Text style={dynamicStyles.insightText}>
+                  {stats.upcomingRenewals.length > 0
+                    ? `${stats.upcomingRenewals.length} renewal${stats.upcomingRenewals.length > 1 ? 's' : ''} in the next 7 days.`
+                    : 'No renewals coming up soon.'}
+                </Text>
+              </View>
+            )}
           </View>
         </FeatureGate>
 
@@ -212,48 +240,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.text,
     marginBottom: 16,
   },
-  activityList: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  activityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-  },
-  activityDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.primary,
-    marginRight: 12,
-  },
-  activityContent: {
-    flex: 1,
-  },
-  activityTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.text,
-    marginBottom: 2,
-  },
-  activityTime: {
-    fontSize: 12,
-    color: colors.textMuted,
-  },
-  activityAmount: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.success,
-  },
-  canceledAmount: {
-    color: colors.error,
-  },
   renewalsList: {
     backgroundColor: colors.card,
     borderRadius: 12,
@@ -307,5 +293,37 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     alignItems: 'center',
+  },
+  emptyState: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 24,
+    marginHorizontal: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: colors.textMuted,
+    textAlign: 'center',
+    paddingVertical: 12,
+  },
+  errorText: {
+    fontSize: 14,
+    color: colors.error,
+    textAlign: 'center',
   },
 });

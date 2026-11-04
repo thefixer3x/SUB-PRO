@@ -7,13 +7,17 @@ import { ShareSubscriptionModal } from '@/components/social/ShareSubscriptionMod
 import { ShareButton } from '@/components/social/ShareButton';
 import { SharedGroup } from '@/types/social';
 import { useSubscriptions } from '@/hooks/useSubscriptions';
+import { useAuth } from '@/contexts/AuthContext';
 import { FeatureGate } from '@/components/monetization/FeatureGate';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeColors } from '@/constants/theme';
 
 export default function SharedGroupsScreen() {
-  const [userId] = useState('user-123');
-  const { data: subscriptions = [], isLoading: isLoadingSubscriptions } = useSubscriptions();
+  const { user } = useAuth();
+  const userId = user?.id;
+  const [userIdState] = useState(userId ?? 'user-123');
+  const { data: subscriptionsData = [], isLoading: isLoadingSubscriptions } = useSubscriptions(userIdState);
+  const subscriptions = subscriptionsData ?? [];
   const [selectedGroup, setSelectedGroup] = useState<SharedGroup | null>(null);
   const [showGroupDetails, setShowGroupDetails] = useState(false);
   const [showSubscriptionPicker, setShowSubscriptionPicker] = useState(false);
@@ -86,7 +90,7 @@ export default function SharedGroupsScreen() {
       >
         <SharedGroupsDisplay
           key={groupsVersion}
-          userId={userId}
+          userId={userIdState}
           onCreateGroup={handleCreateGroup}
           onSelectGroup={handleSelectGroup}
         />
@@ -108,7 +112,7 @@ export default function SharedGroupsScreen() {
               <SharedGroupDetails
                 group={selectedGroup}
                 subscription={selectedGroup.subscriptionId ? getSubscriptionById(selectedGroup.subscriptionId) : undefined}
-                userId={userId}
+                userId={userIdState}
                 onDeleteGroup={handleDeleteGroup}
               />
             )}
@@ -164,7 +168,7 @@ export default function SharedGroupsScreen() {
             visible={showShareModal}
             onClose={handleCloseShareModal}
             subscription={selectedSubscription}
-            userId={userId}
+            userId={userIdState}
           />
         )}
       </FeatureGate>

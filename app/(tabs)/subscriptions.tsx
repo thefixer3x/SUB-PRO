@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { SubscriptionLogo } from '@/components/SubscriptionLogo';
 import { Plus, Search, CreditCard, Bot, ExternalLink, Share2, Brain } from 'lucide-react-native';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useSubscriptions } from '@/hooks/useSubscriptions';
+import { getDashboardStats } from '@/utils/subscriptionMath';
+import type { Subscription } from '@/types/subscription';
 import { ThemeColors } from '@/constants/theme';
 import { AdBanner } from '@/components/monetization/AdBanner';
 import { FeatureGate } from '@/components/monetization/FeatureGate';
@@ -13,98 +17,57 @@ import { VirtualCardInlineView } from '@/components/VirtualCardInlineView';
 import { CancellationBot } from '@/components/embeddedFinance/CancellationBot';
 import { AIAssistant } from '@/components/embeddedFinance/AIAssistant';
 import { SmartNotifications } from '@/components/embeddedFinance/SmartNotifications';
-import { affiliateSystemService } from '@/services/affiliateSystem';
 import { ShareSubscriptionModal } from '@/components/social/ShareSubscriptionModal';
 import { ShareButton } from '@/components/social/ShareButton';
 import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
 
-interface SubscriptionItem {
-  id: number;
-  name: string;
-  plan: string;
-  cost: number;
-  nextBilling: string;
-  status: 'active' | 'paused' | 'cancelled';
-  vendorUrl: string;
-  hasAffiliateLink: boolean;
-  affiliateUrl: string | null;
-  category: string;
-  logo?: string;
-  brandColor?: string;
+/** Format a number as a locale-aware currency string, defaulting to USD. */
+function fmtCurrency(amount: number, currency = 'USD'): string {
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `${currency} ${amount.toFixed(2)}`;
+  }
+}
+
+/** Normalised monthly cost used in the summary bar. */
+function toMonthly(sub: Subscription): number {
+  switch (sub.billingCycle) {
+    case 'Monthly': return sub.monthlyCost;
+    case 'Weekly': return sub.monthlyCost * 52 / 12;
+    case 'Quarterly': return sub.monthlyCost / 3;
+    case 'Annually': return sub.monthlyCost / 12;
+    default: return sub.monthlyCost;
+  }
 }
 
 export default function Subscriptions() {
   const { currentTier, canAccessFeature, getRemainingLimit } = useSubscription();
   const { colors } = useTheme();
+  const { user } = useAuth();
   const dynamicStyles = React.useMemo(() => createStyles(colors), [colors]);
   const [showVirtualCards, setShowVirtualCards] = useState<string | null>(null);
   const [showCancellationBot, setShowCancellationBot] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState<string | null>(null);
   const [expandedVirtualCard, setExpandedVirtualCard] = useState<string | null>(null);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
-  
-  const [subscriptions] = useState<SubscriptionItem[]>([
-    { 
-      id: 1, 
-      name: 'Netflix', 
-      plan: 'Premium', 
-      cost: 15.99, 
-      nextBilling: '2024-02-15', 
-      status: 'active',
-      vendorUrl: 'https://www.netflix.com',
-      hasAffiliateLink: true,
-      affiliateUrl: 'https://netflix.com/plans?ref=subscription_manager',
-      category: 'streaming'
-    },
-    { 
-      id: 2, 
-      name: 'Spotify', 
-      plan: 'Premium', 
-      cost: 9.99, 
-      nextBilling: '2024-02-20', 
-      status: 'active',
-      vendorUrl: 'https://www.spotify.com',
-      hasAffiliateLink: false,
-      affiliateUrl: null,
-      category: 'streaming'
-    },
-    { 
-      id: 3, 
-      name: 'Adobe Creative', 
-      plan: 'Photography', 
-      cost: 9.99, 
-      nextBilling: '2024-02-18', 
-      status: 'active',
-      vendorUrl: 'https://www.adobe.com',
-      hasAffiliateLink: true,
-      affiliateUrl: 'https://adobe.com/creativecloud?ref=subscription_manager',
-      category: 'creative'
-    },
-    { 
-      id: 4, 
-      name: 'GitHub', 
-      plan: 'Pro', 
-      cost: 4.00, 
-      nextBilling: '2024-02-22', 
-      status: 'active',
-      vendorUrl: 'https://github.com',
-      hasAffiliateLink: false,
-      affiliateUrl: null,
-      category: 'productivity'
-    },
-    { 
-      id: 5, 
-      name: 'Notion', 
-      plan: 'Personal Pro', 
-      cost: 8.00, 
-      nextBilling: '2024-02-25', 
-      status: 'active',
-      vendorUrl: 'https://notion.so',
-      hasAffiliateLink: true,
-      affiliateUrl: 'https://notion.so/pricing?ref=subscription_manager',
-      category: 'productivity'
-    },
-  ]);
+
+  const userId = user?.id;
+  const { data: subscriptions, isLoading, error } = useSubscriptions(userId);
+
+  const stats = React.useMemo(
+    () => (subscriptions ? getDashboardStats(subscriptions) : null),
+    [subscriptions],
+  );
+
+  const totalMonthly = subscriptions
+    ? subscriptions.reduce((sum, s) => sum + toMonthly(s), 0)
+    : 0;
 
   const handleShareSubscription = (subscriptionId: string) => {
     setShowShareModal(subscriptionId);
@@ -121,47 +84,31 @@ export default function Subscriptions() {
     console.log('Add new subscription');
   };
 
-  const handleSwitchPlan = async (subscription: any) => {
-    if (subscription.hasAffiliateLink && subscription.affiliateUrl) {
-      // Track affiliate click
-      await affiliateSystemService.trackClick({
-        affiliateLinkId: `aff_${subscription.id}`,
-        userId: 'current-user-id', // TODO: Get from auth context
-        userAgent: navigator.userAgent,
-        ipAddress: 'user-ip', // TODO: Get actual IP
-      });
-
-      // Generate tracking URL
-      const trackingUrl = affiliateSystemService.generateTrackingUrl(
-        subscription.affiliateUrl,
-        'current-user-id',
-        subscription.id.toString()
-      );
-
-      // Open affiliate URL
-      window.open(trackingUrl, '_blank');
-    } else {
-      // Open regular vendor URL
-      window.open(subscription.vendorUrl, '_blank');
-    }
+  const handleSwitchPlan = (_subscription: Subscription) => {
+    // Vendor URL handling is deferred to S304+; open subscription name in search.
+    console.log('Switch plan for:', _subscription.name);
   };
 
-  const renderSubscriptionCard = (subscription: SubscriptionItem) => (
+  const renderSubscriptionCard = (subscription: Subscription) => (
     <View key={subscription.id} style={dynamicStyles.subscriptionCard}>
       <View style={dynamicStyles.subscriptionHeader}>
         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
           <SubscriptionLogo
             name={subscription.name}
-            logoUrl={subscription.logo}
-            color={subscription.brandColor}
+            logoUrl={subscription.logoUrl}
+            color={subscription.color}
             size={36}
           />
           <Text style={[dynamicStyles.subscriptionName, { marginLeft: 10 }]}>{subscription.name}</Text>
         </View>
-        <Text style={dynamicStyles.subscriptionCost}>${subscription.cost}</Text>
+        <Text style={dynamicStyles.subscriptionCost}>
+          {fmtCurrency(subscription.monthlyCost, subscription.currency)}
+        </Text>
       </View>
-      <Text style={dynamicStyles.subscriptionPlan}>{subscription.plan}</Text>
-      <Text style={dynamicStyles.subscriptionBilling}>Next billing: {subscription.nextBilling}</Text>
+      <Text style={dynamicStyles.subscriptionPlan}>{subscription.planName}</Text>
+      <Text style={dynamicStyles.subscriptionBilling}>
+        Next billing: {new Date(subscription.renewalDate).toLocaleDateString()}
+      </Text>
       
       {/* Embedded Finance Section */}
       <FeatureGate
@@ -269,23 +216,17 @@ export default function Subscriptions() {
             >
               <ExternalLink size={16} color={colors.success} />
               <Text style={dynamicStyles.embeddedActionText}>
-                {subscription.hasAffiliateLink ? 'Switch Plan*' : 'Switch Plan'}
+                Switch Plan
               </Text>
             </TouchableOpacity>
           </View>
-          
-          {subscription.hasAffiliateLink && (
-            <Text style={dynamicStyles.affiliateNote}>
-              * Affiliate link - we may earn a commission
-            </Text>
-          )}
         </View>
       </FeatureGate>
     </View>
   );
 
-  const currentSubscription = subscriptions.find(sub => 
-    sub.id.toString() === showVirtualCards || sub.id.toString() === showCancellationBot
+  const currentSubscription = subscriptions?.find(sub =>
+    sub.id === showVirtualCards || sub.id === showCancellationBot,
   );
 
   return (
@@ -299,13 +240,12 @@ export default function Subscriptions() {
         {currentTier === 'free' && remainingSlots !== null && (
           <View style={[
             dynamicStyles.limitWarning,
-            remainingSlots <= 1 && dynamicStyles.limitWarningUrgent
+            remainingSlots <= 1 && dynamicStyles.limitWarningUrgent,
           ]}>
             <Text style={dynamicStyles.limitText}>
-              {remainingSlots > 0 
+              {remainingSlots > 0
                 ? `${remainingSlots} subscription slots remaining`
-                : 'Subscription limit reached'
-              }
+                : 'Subscription limit reached'}
             </Text>
             {remainingSlots <= 1 && (
               <TouchableOpacity
@@ -323,11 +263,11 @@ export default function Subscriptions() {
             <Search size={20} color={colors.textMuted} />
             <Text style={dynamicStyles.searchPlaceholder}>Search subscriptions...</Text>
           </View>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={[
               dynamicStyles.addButton,
-              !canAddMore && dynamicStyles.addButtonDisabled
+              !canAddMore && dynamicStyles.addButtonDisabled,
             ]}
             onPress={handleAddSubscription}
             disabled={!canAddMore}
@@ -338,9 +278,22 @@ export default function Subscriptions() {
 
         <AdBanner placement="subscriptions" />
 
-        <View style={dynamicStyles.subscriptionsList}>
-          {subscriptions.map(renderSubscriptionCard)}
-        </View>
+        {isLoading ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : error ? (
+          <Text style={dynamicStyles.emptyText}>Failed to load subscriptions.</Text>
+        ) : !subscriptions || subscriptions.length === 0 ? (
+          <View style={dynamicStyles.emptyState}>
+            <Text style={dynamicStyles.emptyTitle}>No subscriptions yet</Text>
+            <Text style={dynamicStyles.emptySubtitle}>
+              Add your first subscription to start tracking spending.
+            </Text>
+          </View>
+        ) : (
+          <View style={dynamicStyles.subscriptionsList}>
+            {subscriptions.map(renderSubscriptionCard)}
+          </View>
+        )}
 
         <FeatureGate
           feature="bulkUpload"
@@ -365,19 +318,15 @@ export default function Subscriptions() {
           <Text style={dynamicStyles.summaryTitle}>Monthly Summary</Text>
           <View style={dynamicStyles.summaryRow}>
             <Text style={dynamicStyles.summaryLabel}>Active subscriptions</Text>
-            <Text style={dynamicStyles.summaryValue}>{subscriptions.length}</Text>
+            <Text style={dynamicStyles.summaryValue}>{stats?.activeCount ?? 0}</Text>
           </View>
           <View style={dynamicStyles.summaryRow}>
             <Text style={dynamicStyles.summaryLabel}>Total monthly cost</Text>
-            <Text style={dynamicStyles.summaryValue}>
-              ${subscriptions.reduce((sum, sub) => sum + sub.cost, 0).toFixed(2)}
-            </Text>
+            <Text style={dynamicStyles.summaryValue}>{fmtCurrency(totalMonthly)}</Text>
           </View>
           <View style={dynamicStyles.summaryRow}>
             <Text style={dynamicStyles.summaryLabel}>Annual projection</Text>
-            <Text style={dynamicStyles.summaryValue}>
-              ${(subscriptions.reduce((sum, sub) => sum + sub.cost, 0) * 12).toFixed(2)}
-            </Text>
+            <Text style={dynamicStyles.summaryValue}>{fmtCurrency(totalMonthly * 12)}</Text>
           </View>
         </View>
 
@@ -390,7 +339,7 @@ export default function Subscriptions() {
       {showVirtualCards && currentSubscription && (
         <VirtualCardManager
           subscriptionId={showVirtualCards}
-          userId="current-user-id" // TODO: Get from auth context
+          userId={userId ?? ''}
           visible={!!showVirtualCards}
           onClose={() => setShowVirtualCards(null)}
         />
@@ -400,40 +349,39 @@ export default function Subscriptions() {
       {showCancellationBot && currentSubscription && (
         <CancellationBot
           subscriptionId={showCancellationBot}
-          userId="current-user-id" // TODO: Get from auth context
-          vendorUrl={currentSubscription.vendorUrl}
+          userId={userId ?? ''}
+          vendorUrl=""
           subscriptionName={currentSubscription.name}
           visible={!!showCancellationBot}
           onClose={() => setShowCancellationBot(null)}
           onSuccess={() => {
             setShowCancellationBot(null);
-            // TODO: Refresh subscriptions list
           }}
         />
       )}
-      
+
       {/* Share Subscription Modal */}
       {showShareModal && (
         <ShareSubscriptionModal
           visible={!!showShareModal}
           onClose={() => setShowShareModal(null)}
-          subscription={subscriptions.find(sub => sub.id.toString() === showShareModal) as any}
-          userId="current-user-id" // TODO: Get from auth context
+          subscription={(subscriptions ?? []).find(sub => sub.id === showShareModal) as any}
+          userId={userId ?? ''}
         />
       )}
 
       {/* AI Assistant Modal */}
       <AIAssistant
-        subscriptions={subscriptions}
-        userId="current-user-id" // TODO: Get from auth context
+        subscriptions={subscriptions ?? []}
+        userId={userId ?? ''}
         visible={showAIAssistant}
         onClose={() => setShowAIAssistant(false)}
       />
 
       {/* Smart Notifications */}
       <SmartNotifications
-        subscriptions={subscriptions}
-        userId="current-user-id" // TODO: Get from auth context
+        subscriptions={subscriptions ?? []}
+        userId={userId ?? ''}
       />
     </SafeAreaView>
   );
@@ -772,5 +720,32 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     alignItems: 'center',
+  },
+  emptyState: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 24,
+    marginHorizontal: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: colors.textMuted,
+    textAlign: 'center',
+    paddingVertical: 12,
   },
 });

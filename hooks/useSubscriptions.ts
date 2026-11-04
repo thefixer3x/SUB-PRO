@@ -1,28 +1,74 @@
-import { useQuery } from '@tanstack/react-query';
-import { mockSubscriptions } from '@/data/mockData';
-import { Subscription } from '@/types/subscription';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
+import type { Database } from '@/lib/supabase';
+import type { Subscription } from '@/types/subscription';
 
-// Simulate API call with delay
-const fetchSubscriptions = async (): Promise<Subscription[]> => {
-  await new Promise(resolve => setTimeout(resolve, 800));
-  return mockSubscriptions;
-};
+type SmSubRow = Database['public']['Tables']['sm_subscriptions']['Row'];
 
-export const useSubscriptions = () => {
+/** Map a DB row (snake_case) to the client Subscription model. */
+function toSubscription(row: SmSubRow): Subscription {
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category as Subscription['category'],
+    status: row.status as Subscription['status'],
+    planName: row.plan_name,
+    monthlyCost: Number(row.monthly_cost),
+    currency: row.currency,
+    billingCycle: row.billing_cycle as Subscription['billingCycle'],
+    renewalDate: new Date(row.renewal_date),
+    paymentMethod: row.payment_method,
+    notes: row.notes ?? undefined,
+    lastUsed: row.last_used ? new Date(row.last_used) : undefined,
+    priority: row.priority as Subscription['priority'],
+    deactivationDate: row.deactivation_date ? new Date(row.deactivation_date) : undefined,
+    logoUrl: row.logo_url ?? undefined,
+    color: row.color ?? undefined,
+  };
+}
+
+const TABLE = 'sm_subscriptions';
+
+/** Fetch all subscriptions for the given user_id. RLS enforces ownership. */
+async function fetchSubscriptions(userId: string): Promise<Subscription[]> {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).map(toSubscription);
+}
+
+export const useSubscriptions = (userId: string | undefined) => {
   return useQuery({
-    queryKey: ['subscriptions'],
-    queryFn: fetchSubscriptions,
+    queryKey: ['subscriptions', userId],
+    queryFn: () => (userId ? fetchSubscriptions(userId) : null),
+    enabled: !!userId,
     staleTime: 1000 * 60 * 5, // 5 minutes
+    retry: 1,
   });
 };
 
-export const useActiveSubscriptions = () => {
-  const { data: subscriptions, ...rest } = useSubscriptions();
-  
-  const activeSubscriptions = subscriptions?.filter(sub => sub.status === 'Active') || [];
-  
+export const useActiveSubscriptions = (userId: string | undefined) => {
+  const { data: subscriptions, ...rest } = useSubscriptions(userId);
+
+  const activeSubscriptions = subscriptions?.filter(
+    (sub) => sub.status === 'Active',
+  ) || [];
+
   return {
     data: activeSubscriptions,
     ...rest,
   };
+};
+
+/** Invalidate the subscriptions query cache — call after mutations. */
+export const useInvalidateSubscriptions = () => {
+  const queryClient = useQueryClient();
+  return () => queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
 };

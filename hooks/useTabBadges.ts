@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useActiveSubscriptions } from './useSubscriptions';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface TabBadgeInfo {
   show: boolean;
@@ -19,7 +20,9 @@ interface TabBadges {
  * - Green dot on Analytics tab for positive monthly growth
  */
 export const useTabBadges = (): TabBadges => {
-  const { data: subscriptions = [] } = useActiveSubscriptions();
+  const { user } = useAuth();
+  const userId = user?.id;
+  const { data: subscriptions = [] } = useActiveSubscriptions(userId);
 
   const subscriptionsBadge = useMemo(() => {
     const now = new Date();
