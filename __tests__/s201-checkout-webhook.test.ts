@@ -46,7 +46,7 @@ beforeAll(() => {
 let mockTables: Record<string, Record<string, unknown>[]> = {};
 let mockInserts: Array<{ table: string; row: Record<string, unknown> }> = [];
 let mockUpdateCalls: Array<{ table: string; data: Record<string, unknown> }> = [];
-let trackedTables: string[] = [];
+let mockTrackedTables: string[] = [];
 let mockAuthUser: { id: string; email: string | null; user_metadata: Record<string, unknown> } | null = null;
 let mockAuthError: { message: string; status?: number; code?: string } | null = null;
 let mockAuthThrows = false;
@@ -55,6 +55,7 @@ jest.mock('@supabase/supabase-js', () => {
   const createQueryBuilder = (table: string) => {
     const filters: Array<[string, unknown]> = [];
     let rowLimit: number | undefined;
+    let pendingUpdate: Record<string, unknown> | null = null;
 
     const builder: Record<string, unknown> = {
       select: jest.fn(() => builder),
@@ -71,16 +72,12 @@ jest.mock('@supabase/supabase-js', () => {
         ((mockTables[table] as Record<string, unknown>[]) ??= []).push(row);
         return { data: null, error: null };
       }),
-      update: jest.fn(async (row: Record<string, unknown>) => {
+      // Mirrors the real client: `update()` returns a chainable builder, and
+      // the write is applied when the builder is awaited (after `.eq()` chains).
+      update: jest.fn((row: Record<string, unknown>) => {
         mockUpdateCalls.push({ table, data: row });
-        const rows = mockTables[table] as Record<string, unknown>[] | undefined;
-        if (rows) {
-          for (const r of rows) {
-            const matches = filters.every(([col, val]) => r[col] === val);
-            if (matches) Object.assign(r, row);
-          }
-        }
-        return { data: null, error: null };
+        pendingUpdate = row;
+        return builder;
       }),
       single: jest.fn(async () => {
         const rows = (mockTables[table] as Record<string, unknown>[]) ?? [];
@@ -101,6 +98,11 @@ jest.mock('@supabase/supabase-js', () => {
           Array.isArray(val) ? val.includes(r[col]) : r[col] === val,
         ),
       );
+      // Apply a pending `update()` write to the rows that matched the filters.
+      if (pendingUpdate) {
+        for (const r of filtered) Object.assign(r, pendingUpdate);
+        pendingUpdate = null;
+      }
       const limited = typeof rowLimit === 'number' ? filtered.slice(0, rowLimit) : filtered;
       return Promise.resolve({ data: limited, error: null }).then(resolve, reject);
     };
@@ -130,7 +132,7 @@ jest.mock('@supabase/supabase-js', () => {
 
   const serviceClient = {
     from: jest.fn((table: string) => {
-      trackedTables.push(table);
+      mockTrackedTables.push(table);
       return createQueryBuilder(table);
     }),
     auth: { getUser: jest.fn() },
@@ -196,7 +198,7 @@ beforeEach(() => {
   mockTables = {};
   mockInserts = [];
   mockUpdateCalls = [];
-  trackedTables = [];
+  mockTrackedTables = [];
   mockAuthUser = {
     id: SESSION_USER_ID,
     email: 'user@example.com',
@@ -459,8 +461,8 @@ describe('webhook: SubTrack price sets subscription_tier', () => {
     const proUpdates = mockUpdateCalls.filter((u) => u.table === 'profiles');
     expect(proUpdates.length).toBeGreaterThan(0);
     expect(proUpdates[0].data).toHaveProperty('subscription_tier', 'pro');
-    expect(trackedTables).not.toContain('user_tiers');
-    expect(trackedTables).not.toContain('stripe_subscriptions');
+    expect(mockTrackedTables).not.toContain('user_tiers');
+    expect(mockTrackedTables).not.toContain('stripe_subscriptions');
   });
 
   it('sets tier to the value in metadata.tier (e.g. team)', async () => {
