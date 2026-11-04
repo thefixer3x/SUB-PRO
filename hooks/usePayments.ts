@@ -9,7 +9,7 @@ import { buildApiBases, requestWithFallback } from '@/lib/apiClient';
 const unique = <T,>(values: T[]): T[] => values.filter((value, index) => values.indexOf(value) === index);
 
 export const usePayments = () => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,7 +54,10 @@ export const usePayments = () => {
         '/create-checkout-session',
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          },
           body: JSON.stringify({
             userId: user.id,
             email: (user as any).email || user.id,
@@ -88,7 +91,7 @@ export const usePayments = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, session]);
 
   const openCustomerPortal = useCallback(async () => {
     setError(null);
