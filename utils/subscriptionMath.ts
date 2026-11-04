@@ -215,3 +215,50 @@ export function calculatePotentialSavings(
     reasons,
   };
 }
+
+// ─── Currency split ──────────────────────────────────────────────────────────
+
+export interface CurrencySplit {
+  /** The currency every total is computed in. */
+  currency: string;
+  /** Subscriptions billed in `currency`; only these are summed. */
+  included: Subscription[];
+  /** Subscriptions in any other currency; never added to `currency` totals. */
+  excluded: Subscription[];
+  /** The other currencies present, upper-case, in first-seen order. */
+  otherCurrencies: string[];
+}
+
+/**
+ * Amounts in different currencies cannot be added without an exchange rate,
+ * and the app has none. So totals use the currency most of the user's
+ * subscriptions are billed in (ties go to the first seen), and the rest are
+ * reported separately instead of being summed into it.
+ */
+export function splitByPrimaryCurrency(
+  subscriptions: Subscription[],
+  fallback = 'USD',
+): CurrencySplit {
+  const codeOf = (s: Subscription) => (s.currency || fallback).toUpperCase();
+
+  const counts = new Map<string, number>();
+  for (const sub of subscriptions) {
+    const code = codeOf(sub);
+    counts.set(code, (counts.get(code) ?? 0) + 1);
+  }
+
+  let currency = fallback.toUpperCase();
+  let best = 0;
+  for (const [code, count] of counts) {
+    if (count > best) {
+      currency = code;
+      best = count;
+    }
+  }
+
+  const included = subscriptions.filter((s) => codeOf(s) === currency);
+  const excluded = subscriptions.filter((s) => codeOf(s) !== currency);
+  const otherCurrencies = [...counts.keys()].filter((c) => c !== currency);
+
+  return { currency, included, excluded, otherCurrencies };
+}

@@ -6,6 +6,7 @@ import {
   calculateCategoryBreakdown,
   detectMixedCurrencies,
   calculatePotentialSavings,
+  splitByPrimaryCurrency,
   DashboardStats,
   getDashboardStats,
 } from '../utils/subscriptionMath';
@@ -413,5 +414,63 @@ describe('calculatePotentialSavings', () => {
     expect(result.monthlyAmount).toBeCloseTo(15.99, 2);
     expect(result.reasons).toHaveLength(1);
     expect(result.reasons[0].type).toBe('duplicate_category');
+  });
+});
+
+// ─── splitByPrimaryCurrency ───────────────────────────────────────────────
+
+describe('splitByPrimaryCurrency', () => {
+  it('never adds amounts in different currencies together', () => {
+    const subs = [
+      sub({ name: 'A', monthlyCost: 10, currency: 'USD' }),
+      sub({ name: 'B', monthlyCost: 10, currency: 'EUR' }),
+    ];
+    const split = splitByPrimaryCurrency(subs);
+    expect(calculateMonthlyTotal(split.included)).toBe(10);
+    expect(calculateMonthlyTotal(split.included)).not.toBe(20);
+    expect(split.excluded).toHaveLength(1);
+  });
+
+  it('uses the currency most subscriptions are billed in', () => {
+    const split = splitByPrimaryCurrency([
+      sub({ name: 'A', currency: 'eur' }),
+      sub({ name: 'B', currency: 'NGN' }),
+      sub({ name: 'C', currency: 'NGN' }),
+    ]);
+    expect(split.currency).toBe('NGN');
+    expect(split.included.map((s) => s.name)).toEqual(['B', 'C']);
+    expect(split.otherCurrencies).toEqual(['EUR']);
+  });
+
+  it('breaks a tie in favour of the first currency seen', () => {
+    const split = splitByPrimaryCurrency([
+      sub({ name: 'A', currency: 'GBP' }),
+      sub({ name: 'B', currency: 'USD' }),
+    ]);
+    expect(split.currency).toBe('GBP');
+  });
+
+  it('includes everything when there is one currency', () => {
+    const subs = [sub({ name: 'A' }), sub({ name: 'B' })];
+    const split = splitByPrimaryCurrency(subs);
+    expect(split.currency).toBe('USD');
+    expect(split.included).toHaveLength(2);
+    expect(split.excluded).toHaveLength(0);
+    expect(split.otherCurrencies).toEqual([]);
+  });
+
+  it('falls back to USD for an empty list', () => {
+    expect(splitByPrimaryCurrency([]).currency).toBe('USD');
+  });
+
+  it('keeps savings from mixing currencies', () => {
+    // Two Entertainment services, but in different currencies: no saving can
+    // be computed in one currency, so none is claimed.
+    const subs = [
+      sub({ name: 'Netflix', category: 'Entertainment', monthlyCost: 15, currency: 'USD' }),
+      sub({ name: 'Showmax', category: 'Entertainment', monthlyCost: 9, currency: 'EUR' }),
+    ];
+    const split = splitByPrimaryCurrency(subs);
+    expect(calculatePotentialSavings(split.included).monthlyAmount).toBe(0);
   });
 });

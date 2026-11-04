@@ -20,6 +20,7 @@ import { ThemeColors } from '@/constants/theme';
 import {
   getDashboardStats,
   calculatePotentialSavings,
+  splitByPrimaryCurrency,
   type CategoryBreakdown,
 } from '@/utils/subscriptionMath';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -189,7 +190,7 @@ function RenewalsList({
               <Text style={s.subCat}>{sub.category}</Text>
             </View>
             <View style={s.right}>
-              <Text style={s.subAmount}>{formatCurrency(sub.monthlyCost, currency)}</Text>
+              <Text style={s.subAmount}>{formatCurrency(sub.monthlyCost, sub.currency || currency)}</Text>
               <Text style={s.subDays}>{days === 0 ? 'Today' : `${days}d`}</Text>
             </View>
           </View>
@@ -233,18 +234,14 @@ export default function Analytics() {
   } = useSubscriptions(user?.id);
 
   const hasData = subscriptions && subscriptions.length > 0;
-  const stats = hasData ? getDashboardStats(subscriptions) : null;
 
-  // Use the currency the user's own subscriptions are actually in. Falls back
-  // to USD only when the data carries no currency at all.
-  const currency = useMemo(() => {
-    const codes = (subscriptions ?? [])
-      .map((s) => s.currency)
-      .filter((c): c is string => Boolean(c))
-      .map((c) => c.toUpperCase());
-    return codes.length > 0 ? codes[0] : 'USD';
-  }, [subscriptions]);
-  const savings = hasData ? calculatePotentialSavings(subscriptions) : null;
+  // Amounts in different currencies are never added together: every total,
+  // breakdown and saving below uses only the subscriptions billed in the
+  // user's main currency, and the rest are named in a notice instead.
+  const split = useMemo(() => splitByPrimaryCurrency(subscriptions ?? []), [subscriptions]);
+  const currency = split.currency;
+  const stats = hasData ? getDashboardStats(split.included) : null;
+  const savings = hasData ? calculatePotentialSavings(split.included) : null;
 
   if (isError) {
     return (
@@ -302,6 +299,17 @@ export default function Analytics() {
 
         {/* Metrics */}
         {stats && <MetricsRow stats={stats} currency={currency} />}
+
+        {split.excluded.length > 0 && (
+          <View style={styles.insightCard}>
+            <Text style={styles.insightText}>
+              Totals are in {currency}. {split.excluded.length} subscription
+              {split.excluded.length > 1 ? 's' : ''} billed in {split.otherCurrencies.join(', ')}{' '}
+              {split.excluded.length > 1 ? 'are' : 'is'} not included, because amounts in different
+              currencies can't be added without an exchange rate.
+            </Text>
+          </View>
+        )}
 
         {/* Savings (conditional — hidden when none) */}
         {savings && savings.monthlyAmount > 0 && (
