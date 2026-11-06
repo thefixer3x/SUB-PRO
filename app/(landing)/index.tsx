@@ -212,7 +212,7 @@ const LandingPage = () => {
     },
     {
       name: 'Pro',
-      price: '$4.99',
+      price: '$10',
       period: '/month',
       description: 'Most popular for individuals',
       features: [
@@ -227,8 +227,8 @@ const LandingPage = () => {
       popular: true,
     },
     {
-      name: 'Premium',
-      price: '$9.99',
+      name: 'Team',
+      price: '$20',
       period: '/month',
       description: 'For teams and power users',
       features: [
