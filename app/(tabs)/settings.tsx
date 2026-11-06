@@ -10,18 +10,15 @@ import {
   Alert,
   Platform,
   Share as RNShare,
-  Linking,
 } from 'react-native';
 import {
   Bell,
   Shield,
   Palette,
   Download,
-  HelpCircle,
   ChevronRight,
   Smartphone,
   Mail,
-  Calendar,
   DollarSign,
   Settings as SettingsIcon,
   FileText,
@@ -43,6 +40,7 @@ import { FEATURE_FLAGS } from '@/config/compliance';
 import { SecurityHealthCheck } from '@/types/compliance';
 import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
 import { usePreferences } from '@/hooks/usePreferences';
+import { useSubscriptions } from '@/hooks/useSubscriptions';
 
 export default function Settings() {
   const router = useRouter();
@@ -60,11 +58,10 @@ export default function Settings() {
   const displayName =
     user?.user_metadata?.full_name ?? (userEmail ? userEmail.split('@')[0] : '');
 
-  const [notifications, setNotifications] = useState({
-    renewals: true,
-    newSubscriptions: true,
-    weeklyReports: true,
-  });
+  // Notification toggles live in the persisted preferences, so they survive a reload.
+  const notifications = preferences.notifications;
+  const [showCurrencyOptions, setShowCurrencyOptions] = useState(false);
+  const { data: userSubscriptions, isLoading: subscriptionsLoading } = useSubscriptions(userId || undefined);
 
   useEffect(() => {
     loadSecurityData();
@@ -78,12 +75,14 @@ export default function Settings() {
   };
 
   const toggleNotification = (key: keyof typeof notifications) => {
-    setNotifications(prev => ({
+    setPreferences(prev => ({
       ...prev,
-      [key]: !prev[key],
+      notifications: { ...prev.notifications, [key]: !prev.notifications[key] },
     }));
   };
 
+  // react-native-web has no working Alert.alert, so the confirmation dialog is
+  // platform-specific: a native alert on iOS/Android, window.confirm on web.
   const confirmSignOut = async (): Promise<boolean> => {
     if (Platform.OS === 'web') {
       if (typeof window === 'undefined' || typeof window.confirm !== 'function') {
@@ -128,33 +127,20 @@ export default function Settings() {
 
   // --- Wired preference handlers (replaces the old no-op onPress) ---
 
-  const handleCurrencyTap = () => {
-    Alert.alert(
-      'Currency',
-      `Current: ${preferences.currency}`,
-      [
-        {
-          text: 'USD — US Dollar',
-          onPress: () => setPreferences({ ...preferences, currency: 'USD' }),
-        },
-        {
-          text: 'EUR — Euro',
-          onPress: () => setPreferences({ ...preferences, currency: 'EUR' }),
-        },
-        {
-          text: 'GBP — British Pound',
-          onPress: () => setPreferences({ ...preferences, currency: 'GBP' }),
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
-  };
+  // An inline list rather than Alert.alert with buttons, which does nothing on
+  // react-native-web.
+  const CURRENCY_OPTIONS = [
+    { code: 'USD', label: 'US Dollar' },
+    { code: 'EUR', label: 'Euro' },
+    { code: 'GBP', label: 'British Pound' },
+    { code: 'NGN', label: 'Nigerian Naira' },
+  ];
 
-  const handleDateFormatTap = () => {
-    showMessage(
-      'Date Format',
-      'Date format selection is coming soon. Current: MM/DD/YYYY.'
-    );
+  const handleCurrencyTap = () => setShowCurrencyOptions(open => !open);
+
+  const selectCurrency = (code: string) => {
+    setPreferences(prev => ({ ...prev, currency: code }));
+    setShowCurrencyOptions(false);
   };
 
   const handlePrivacySettingsTap = () => {
@@ -162,6 +148,10 @@ export default function Settings() {
   };
 
   const handleExportData = async () => {
+    if (subscriptionsLoading || !userSubscriptions) {
+      showMessage('Export Data', 'Your subscriptions are still loading. Please try again in a moment.');
+      return;
+    }
     try {
       const exportPayload = {
         user: {
@@ -169,7 +159,7 @@ export default function Settings() {
           email: userEmail,
         },
         preferences,
-        subscriptions: [],
+        subscriptions: userSubscriptions,
         exportedAt: new Date().toISOString(),
       };
 
@@ -195,16 +185,6 @@ export default function Settings() {
       }
     } catch {
       showMessage('Export Failed', 'Unable to export your data. Please try again.');
-    }
-  };
-
-  const handleHelpTap = async () => {
-    const helpUrl = 'https://subtrackpro.com/help';
-    const supported = await Linking.canOpenURL(helpUrl);
-    if (supported) {
-      await Linking.openURL(helpUrl);
-    } else {
-      showMessage('Help & Support', 'For assistance, please visit our help center or contact support.');
     }
   };
 
@@ -358,12 +338,16 @@ export default function Settings() {
             subtitle={`${preferences.currency} — Select currency`}
             onPress={handleCurrencyTap}
           />
-          <SettingsItem
-            icon={<Calendar size={20} color="#F59E0B" />}
-            title="Date Format"
-            subtitle="MM/DD/YYYY"
-            onPress={handleDateFormatTap}
-          />
+          {showCurrencyOptions &&
+            CURRENCY_OPTIONS.map(option => (
+              <SettingsItem
+                key={option.code}
+                icon={<DollarSign size={20} color={option.code === preferences.currency ? '#10B981' : colors.textMuted} />}
+                title={`${option.code} — ${option.label}`}
+                subtitle={option.code === preferences.currency ? 'Selected' : undefined}
+                onPress={() => selectCurrency(option.code)}
+              />
+            ))}
         </SettingsSection>
 
         <SettingsSection title="Data & Privacy">
@@ -378,15 +362,6 @@ export default function Settings() {
             title="Export Data"
             subtitle="Download your subscription data"
             onPress={handleExportData}
-          />
-        </SettingsSection>
-
-        <SettingsSection title="Support">
-          <SettingsItem
-            icon={<HelpCircle size={20} color="#64748B" />}
-            title="Help & Support"
-            subtitle="Get help with the app"
-            onPress={handleHelpTap}
           />
         </SettingsSection>
 

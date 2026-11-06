@@ -8,7 +8,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscriptions } from '@/hooks/useSubscriptions';
-import { getDashboardStats } from '@/utils/subscriptionMath';
+import { getDashboardStats, splitByPrimaryCurrency } from '@/utils/subscriptionMath';
 import { ThemeColors } from '@/constants/theme';
 
 /** Format a number as a locale-aware currency string, defaulting to USD. */
@@ -38,9 +38,18 @@ export default function Dashboard() {
   const userId = user?.id;
   const { data: subscriptions, isLoading, error } = useSubscriptions(userId);
 
+  // Counts and the renewal list use every subscription. Money totals use only
+  // the subscriptions billed in the user's main currency: amounts in different
+  // currencies cannot be added without an exchange rate.
+  const split = React.useMemo(() => splitByPrimaryCurrency(subscriptions ?? []), [subscriptions]);
+  const currency = split.currency;
   const stats = React.useMemo(
     () => (subscriptions ? getDashboardStats(subscriptions) : null),
     [subscriptions],
+  );
+  const money = React.useMemo(
+    () => (subscriptions ? getDashboardStats(split.included) : null),
+    [subscriptions, split],
   );
 
   return (
@@ -70,12 +79,12 @@ export default function Dashboard() {
             </View>
 
             <View style={dynamicStyles.metricCard}>
-              <Text style={dynamicStyles.metricValue}>{fmtCurrency(stats.monthlyTotal)}</Text>
+              <Text style={dynamicStyles.metricValue}>{fmtCurrency(money?.monthlyTotal ?? 0, currency)}</Text>
               <Text style={dynamicStyles.metricLabel}>Monthly Spending</Text>
             </View>
 
             <View style={dynamicStyles.metricCard}>
-              <Text style={dynamicStyles.metricValue}>{fmtCurrency(stats.annualTotal)}</Text>
+              <Text style={dynamicStyles.metricValue}>{fmtCurrency(money?.annualTotal ?? 0, currency)}</Text>
               <Text style={dynamicStyles.metricLabel}>Yearly Total</Text>
             </View>
 
@@ -134,21 +143,24 @@ export default function Dashboard() {
           <View style={dynamicStyles.section}>
             <Text style={dynamicStyles.sectionTitle}>Smart Insights</Text>
 
-            {stats && stats.categoryBreakdown.length > 0 && (
+            {money && money.categoryBreakdown.length > 0 && (
               <View style={dynamicStyles.insightCard}>
                 <Text style={dynamicStyles.insightTitle}>Top Category</Text>
                 <Text style={dynamicStyles.insightText}>
-                  {stats.categoryBreakdown[0]?.category} is your largest expense at{' '}
-                  {fmtCurrency(stats.categoryBreakdown[0]?.amount ?? 0)}.
+                  {money.categoryBreakdown[0]?.category} is your largest expense at{' '}
+                  {fmtCurrency(money.categoryBreakdown[0]?.amount ?? 0, currency)}.
                 </Text>
               </View>
             )}
 
-            {stats && stats.mixedCurrencies && (
+            {split.excluded.length > 0 && (
               <View style={dynamicStyles.insightCard}>
                 <Text style={dynamicStyles.insightTitle}>Multiple Currencies</Text>
                 <Text style={dynamicStyles.insightText}>
-                  You have subscriptions in more than one currency. Totals are normalised to monthly USD.
+                  Totals are in {currency}. {split.excluded.length} subscription
+                  {split.excluded.length > 1 ? 's' : ''} billed in {split.otherCurrencies.join(', ')}{' '}
+                  {split.excluded.length > 1 ? 'are' : 'is'} not included, because amounts in different
+                  currencies can't be added without an exchange rate.
                 </Text>
               </View>
             )}
