@@ -73,8 +73,8 @@ Vercel environment (owner sets these; names only, never values in the repo): `ST
 
 ## 4. Phase 2: Stripe cutover (owner, about 15 minutes)
 
-1. Add lookup key `subtrack_pro_monthly` to `price_1RiSAL2KF4vMCpn8wUyDio3N` (additive; nothing reads it until the new checkout ships).
-2. Tag endpoint `we_1RiSB62…` with `metadata.project = subtrack`. Re-list SubTrack prices and confirm each carries `metadata.project = subtrack` (checked 2026-11-03: Pro monthly `price_1RiSAL2…`, Enterprise monthly `price_1RiSAi2…` and the legacy one-time Pro price are all tagged; the Basic product has no price). Add lookup key `subtrack_enterprise_monthly` to the Enterprise price as well.
+1. ~~Add lookup key `subtrack_pro_monthly` to `price_1RiSAL2KF4vMCpn8wUyDio3N`.~~ **Superseded by D4 (2026-11-04):** `subtrack_pro_monthly` is on the active $10 Pro price (`price_1UY1Vm2…`); the $4.99 price is archived. Do not move the key back.
+2. Tag endpoint `we_1RiSB62…` with `metadata.project = subtrack`. Re-list SubTrack prices and confirm each carries `metadata.project = subtrack` (checked 2026-11-03: Pro monthly `price_1RiSAL2…`, Enterprise monthly `price_1RiSAi2…` and the legacy one-time Pro price are all tagged; the Basic product has no price). ~~Add lookup key `subtrack_enterprise_monthly` to the Enterprise price as well.~~ Superseded by D4: the second tier is Team, `subtrack_team_monthly` on `price_1UY1Vo2…` ($20); the $9.99 Enterprise price is archived.
 3. After the Vercel preview passes a Stripe **test-mode** run (checkout → webhook → tier shown in app), change the endpoint URL to `https://sub-pro.lanonasis.com/api/stripe/webhook`. The signing secret does not change, and Vercel already holds it.
 4. Send a test event from the Stripe dashboard and confirm a 200 in Vercel function logs.
 5. Rollback: set the endpoint URL back to the Netlify address. Both handlers share `server/`, so behaviour is identical.
