@@ -81,7 +81,7 @@
     "papaparse": "^5.5.3",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "react-native": "0.81.5",
+    "react-native": "0.81.6",
     "react-native-flash-message": "^0.4.2",
     "react-native-gesture-handler": "~2.28.0",
     "react-native-google-mobile-ads": "^15.4.0",
