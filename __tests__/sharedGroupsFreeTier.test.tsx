@@ -1,11 +1,12 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import SharedGroupsScreen from '@/app/(tabs)/shared-groups';
 import { SubscriptionProvider } from '@/hooks/useSubscription';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 
+const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
+  useRouter: () => ({ push: mockPush, back: jest.fn(), replace: jest.fn() }),
 }));
 
 jest.mock('@/contexts/AuthContext', () => ({
@@ -53,5 +54,15 @@ describe('Shared Groups screen on the free plan', () => {
     expect(screen.queryByText('Create a Shared Group')).toBeNull();
     expect(screen.queryByText('Shared Subscriptions')).toBeNull();
     expect(screen.queryByText('Share')).toBeNull();
+  });
+
+  it('offers a way to the plans from the upgrade prompt', async () => {
+    mockPush.mockClear();
+    renderFreeTierScreen();
+
+    const button = await screen.findByText('See plans');
+    fireEvent.press(button);
+
+    expect(mockPush).toHaveBeenCalledWith('/(tabs)/upgrade');
   });
 });

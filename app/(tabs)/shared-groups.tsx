@@ -11,12 +11,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import { FeatureGate } from '@/components/monetization/FeatureGate';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeColors } from '@/constants/theme';
+import { useRouter } from 'expo-router';
 
 export default function SharedGroupsScreen() {
   const { user } = useAuth();
-  const userId = user?.id;
-  const [userIdState] = useState(userId ?? 'user-123');
-  const { data: subscriptionsData = [], isLoading: isLoadingSubscriptions } = useSubscriptions(userIdState);
+  // The signed-in user only. There is no placeholder id: while auth is still
+  // loading the gate below denies access, so nothing is queried or shared.
+  const userId = user?.id ?? '';
+  const router = useRouter();
+  const { data: subscriptionsData = [], isLoading: isLoadingSubscriptions } = useSubscriptions(userId || undefined);
   const subscriptions = subscriptionsData ?? [];
   const [selectedGroup, setSelectedGroup] = useState<SharedGroup | null>(null);
   const [showGroupDetails, setShowGroupDetails] = useState(false);
@@ -85,12 +88,19 @@ export default function SharedGroupsScreen() {
               Subscription sharing is available on Pro and Team plans.
               Upgrade to share subscriptions with friends, family, or coworkers.
             </Text>
+            <TouchableOpacity
+              style={dynamicStyles.upgradeButton}
+              onPress={() => router.push('/(tabs)/upgrade')}
+              accessibilityRole="button"
+            >
+              <Text style={dynamicStyles.upgradeButtonText}>See plans</Text>
+            </TouchableOpacity>
           </View>
         }
       >
         <SharedGroupsDisplay
           key={groupsVersion}
-          userId={userIdState}
+          userId={userId}
           onCreateGroup={handleCreateGroup}
           onSelectGroup={handleSelectGroup}
         />
@@ -112,7 +122,7 @@ export default function SharedGroupsScreen() {
               <SharedGroupDetails
                 group={selectedGroup}
                 subscription={selectedGroup.subscriptionId ? getSubscriptionById(selectedGroup.subscriptionId) : undefined}
-                userId={userIdState}
+                userId={userId}
                 onDeleteGroup={handleDeleteGroup}
               />
             )}
@@ -168,7 +178,7 @@ export default function SharedGroupsScreen() {
             visible={showShareModal}
             onClose={handleCloseShareModal}
             subscription={selectedSubscription}
-            userId={userIdState}
+            userId={userId}
           />
         )}
       </FeatureGate>
@@ -198,6 +208,18 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 24,
+  },
+  upgradeButton: {
+    marginTop: 20,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  upgradeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   modalContainer: {
     flex: 1,

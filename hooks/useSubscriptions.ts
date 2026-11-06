@@ -44,10 +44,20 @@ async function fetchSubscriptions(userId: string): Promise<Subscription[]> {
   return (data ?? []).map(toSubscription);
 }
 
+// Real account ids are UUIDs. The demo/guest account uses a local id
+// ("mock-user-…") that has no rows; querying with it makes Postgres reject the
+// uuid cast (HTTP 400), which the screens showed as "Failed to load".
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const useSubscriptions = (userId: string | undefined) => {
   return useQuery({
     queryKey: ['subscriptions', userId],
-    queryFn: () => (userId ? fetchSubscriptions(userId) : null),
+    queryFn: async (): Promise<Subscription[] | null> => {
+      if (!userId) return null;
+      // A non-account id (demo mode) has no subscriptions: show the empty state.
+      if (!UUID_RE.test(userId)) return [];
+      return fetchSubscriptions(userId);
+    },
     enabled: !!userId,
     staleTime: 1000 * 60 * 5, // 5 minutes
     retry: 1,
