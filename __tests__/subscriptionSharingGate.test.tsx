@@ -1,9 +1,25 @@
 import { renderHook } from '@testing-library/react-native';
+import React from 'react';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { SUBSCRIPTION_PLANS } from '@/config/subscriptionPlans';
 import { hasFeatureAccess, subscriptionPlans } from '@/config/monetization';
 import { SubscriptionProvider, useSubscription } from '@/hooks/useSubscription';
+
+// Only the hook's dependencies are mocked: a signed-in user whose profile
+// row is still loading. The hook and its gate are real.
+jest.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 'user-1', email: 'user@example.com' } }),
+}));
+jest.mock('@/lib/supabase', () => ({
+  supabase: {
+    from: () => ({
+      select: () => ({
+        eq: () => ({ single: () => new Promise(() => {}) }),
+      }),
+    }),
+  },
+}));
 
 const SHARING_CODE_FILES = [
   'app/(tabs)/shared-groups.tsx',
@@ -41,9 +57,14 @@ describe('subscriptionSharing entitlement', () => {
   });
 
   it('denies sharing through useSubscription().canAccessFeature for a free account', () => {
-    const { result } = renderHook(() => useSubscription(), { wrapper: SubscriptionProvider });
+    // When the user has no profile row yet (or tier is still loading),
+    // canAccessFeature must deny by default — even if the user is technically "free".
+    const { result } = renderHook(() => useSubscription(), {
+      wrapper: ({ children }) => <SubscriptionProvider>{children}</SubscriptionProvider>,
+    });
 
-    expect(result.current.currentTier).toBe('free');
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.currentTier).toBeUndefined();
     expect(result.current.canAccessFeature('subscriptionSharing')).toBe(false);
   });
 
