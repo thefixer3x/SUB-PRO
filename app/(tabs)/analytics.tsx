@@ -1,161 +1,412 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
-import { TrendingUp, DollarSign, Calendar } from 'lucide-react-native';
+import React, { useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  SafeAreaView,
+  ActivityIndicator,
+} from 'react-native';
+import {
+  TrendingUp,
+  DollarSign,
+  Calendar,
+  Sparkles,
+  AlertCircle,
+  BarChart3,
+} from 'lucide-react-native';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors } from '@/constants/theme';
+import {
+  getDashboardStats,
+  calculatePotentialSavings,
+  splitByPrimaryCurrency,
+  type CategoryBreakdown,
+} from '@/utils/subscriptionMath';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useSubscriptions } from '@/hooks/useSubscriptions';
+import { useAuth } from '@/contexts/AuthContext';
 import { AdBanner } from '@/components/monetization/AdBanner';
 import { FeatureGate } from '@/components/monetization/FeatureGate';
 import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
-import { useTheme } from '@/contexts/ThemeContext';
-import { ThemeColors } from '@/constants/theme';
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+const CATEGORY_COLORS = ['primary', 'success', 'warning', 'info', 'error', 'primary'] as const;
+
+function getCatColor(index: number, colors: ThemeColors): string {
+  const key = CATEGORY_COLORS[index % CATEGORY_COLORS.length];
+  return (colors as unknown as Record<string, string>)[key];
+}
+
+/**
+ * Format an amount in the user's real currency.
+ *
+ * Falls back to the subscription's own currency, then to the user's saved
+ * preference, then to USD. No symbol is hardcoded to '$'.
+ */
+export function formatCurrency(amount: number, currency?: string): string {
+  const code = (currency || 'USD').toUpperCase();
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: code,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `${code} ${amount.toFixed(2)}`;
+  }
+}
+
+// ─── Metrics row ────────────────────────────────────────────────────────────
+
+function MetricsRow({
+  stats,
+  currency,
+}: {
+  stats: ReturnType<typeof getDashboardStats>;
+  currency: string;
+}) {
+  const { colors } = useTheme();
+  const s = createMetricsStyles(colors);
+
+  return (
+    <View style={s.row}>
+      <View style={s.card}>
+        <DollarSign size={22} color={colors.primary} />
+        <Text style={s.value}>
+          {formatCurrency(stats.monthlyTotal, currency)}
+        </Text>
+        <Text style={s.label}>This Month</Text>
+      </View>
+
+      <View style={s.card}>
+        <Calendar size={22} color={colors.warning} />
+        <Text style={s.value}>
+          {formatCurrency(stats.annualTotal, currency)}
+        </Text>
+        <Text style={s.label}>Annual Total</Text>
+      </View>
+
+      <View style={s.card}>
+        <BarChart3 size={22} color={colors.success} />
+        <Text style={s.value}>{stats.activeCount}</Text>
+        <Text style={s.label}>Active</Text>
+      </View>
+    </View>
+  );
+}
+
+// ─── Category breakdown ─────────────────────────────────────────────────────
+
+function CategoryList({
+  categories,
+  currency,
+}: {
+  categories: CategoryBreakdown[];
+  currency: string;
+}) {
+  const { colors } = useTheme();
+  const s = createCategoryStyles(colors);
+
+  return (
+    <View style={s.list}>
+      {categories.map((cat, i) => (
+        <View
+          key={cat.category}
+          style={[s.item, i === categories.length - 1 ? { borderBottomWidth: 0 } : null]}
+        >
+          <View style={[s.dot, { backgroundColor: getCatColor(i, colors) }]} />
+          <Text style={s.name}>{cat.category}</Text>
+          <Text style={s.amount}>{formatCurrency(cat.amount, currency)}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ─── Savings card ───────────────────────────────────────────────────────────
+
+function SavingsCard({
+  savings,
+  currency,
+}: {
+  savings: ReturnType<typeof calculatePotentialSavings>;
+  currency: string;
+}) {
+  const { colors } = useTheme();
+  const s = createSavingsStyles(colors);
+
+  if (savings.monthlyAmount <= 0) return null;
+
+  return (
+    <View style={s.card}>
+      <View style={s.header}>
+        <Sparkles size={18} color={colors.success} />
+        <Text style={s.title}>Potential Savings</Text>
+      </View>
+
+      <Text style={s.total}>Save {formatCurrency(savings.monthlyAmount, currency)}/mo</Text>
+
+      {savings.reasons.map((reason, i) => (
+        <View key={i} style={s.reason}>
+          <Text style={s.reasonText}>{reason.description}</Text>
+          <Text style={s.reasonAmt}>
+            ~{formatCurrency(reason.monthlyAmount, currency)}/mo
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ─── Upcoming renewals ──────────────────────────────────────────────────────
+
+function RenewalsList({
+  renewals,
+  currency,
+}: {
+  renewals: ReturnType<typeof getDashboardStats>['upcomingRenewals'];
+  currency: string;
+}) {
+  const { colors } = useTheme();
+  const s = createRenewalStyles(colors);
+
+  if (renewals.length === 0) return null;
+
+  return (
+    <View style={s.section}>
+      <Text style={s.sectionTitle}>Upcoming Renewals</Text>
+      {renewals.slice(0, 3).map((sub) => {
+        const days = Math.max(
+          0,
+          Math.ceil((new Date(sub.renewalDate).getTime() - Date.now()) / 86400000),
+        );
+        return (
+          <View key={sub.id} style={s.item}>
+            <View style={s.left}>
+              <Text style={s.subName}>{sub.name}</Text>
+              <Text style={s.subCat}>{sub.category}</Text>
+            </View>
+            <View style={s.right}>
+              <Text style={s.subAmount}>{formatCurrency(sub.monthlyCost, sub.currency || currency)}</Text>
+              <Text style={s.subDays}>{days === 0 ? 'Today' : `${days}d`}</Text>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// ─── Empty state ────────────────────────────────────────────────────────────
+
+function EmptyState() {
+  const { colors } = useTheme();
+  const s = createEmptyStyles(colors);
+
+  return (
+    <View style={s.container}>
+      <TrendingUp size={56} color={colors.textMuted} />
+      <Text style={s.title}>No subscriptions yet</Text>
+      <Text style={s.description}>
+        Add your first subscription on the Dashboard
+        to see spending insights here.
+      </Text>
+    </View>
+  );
+}
+
+// ─── Main screen ────────────────────────────────────────────────────────────
 
 export default function Analytics() {
   const { currentTier } = useSubscription();
   const { colors } = useTheme();
-  const dynamicStyles = React.useMemo(() => createStyles(colors), [colors]);
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
+  const { user } = useAuth();
+
+  const {
+    data: subscriptions,
+    isLoading,
+    isError,
+    error,
+  } = useSubscriptions(user?.id);
+
+  const hasData = subscriptions && subscriptions.length > 0;
+
+  // Amounts in different currencies are never added together: every total,
+  // breakdown and saving below uses only the subscriptions billed in the
+  // user's main currency, and the rest are named in a notice instead.
+  const split = useMemo(() => splitByPrimaryCurrency(subscriptions ?? []), [subscriptions]);
+  const currency = split.currency;
+  const stats = hasData ? getDashboardStats(split.included) : null;
+  const savings = hasData ? calculatePotentialSavings(split.included) : null;
+
+  if (isError) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.scrollContent}
+        >
+          <View style={styles.errorBox}>
+            <AlertCircle size={32} color={colors.error} />
+            <Text style={styles.errorTitle}>Something went wrong</Text>
+            <Text style={styles.errorText}>
+              {error instanceof Error ? error.message : 'Unable to load analytics.'}
+            </Text>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  if (isLoading || !hasData) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {isLoading ? (
+            <View style={styles.loader}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.loaderText}>Loading your analytics…</Text>
+            </View>
+          ) : (
+            <EmptyState />
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <SafeAreaView style={dynamicStyles.container}>
-      <ScrollView style={dynamicStyles.content} showsVerticalScrollIndicator={false} contentContainerStyle={dynamicStyles.scrollContent}>
-        <View style={dynamicStyles.header}>
-          <Text style={dynamicStyles.title}>Analytics</Text>
-          <Text style={dynamicStyles.subtitle}>Track your subscription spending patterns</Text>
+    <SafeAreaView style={styles.container}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Analytics</Text>
+          <Text style={styles.subtitle}>
+            Your subscription spending at a glance
+          </Text>
         </View>
 
-        <View style={dynamicStyles.metricsGrid}>
-          <View style={dynamicStyles.metricCard}>
-            <DollarSign size={24} color={colors.primary} />
-            <Text style={dynamicStyles.metricValue}>$247.89</Text>
-            <Text style={dynamicStyles.metricLabel}>This Month</Text>
+        {/* Metrics */}
+        {stats && <MetricsRow stats={stats} currency={currency} />}
+
+        {split.excluded.length > 0 && (
+          <View style={styles.insightCard}>
+            <Text style={styles.insightText}>
+              Totals are in {currency}. {split.excluded.length} subscription
+              {split.excluded.length > 1 ? 's' : ''} billed in {split.otherCurrencies.join(', ')}{' '}
+              {split.excluded.length > 1 ? 'are' : 'is'} not included, because amounts in different
+              currencies can't be added without an exchange rate.
+            </Text>
           </View>
-          
-          <View style={dynamicStyles.metricCard}>
-            <TrendingUp size={24} color={colors.success} />
-            <Text style={dynamicStyles.metricValue}>+5.2%</Text>
-            <Text style={dynamicStyles.metricLabel}>vs Last Month</Text>
-          </View>
-          
-          <View style={dynamicStyles.metricCard}>
-            <Calendar size={24} color={colors.warning} />
-            <Text style={dynamicStyles.metricValue}>$2,974</Text>
-            <Text style={dynamicStyles.metricLabel}>Annual Total</Text>
-          </View>
-        </View>
+        )}
+
+        {/* Savings (conditional — hidden when none) */}
+        {savings && savings.monthlyAmount > 0 && (
+            <SavingsCard savings={savings} currency={currency} />
+          )}
 
         <AdBanner placement="analytics" />
 
-        <View style={dynamicStyles.chartSection}>
-          <Text style={dynamicStyles.sectionTitle}>Spending Trend</Text>
-          <View style={dynamicStyles.chartPlaceholder}>
-            <Text style={dynamicStyles.chartText}>Basic spending chart available</Text>
-            <Text style={dynamicStyles.chartSubtext}>6 months of data</Text>
-          </View>
-        </View>
+        {/* Upcoming renewals */}
+        {stats && <RenewalsList renewals={stats.upcomingRenewals} currency={currency} />}
 
+        {/* Category breakdown — basic tier */}
         <FeatureGate
           feature="smartInsights"
           requiredTier="pro"
           fallback={
-            <View style={dynamicStyles.basicAnalytics}>
-              <Text style={dynamicStyles.sectionTitle}>Category Breakdown</Text>
-              <View style={dynamicStyles.categoryList}>
-                <View style={dynamicStyles.categoryItem}>
-                  <View style={[dynamicStyles.categoryDot, { backgroundColor: colors.primary }]} />
-                  <Text style={dynamicStyles.categoryName}>Entertainment</Text>
-                  <Text style={dynamicStyles.categoryAmount}>$45.97</Text>
-                </View>
-                <View style={dynamicStyles.categoryItem}>
-                  <View style={[dynamicStyles.categoryDot, { backgroundColor: colors.success }]} />
-                  <Text style={dynamicStyles.categoryName}>Productivity</Text>
-                  <Text style={dynamicStyles.categoryAmount}>$67.99</Text>
-                </View>
-                <View style={dynamicStyles.categoryItem}>
-                  <View style={[dynamicStyles.categoryDot, { backgroundColor: colors.warning }]} />
-                  <Text style={dynamicStyles.categoryName}>Creative</Text>
-                  <Text style={dynamicStyles.categoryAmount}>$29.99</Text>
-                </View>
-              </View>
+            <View style={styles.basicAnalytics}>
+              <Text style={styles.sectionTitle}>Category Breakdown</Text>
+              {stats && (
+                <CategoryList
+                  categories={stats.categoryBreakdown}
+                  currency={currency}
+                />
+              )}
             </View>
           }
         >
-          <View style={dynamicStyles.advancedAnalytics}>
-            <Text style={dynamicStyles.sectionTitle}>Smart Insights</Text>
-            
-            <View style={dynamicStyles.insightCard}>
-              <Text style={dynamicStyles.insightTitle}>Spending Optimization</Text>
-              <Text style={dynamicStyles.insightText}>
-                You could save $23/month by consolidating your streaming services into family plans.
-              </Text>
-            </View>
-            
-            <View style={dynamicStyles.insightCard}>
-              <Text style={dynamicStyles.insightTitle}>Usage Analysis</Text>
-              <Text style={dynamicStyles.insightText}>
-                Adobe Creative Cloud shows low usage (3 days this month). Consider downgrading to Photography plan.
-              </Text>
-            </View>
-            
-            <View style={dynamicStyles.insightCard}>
-              <Text style={dynamicStyles.insightTitle}>Trend Alert</Text>
-              <Text style={dynamicStyles.insightText}>
-                Your productivity tool spending increased 40% this quarter. Budget impact: +$89/month.
-              </Text>
-            </View>
+          {/* Pro — advanced insights */}
+          <View style={styles.advancedAnalytics}>
+            <Text style={styles.sectionTitle}>Smart Insights</Text>
 
-            <Text style={dynamicStyles.sectionTitle}>Advanced Charts</Text>
-            
-            <View style={dynamicStyles.advancedChart}>
-              <Text style={dynamicStyles.chartTitle}>Spending Heatmap</Text>
-              <View style={dynamicStyles.chartPlaceholder}>
-                <Text style={dynamicStyles.chartText}>Interactive heatmap showing spending patterns</Text>
-                <Text style={dynamicStyles.chartSubtext}>24 months of historical data</Text>
+            {savings && savings.monthlyAmount > 0 && (
+              <View style={styles.insightCard}>
+                <Text style={styles.insightTitle}>💡 Spending Optimization</Text>
+                <Text style={styles.insightText}>
+                  You could save ~{formatCurrency(savings.monthlyAmount, currency)}/mo by
+                  consolidating overlapping services and switching to annual plans.
+                </Text>
               </View>
-            </View>
-            
-            <View style={dynamicStyles.advancedChart}>
-              <Text style={dynamicStyles.chartTitle}>Predictive Analysis</Text>
-              <View style={dynamicStyles.chartPlaceholder}>
-                <Text style={dynamicStyles.chartText}>AI-powered spending forecasts</Text>
-                <Text style={dynamicStyles.chartSubtext}>12-month projection with confidence intervals</Text>
+            )}
+
+            {stats && stats.upcomingRenewals.length > 0 && (
+              <View style={styles.insightCard}>
+                <Text style={styles.insightTitle}>📅 Upcoming Renewals</Text>
+                <Text style={styles.insightText}>
+                  {stats.upcomingRenewals.length} subscription
+                  {stats.upcomingRenewals.length > 1 ? 's' : ''} renew in the next 7 days.
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.insightCard}>
+              <Text style={styles.insightTitle}>📊 Category Breakdown</Text>
+              <View style={styles.categoryInline}>
+                {stats &&
+                  stats.categoryBreakdown.map((cat) => (
+                    <View key={cat.category} style={styles.catChip}>
+                      <Text style={styles.catName}>{cat.category}</Text>
+                      <Text style={styles.catAmt}>{formatCurrency(cat.amount, currency)}</Text>
+                    </View>
+                  ))}
               </View>
             </View>
           </View>
         </FeatureGate>
 
-        {currentTier === 'free' && <AdBanner placement="analytics" size="medium-rectangle" />}
+        {currentTier === 'free' && (
+          <AdBanner placement="analytics" size="medium-rectangle" />
+        )}
 
-        <View style={dynamicStyles.exportSection}>
-          <Text style={dynamicStyles.sectionTitle}>Export Data</Text>
-          
+        {/* Export */}
+        <View style={styles.exportSection}>
+          <Text style={styles.sectionTitle}>Export Data</Text>
+
           <FeatureGate
             feature="exportFormats"
             requiredTier="pro"
             fallback={
-              <View style={dynamicStyles.basicExport}>
-                <Text style={dynamicStyles.exportText}>Basic CSV export available</Text>
+              <View style={styles.basicExport}>
+                <Text style={styles.exportText}>Basic CSV export available</Text>
               </View>
             }
           >
-            <View style={dynamicStyles.exportOptions}>
-              <Text style={dynamicStyles.exportText}>Export in multiple formats:</Text>
-              <View style={dynamicStyles.exportButtons}>
-                <View style={dynamicStyles.exportButton}>
-                  <Text style={dynamicStyles.exportButtonText}>CSV</Text>
-                </View>
-                <View style={dynamicStyles.exportButton}>
-                  <Text style={dynamicStyles.exportButtonText}>PDF</Text>
-                </View>
-                <View style={dynamicStyles.exportButton}>
-                  <Text style={dynamicStyles.exportButtonText}>Excel</Text>
-                </View>
-                <View style={dynamicStyles.exportButton}>
-                  <Text style={dynamicStyles.exportButtonText}>JSON</Text>
-                </View>
+            <View style={styles.exportOptions}>
+              <Text style={styles.exportText}>Export in multiple formats:</Text>
+              <View style={styles.exportButtons}>
+                {['CSV', 'PDF', 'Excel', 'JSON'].map((fmt) => (
+                  <View key={fmt} style={styles.exportButton}>
+                    <Text style={styles.exportButtonText}>{fmt}</Text>
+                  </View>
+                ))}
               </View>
             </View>
           </FeatureGate>
         </View>
 
-        <View style={dynamicStyles.brandingSection}>
+        <View style={styles.brandingSection}>
           <PoweredByLanOnasis variant="minimal" />
         </View>
       </ScrollView>
@@ -163,198 +414,332 @@ export default function Analytics() {
   );
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 100,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.textSecondary,
-  },
-  metricsGrid: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 24,
-    gap: 12,
-  },
-  metricCard: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  metricValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text,
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  metricLabel: {
-    fontSize: 12,
-    color: colors.textMuted,
-    textAlign: 'center',
-  },
-  chartSection: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 16,
-  },
-  chartPlaceholder: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 40,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  chartText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.text,
-    marginBottom: 8,
-  },
-  chartSubtext: {
-    fontSize: 14,
-    color: colors.textMuted,
-  },
-  basicAnalytics: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  categoryList: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  categoryItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-  },
-  categoryDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 12,
-  },
-  categoryName: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.text,
-  },
-  categoryAmount: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  advancedAnalytics: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  insightCard: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  insightTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 8,
-  },
-  insightText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 20,
-  },
-  advancedChart: {
-    marginBottom: 16,
-  },
-  chartTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 12,
-  },
-  exportSection: {
-    paddingHorizontal: 20,
-    marginBottom: 32,
-  },
-  basicExport: {
-    backgroundColor: colors.cardSecondary,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderStyle: 'dashed',
-  },
-  exportOptions: {
-    backgroundColor: colors.card,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  exportText: {
-    fontSize: 14,
-    color: colors.textMuted,
-    marginBottom: 12,
-  },
-  exportButtons: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  exportButton: {
-    backgroundColor: colors.backgroundSecondary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  exportButtonText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: colors.text,
-  },
-  brandingSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-});
+// ─── Styles ─────────────────────────────────────────────────────────────────
+
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    content: { flex: 1 },
+    scrollContent: { paddingBottom: 100 },
+    header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24 },
+    title: {
+      fontSize: 28,
+      fontWeight: '700',
+      color: colors.text,
+      marginBottom: 8,
+    },
+    subtitle: {
+      fontSize: 16,
+      color: colors.textSecondary,
+    },
+    loader: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: 80,
+    },
+    loaderText: {
+      marginTop: 16,
+      fontSize: 15,
+      color: colors.textMuted,
+    },
+    errorBox: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 32,
+    },
+    errorTitle: {
+      marginTop: 16,
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.error,
+    },
+    errorText: {
+      marginTop: 8,
+      fontSize: 14,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+    basicAnalytics: { paddingHorizontal: 20, marginBottom: 24 },
+    advancedAnalytics: { paddingHorizontal: 20, marginBottom: 24 },
+    sectionTitle: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 16,
+    },
+    insightCard: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    insightTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 8,
+    },
+    insightText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      lineHeight: 20,
+    },
+    categoryInline: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    catChip: {
+      backgroundColor: colors.backgroundSecondary,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    catName: {
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    catAmt: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    exportSection: { paddingHorizontal: 20, marginBottom: 32 },
+    basicExport: {
+      backgroundColor: colors.cardSecondary,
+      padding: 16,
+      borderRadius: 12,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderStyle: 'dashed',
+    },
+    exportOptions: {
+      backgroundColor: colors.card,
+      padding: 16,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    exportText: {
+      fontSize: 14,
+      color: colors.textMuted,
+      marginBottom: 12,
+    },
+    exportButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    exportButton: {
+      backgroundColor: colors.backgroundSecondary,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 8,
+    },
+    exportButtonText: {
+      fontSize: 12,
+      fontWeight: '500',
+      color: colors.text,
+    },
+    brandingSection: {
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      alignItems: 'center',
+    },
+  });
+}
+
+function createMetricsStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      paddingHorizontal: 20,
+      marginBottom: 20,
+      gap: 12,
+    },
+    card: {
+      flex: 1,
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      padding: 16,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    value: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: colors.text,
+      marginTop: 8,
+      marginBottom: 4,
+    },
+    label: {
+      fontSize: 12,
+      color: colors.textMuted,
+      textAlign: 'center',
+    },
+  });
+}
+
+function createCategoryStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    list: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+    },
+    item: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderLight,
+    },
+    dot: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      marginRight: 12,
+    },
+    name: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: '500',
+      color: colors.text,
+    },
+    amount: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.text,
+    },
+  });
+}
+
+function createSavingsStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    card: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 8,
+    },
+    title: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    total: {
+      fontSize: 24,
+      fontWeight: '700',
+      color: colors.success,
+      marginBottom: 12,
+    },
+    reason: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 6,
+      paddingHorizontal: 4,
+    },
+    reasonText: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      flex: 1,
+    },
+    reasonAmt: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.success,
+      marginLeft: 12,
+    },
+  });
+}
+
+function createRenewalStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    section: {
+      paddingHorizontal: 20,
+      marginBottom: 20,
+    },
+    sectionTitle: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 12,
+    },
+    item: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      borderRadius: 10,
+      padding: 14,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    left: {
+      flex: 1,
+    },
+    subName: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    subCat: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    right: {
+      alignItems: 'flex-end',
+    },
+    subAmount: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    subDays: {
+      fontSize: 12,
+      color: colors.warning,
+      marginTop: 2,
+    },
+  });
+}
+
+function createEmptyStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 32,
+      paddingVertical: 80,
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: colors.text,
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    description: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 22,
+    },
+  });
+}
