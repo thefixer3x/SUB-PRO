@@ -314,6 +314,9 @@ Runs **in parallel with Sprint 2**, except where `Depends on` says otherwise.
 - **Scope:** `supabase/proposed/2026-11-sm-permissions.sql`, `supabase/proposed/README.md`.
 - **Do:** as in C09 in `CARDS.md`. Also confirm, citing the S201/S203 code, that every write to `sm_subscriptions` and `virtual_cards` uses the service role, so owner-only `SELECT` policies don't break anything. **Do not run it.**
 - **Accept when:** the SQL plus a rollback block are in the PR, and the card is blocked with "needs owner: apply".
+- **Status (2026-11-06):** SQL, rollback and local tests are in `supabase/proposed/`. **Needs owner: apply.** Two departures from C09, both recorded in the SQL header:
+  - `sm_subscriptions` keeps owner writes, because the app writes it from the client. Making it `SELECT` only would break adding subscriptions.
+  - A guard on the `profiles` billing fields is added.
 
 ### S402: Stripe webhook cutover (= M04) (P1)
 - **Role:** owner, with the orchestrator assisting via the Stripe connector · **Depends on:** S201, S202 merged and the preview test-mode run passed
