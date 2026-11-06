@@ -6,7 +6,7 @@
  * Only dependencies are mocked; the screen and usePreferences are real.
  */
 import React from 'react';
-import { Platform, Share, Switch } from 'react-native';
+import { Linking, Platform, Share, Switch } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -62,6 +62,8 @@ const renderSettings = async () => {
 beforeEach(async () => {
   await AsyncStorage.clear();
   Platform.OS = 'ios';
+  delete process.env.EXPO_PUBLIC_SUPPORT_URL;
+  delete process.env.EXPO_PUBLIC_SUPPORT_EMAIL;
 });
 
 describe('Settings', () => {
@@ -107,5 +109,15 @@ describe('Settings', () => {
     await renderSettings();
     expect(screen.queryByText('Date Format')).toBeNull();
     expect(screen.queryByText('Help & Support')).toBeNull();
+  });
+
+  it('shows Help & Support when a support link is configured, and opens it', async () => {
+    process.env.EXPO_PUBLIC_SUPPORT_EMAIL = 'help@example.com';
+    const openSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    await renderSettings();
+
+    fireEvent.press(screen.getByText('Help & Support'));
+    await waitFor(() => expect(openSpy).toHaveBeenCalledWith('mailto:help@example.com'));
+    openSpy.mockRestore();
   });
 });

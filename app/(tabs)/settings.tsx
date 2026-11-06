@@ -10,6 +10,7 @@ import {
   Alert,
   Platform,
   Share as RNShare,
+  Linking,
 } from 'react-native';
 import {
   Bell,
@@ -24,10 +25,12 @@ import {
   FileText,
   AlertTriangle,
   LogOut,
+  HelpCircle,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { getSupportLink } from '@/config/support';
 import { ThemeSelector } from '@/components/ThemeSelector';
 import { BudgetAlertRow } from '@/components/BudgetAlertRow';
 import { useBudgetAlert } from '@/hooks/useBudgetAlert';
@@ -185,6 +188,17 @@ export default function Settings() {
       }
     } catch {
       showMessage('Export Failed', 'Unable to export your data. Please try again.');
+    }
+  };
+
+  const supportLink = getSupportLink();
+
+  const handleOpenSupport = async () => {
+    if (!supportLink) return;
+    try {
+      await Linking.openURL(supportLink.href);
+    } catch {
+      Alert.alert('Help & Support', `Could not open ${supportLink.label}.`);
     }
   };
 
@@ -364,6 +378,17 @@ export default function Settings() {
             onPress={handleExportData}
           />
         </SettingsSection>
+
+        {supportLink && (
+          <SettingsSection title="Support">
+            <SettingsItem
+              icon={<HelpCircle size={20} color="#3B82F6" />}
+              title="Help & Support"
+              subtitle={supportLink.kind === 'email' ? `Email ${supportLink.label}` : supportLink.label}
+              onPress={handleOpenSupport}
+            />
+          </SettingsSection>
+        )}
 
         <SettingsSection title="Account">
           <SettingsItem
