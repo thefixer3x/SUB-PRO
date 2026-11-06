@@ -1,32 +1,27 @@
 /**
- * Tests for the C08 server-side proxies (hibp-check, splitwise-api).
- * Auth is mocked at the shared helper; no live services are called.
+ * Tests for the Vercel api/ handlers (hibp-check, splitwise).
+ *
+ * Ported from netlify/functions/__tests__/c08-functions.test.ts after
+ * the original Netlify functions were deleted (card S203).  Auth is
+ * mocked at server/auth (used by the api/ layer), and handlers are
+ * invoked with web Request objects instead of Netlify events.
  */
 
+// ── mocks must be declared before imports; Jest hoists jest.mock() and
+// ── import statements, so we declare mockRequireUser first and reference
+// ── it by name in the mock factory (resolved at init, not at parse time).
 const mockRequireUser = jest.fn();
 
-jest.mock('../_shared/auth', () => ({
+jest.mock('../../../server/auth', () => ({
   requireUser: (...args: unknown[]) => mockRequireUser(...args),
 }));
 
-import { handler as hibpHandler } from '../hibp-check';
-import { handler as splitwiseHandler } from '../splitwise-api';
+// eslint-disable-next-line import/order
+import hibpHandler from '../../../api/hibp-check';
+// eslint-disable-next-line import/order
+import splitwiseHandler from '../../../api/splitwise';
 
 const ORIGIN = 'https://sub-pro.lanonasis.com';
-
-const makeEvent = (overrides: Record<string, unknown> = {}) => ({
-  httpMethod: 'GET',
-  path: '/.netlify/functions/hibp-check',
-  headers: { origin: ORIGIN, authorization: 'Bearer token' },
-  queryStringParameters: null,
-  body: null,
-  ...overrides,
-});
-
-const unauthorized = {
-  ok: false,
-  response: { statusCode: 401, headers: {}, body: JSON.stringify({ error: 'Authentication required' }) },
-};
 
 const signedIn = (email: string | null = 'me@example.com') => ({
   ok: true,
@@ -43,24 +38,29 @@ beforeEach(() => {
   (global as unknown as { fetch: typeof fetchMock }).fetch = fetchMock;
 });
 
-describe('hibp-check', () => {
-  it('returns the auth helper response (401) without calling HIBP', async () => {
-    mockRequireUser.mockResolvedValue(unauthorized);
-    const result = await hibpHandler(makeEvent() as never);
-    expect(result.statusCode).toBe(401);
+describe('api/hibp-check handler', () => {
+  it('returns 401 without a valid session', async () => {
+    mockRequireUser.mockResolvedValue({
+      ok: false,
+      response: { statusCode: 401, headers: {}, body: JSON.stringify({ error: 'Authentication required' }) },
+    });
+    const req = new Request('https://placeholder/api/hibp-check', { method: 'POST', headers: { origin: ORIGIN } });
+    const res = await hibpHandler(req);
+    expect(res.status).toBe(401);
+    expect(JSON.parse(await res.text()).error).toMatch(/authentication required/i);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('checks the session email and ignores an email in the query', async () => {
     mockRequireUser.mockResolvedValue(signedIn('me@example.com'));
-    fetchMock.mockResolvedValue({ status: 404, ok: false });
+    fetchMock.mockResolvedValue({ status: 404, ok: false, json: () => Promise.resolve([]) });
 
-    const result = await hibpHandler(
-      makeEvent({ queryStringParameters: { email: 'someone-else@example.com' } }) as never,
-    );
+    const req = new Request('https://placeholder/api/hibp-check', { method: 'GET' });
+    const res = await hibpHandler(req);
 
-    expect(result.statusCode).toBe(200);
-    expect(JSON.parse(result.body).breached).toBe(false);
+    expect(res.status).toBe(200);
+    const body = JSON.parse(await res.text());
+    expect(body.breached).toBe(false);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0][0])).toContain(encodeURIComponent('me@example.com'));
     expect(String(fetchMock.mock.calls[0][0])).not.toContain('someone-else');
@@ -69,31 +69,37 @@ describe('hibp-check', () => {
   it('returns 503 when the API key is not configured', async () => {
     delete process.env.HAVEIBEENPWNED_API_KEY;
     mockRequireUser.mockResolvedValue(signedIn());
-    const result = await hibpHandler(makeEvent() as never);
-    expect(result.statusCode).toBe(503);
+    const req = new Request('https://placeholder/api/hibp-check', { method: 'POST', headers: { origin: ORIGIN } });
+    const res = await hibpHandler(req);
+    expect(res.status).toBe(503);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('rejects an unknown origin', async () => {
-    const result = await hibpHandler(makeEvent({ headers: { origin: 'https://evil.example' } }) as never);
-    expect(result.statusCode).toBe(403);
+    const req = new Request('https://placeholder/api/hibp-check', { method: 'GET', headers: { origin: 'https://evil.example' } });
+    const res = await hibpHandler(req);
+    expect(res.status).toBe(403);
     expect(mockRequireUser).not.toHaveBeenCalled();
   });
 });
 
-describe('splitwise-api', () => {
+describe('api/splitwise handler', () => {
   it('returns 401 without a valid session', async () => {
-    mockRequireUser.mockResolvedValue(unauthorized);
-    const result = await splitwiseHandler(makeEvent({ httpMethod: 'POST' }) as never);
-    expect(result.statusCode).toBe(401);
+    mockRequireUser.mockResolvedValue({
+      ok: false,
+      response: { statusCode: 401, headers: {}, body: JSON.stringify({ error: 'Authentication required' }) },
+    });
+    const req = new Request('https://placeholder/api/splitwise', { method: 'POST', headers: { origin: ORIGIN } });
+    const res = await splitwiseHandler(req);
+    expect(res.status).toBe(401);
   });
 
   it('is disabled (501) for signed-in users and never calls Splitwise', async () => {
     mockRequireUser.mockResolvedValue(signedIn());
-    const result = await splitwiseHandler(
-      makeEvent({ httpMethod: 'POST', body: JSON.stringify({ action: 'delete_group', groupId: 1 }) }) as never,
-    );
-    expect(result.statusCode).toBe(501);
+    const req = new Request('https://placeholder/api/splitwise', { method: 'POST' });
+    const res = await splitwiseHandler(req);
+    expect(res.status).toBe(501);
+    expect(JSON.parse(await res.text()).error).toBe('Splitwise integration is not available yet');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

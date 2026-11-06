@@ -1,26 +1,27 @@
-import { validateBankingProxyRequestBody } from '../../lib/bankingProxy';
-import { requireUser } from './_shared/auth';
+/**
+ * Thin adapter: netlify/functions/banking-proxy.ts → api/banking/proxy.ts.
+ *
+ * Converts the Netlify event format into a Request and delegates to the
+ * Vercel handler.  This file can be retired once Netlify is fully retired.
+ *
+ * NOTE: The original function used wildcard CORS (Access-Control-Allow-Origin: *)
+ * which is now fixed by routing through server/cors.ts (origin-specific).
+ */
 
-const MCP_API_KEY = process.env.MCP_API_KEY ?? '';
-const MCP_BASE_URL =
-  process.env.MCP_BASE_URL ?? 'https://api.onasis-gateway.com';
-const SUPABASE_URL =
-  process.env.EXPO_PUBLIC_SUPABASE_URL ??
-  process.env.NEXT_PUBLIC_SUPABASE_URL ??
-  '';
-const SUPABASE_ANON_KEY =
-  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  process.env.SUPABASE_PUBLISHABLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  '';
-const UPSTREAM_TIMEOUT_MS = 10_000;
+import vercelHandler from '../../api/banking/proxy';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+/**
+ * Canonical (title-cased) spellings for the headers the server layer emits.
+ * The Web Headers API lowercases every name on iteration, but the Netlify
+ * function contract has always returned canonical names.
+ */
+const CANONICAL_HEADER_NAMES: Record<string, string> = {
+  'Access-Control-Allow-Origin': 'access-control-allow-origin',
+  'Access-Control-Allow-Methods': 'access-control-allow-methods',
+  'Access-Control-Allow-Headers': 'access-control-allow-headers',
+  'Access-Control-Max-Age': 'access-control-max-age',
+  'Content-Type': 'content-type',
+  Vary: 'vary',
 };
 
 interface NetlifyEvent {
@@ -35,84 +36,52 @@ interface NetlifyResult {
   body: string;
 }
 
-const json = (statusCode: number, data: unknown): NetlifyResult => ({
-  statusCode,
-  headers: {
-    'Content-Type': 'application/json',
-    ...corsHeaders,
-  },
-  body: JSON.stringify(data),
-});
-
-export const handler = async (event: NetlifyEvent): Promise<NetlifyResult> => {
-  if (event.httpMethod === 'OPTIONS') {
-    return json(200, { ok: true });
+const toRequest = (event: NetlifyEvent): Request => {
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(event.headers ?? {})) {
+    if (value) headers.set(key, value);
   }
+  return new Request('https://placeholder/api/banking/proxy', {
+    method: event.httpMethod,
+    headers,
+    body: event.body ?? undefined,
+  });
+};
 
-  if (event.httpMethod !== 'POST') {
-    return json(405, { error: 'Method Not Allowed' });
-  }
-
-  if (!MCP_API_KEY) {
-    return json(503, { error: 'Banking service not configured' });
-  }
-
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    return json(503, { error: 'Authentication service not configured' });
-  }
-
-  const auth = await requireUser(event);
-  if (!auth.ok) {
-    const payload = JSON.parse(auth.response.body) as { error?: string };
-    return json(auth.response.statusCode, {
-      error: payload.error ?? 'Authentication required',
-    });
-  }
-
-  const authenticatedUserId = auth.user.id;
-
-  let body: unknown;
-  try {
-    body = JSON.parse(event.body ?? '{}');
-  } catch {
-    return json(400, { error: 'Invalid JSON' });
-  }
-
-  const validation = validateBankingProxyRequestBody(body);
-  if (!validation.ok) {
-    return json(400, { error: validation.error });
-  }
-
-  const { path, payload, method } = validation.value;
-  const url = `${MCP_BASE_URL}${path}`;
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${MCP_API_KEY}`,
-    'X-User-ID': authenticatedUserId,
-  };
-
-  try {
-    const upstream = await fetch(url, {
-      method,
-      headers,
-      ...(payload ? { body: JSON.stringify(payload) } : {}),
-      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-    });
-
-    const data = await upstream.json().catch(() => ({}));
-    return json(upstream.status, data);
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      (error.name === 'AbortError' || error.name === 'TimeoutError')
-    ) {
-      return json(504, { error: 'Upstream banking service timed out' });
+const fromResponse = async (
+  response: Response,
+  event: NetlifyEvent,
+): Promise<NetlifyResult> => {
+  const body = await response.text();
+  const headers: Record<string, string | undefined> = {};
+  response.headers.forEach((value, key) => {
+    headers[key] = value;
+  });
+  // The Web Headers API lowercases every name. The Netlify contract (and
+  // every existing caller) reads canonical, title-cased header names, so
+  // restore the casing the server layer used.
+  for (const [canonical, lower] of Object.entries(CANONICAL_HEADER_NAMES)) {
+    if (headers[lower] !== undefined) {
+      headers[canonical] = headers[lower];
+      delete headers[lower];
     }
-
-    console.error('[netlify/banking-proxy] error:', error);
-    return json(500, { error: 'Internal server error' });
   }
+  if (!event.headers?.origin) {
+    delete headers['Access-Control-Allow-Origin'];
+  }
+  return {
+    statusCode: response.status,
+    headers,
+    body,
+  };
+};
+
+export const handler = async (
+  event: NetlifyEvent,
+): Promise<NetlifyResult> => {
+  const request = toRequest(event);
+  const response = await vercelHandler(request);
+  return fromResponse(response, event);
 };
 
 export default handler;

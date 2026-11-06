@@ -57,7 +57,8 @@ const BANK_ACCOUNTS_TABLE: keyof Database['public']['Tables'] = 'bank_accounts';
 const SUBSCRIPTIONS_TABLE: keyof Database['public']['Tables'] = 'subscriptions';
 const SUBSCRIPTION_CONFLICT_COLUMNS = 'user_id,detection_key';
 const RELATIVE_BANKING_PROXY_URL = '/api/banking/proxy';
-const NETLIFY_BANKING_PROXY_PATH = '/banking-proxy';
+const VERCEL_BANKING_PROXY_PATH = '/api/banking/proxy';
+const NETLIFY_BANKING_PROXY_PATH = '/api/banking/proxy';
 
 const unique = <T,>(values: T[]): T[] =>
   values.filter((value, index) => values.indexOf(value) === index);
