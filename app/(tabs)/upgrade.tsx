@@ -20,7 +20,8 @@ export default function UpgradeScreen() {
   };
 
   const renderCurrentPlan = () => {
-    const plan = SUBSCRIPTION_PLANS[currentTier];
+    const tier = currentTier ?? 'free';
+    const plan = SUBSCRIPTION_PLANS[tier];
     
     return (
       <View style={styles.currentPlanCard}>
@@ -31,11 +32,11 @@ export default function UpgradeScreen() {
         
         <Text style={styles.currentPlanName}>{plan.name}</Text>
         <Text style={styles.currentPlanPrice}>
-          ${plan.price}{currentTier === 'team' && '/user'}/month
+          ${plan.price}{tier === 'team' && '/user'}/month
         </Text>
         
         <View style={styles.currentPlanFeatures}>
-          {plan.features.slice(0, 3).map((feature, index) => (
+          {plan.features.slice(0, 3).map((feature: string, index: number) => (
             <View key={index} style={styles.featureRow}>
               <Check size={16} color="#10B981" />
               <Text style={styles.featureText}>{feature}</Text>
@@ -191,7 +192,7 @@ export default function UpgradeScreen() {
       <PlanComparison
         visible={showComparison}
         onClose={() => setShowComparison(false)}
-        currentTier={currentTier}
+        currentTier={currentTier ?? 'free'}
         onSelectPlan={handleSelectPlan}
       />
     </SafeAreaView>
