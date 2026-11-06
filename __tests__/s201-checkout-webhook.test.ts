@@ -282,24 +282,31 @@ describe('checkout: authentication', () => {
   });
 
   it('returns 503 when Supabase env is missing', async () => {
-    // server/auth.ts falls back to EXPO_PUBLIC_*, NEXT_PUBLIC_*, SUPABASE_,
-    // SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL, etc. Another test file sets
-    // SUPABASE_URL, so blanking only the EXPO_PUBLIC aliases silently failed.
-    const keys = [
-      'EXPO_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL',
-      'SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY',
-      'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
-      'SUPABASE_ANON_KEY', 'EXPO_PUBLIC_SUPABASE_ANON_KEY',
-      'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-    ];
-    const vals = keys.map((k) => process.env[k] ?? '');
-    keys.forEach((k) => delete process.env[k]);
+    // server/auth.ts reads the URL and anon key from several env aliases, so
+    // EVERY alias must be cleared for this to be a real "not configured" state.
+    // Leaving one populated (another test file may set one) lets auth succeed.
+    const aliases = {
+      EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      SUPABASE_URL: process.env.SUPABASE_URL,
+      SUPABASE_PUBLISHABLE_KEY: process.env.SUPABASE_PUBLISHABLE_KEY,
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
+    };
+    for (const key of Object.keys(aliases)) delete process.env[key];
+
     try {
       const req = makeRequestObject({ method: 'POST', headers: { Authorization: 'Bearer valid-token' } });
       const res = await checkoutHandler(req);
       expect(res.status).toBe(503);
     } finally {
-      keys.forEach((k, i) => { process.env[k] = vals[i]!; });
+      // Restore only the aliases that were actually set, so we never invent one.
+      for (const [key, value] of Object.entries(aliases)) {
+        if (value !== undefined) process.env[key] = value;
+      }
     }
   });
 });
@@ -338,6 +345,72 @@ describe('checkout: user identity', () => {
     expect(res.status).toBe(200);
     const call = (mockStripeApi.checkout.sessions.create as jest.Mock).mock.calls[0][0] as Record<string, unknown>;
     expect((call as Record<string, unknown>).customer_email).toBe('session@example.com');
+  });
+});
+
+describe('checkout: plan selection (D4)', () => {
+  const PRICES: Record<string, { id: string; metadata: Record<string, string> }> = {
+    subtrack_pro_monthly: { id: 'price_pro_10', metadata: { project: 'subtrack', tier: 'pro' } },
+    subtrack_team_monthly: { id: 'price_team_20', metadata: { project: 'subtrack', tier: 'team' } },
+  };
+
+  const post = (body?: string) =>
+    checkoutHandler(
+      makeRequestObject({
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid-token', 'Content-Type': 'application/json', origin: ALLOWED_ORIGIN },
+        body,
+      }),
+    );
+
+  const lineItemPrice = () => {
+    const call = (mockStripeApi.checkout.sessions.create as jest.Mock).mock.calls[0][0] as {
+      line_items: Array<{ price: string }>;
+    };
+    return call.line_items[0].price;
+  };
+
+  beforeEach(() => {
+    mockStripeApi.prices.list.mockImplementation(async ({ lookup_keys }: { lookup_keys: string[] }) => ({
+      data: PRICES[lookup_keys[0]] ? [PRICES[lookup_keys[0]]] : [],
+      has_more: false,
+    }));
+  });
+
+  it('defaults to Pro when the body names no plan', async () => {
+    const res = await post();
+    expect(res.status).toBe(200);
+    expect(mockStripeApi.prices.list).toHaveBeenCalledWith(expect.objectContaining({ lookup_keys: ['subtrack_pro_monthly'] }));
+    expect(lineItemPrice()).toBe('price_pro_10');
+  });
+
+  it('charges the Team price when plan is team', async () => {
+    const res = await post(JSON.stringify({ plan: 'team' }));
+    expect(res.status).toBe(200);
+    expect(mockStripeApi.prices.list).toHaveBeenCalledWith(expect.objectContaining({ lookup_keys: ['subtrack_team_monthly'] }));
+    expect(lineItemPrice()).toBe('price_team_20');
+  });
+
+  it.each(['enterprise', 'free', '__proto__', 'price_pro_10', 42])('rejects plan %p with 400 and creates no session', async (plan) => {
+    const res = await post(JSON.stringify({ plan }));
+    expect(res.status).toBe(400);
+    expect(mockStripeApi.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malformed body with 400', async () => {
+    const res = await post('{not json');
+    expect(res.status).toBe(400);
+    expect(mockStripeApi.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses a price not tagged for this app and plan', async () => {
+    mockStripeApi.prices.list.mockResolvedValueOnce({
+      data: [{ id: 'price_vortex', metadata: { project: 'vortexcore', tier: 'team' } }],
+      has_more: false,
+    });
+    const res = await post(JSON.stringify({ plan: 'team' }));
+    expect(res.status).toBe(500);
+    expect(mockStripeApi.checkout.sessions.create).not.toHaveBeenCalled();
   });
 });
 

@@ -32,7 +32,7 @@ export const SUBSCRIPTION_PLANS: Record<string, SubscriptionPlan> = {
     id: 'pro',
     name: 'Pro',
     description: 'For power users and small businesses',
-    price: 4.99,
+    price: 10.00,
     billingCycle: 'monthly',
     features: [
       'Unlimited subscriptions',
@@ -63,7 +63,7 @@ export const SUBSCRIPTION_PLANS: Record<string, SubscriptionPlan> = {
     id: 'team',
     name: 'Team',
     description: 'Collaborative workspace for teams',
-    price: 2.00, // per user per month
+    price: 20.00, // flat per month (Stripe lookup key subtrack_team_monthly)
     billingCycle: 'monthly',
     features: [
       'All Pro features included',

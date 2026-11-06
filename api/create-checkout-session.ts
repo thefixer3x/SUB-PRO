@@ -13,6 +13,34 @@ import { ensureStripe } from '../server/stripe';
 
 export const runtime = 'nodejs';
 
+/** Purchasable plans and their Stripe lookup keys (decision D4). */
+export const PLAN_LOOKUP_KEYS = {
+  pro: 'subtrack_pro_monthly',
+  team: 'subtrack_team_monthly',
+} as const;
+
+type PurchasablePlan = keyof typeof PLAN_LOOKUP_KEYS;
+
+/**
+ * Read `plan` from the JSON body. A missing body or missing `plan` means Pro,
+ * which keeps older clients working. Anything else that is not an allowlisted
+ * plan returns null and the request is rejected.
+ */
+async function readPlan(request: Request): Promise<PurchasablePlan | null> {
+  let raw: unknown;
+  try {
+    const text = await request.text();
+    if (!text) return 'pro';
+    raw = (JSON.parse(text) as { plan?: unknown })?.plan;
+  } catch {
+    return null;
+  }
+  if (raw === undefined || raw === null) return 'pro';
+  return typeof raw === 'string' && Object.prototype.hasOwnProperty.call(PLAN_LOOKUP_KEYS, raw)
+    ? (raw as PurchasablePlan)
+    : null;
+}
+
 export default async function handler(request: Request): Promise<Response> {
   // --- OPTIONS preflight ---
   if (request.method === 'OPTIONS') {
@@ -46,15 +74,33 @@ export default async function handler(request: Request): Promise<Response> {
     const { id: userId, email } = auth.user;
     const origin = getRequestOrigin(Object.fromEntries(request.headers.entries()));
 
-    // Resolve the price via lookup_key (never from the body).
+    // The body may name a plan, but only from a fixed allowlist; the price
+    // itself is always resolved server-side through its Stripe lookup key.
+    const plan = await readPlan(request);
+    if (!plan) {
+      return new Response(
+        JSON.stringify({ error: `Unknown plan. Expected one of: ${Object.keys(PLAN_LOOKUP_KEYS).join(', ')}` }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
+        },
+      );
+    }
+    const lookupKey = PLAN_LOOKUP_KEYS[plan];
+
     const client = ensureStripe();
     const prices = await client.prices.list({
-      lookup_keys: ['subtrack_pro_monthly'],
+      lookup_keys: [lookupKey],
+      active: true,
     });
 
-    if (!prices.data?.length) {
+    const price = prices.data?.[0];
+    // Refuse a price that is not tagged for this app and plan, so a lookup key
+    // moved by mistake can never sell another product (see decision D2).
+    if (!price || price.metadata?.project !== 'subtrack' || price.metadata?.tier !== plan) {
+      console.error(`Checkout price misconfigured for lookup_key=${lookupKey}`);
       return new Response(
-        JSON.stringify({ error: 'Price not found (lookup_key=subtrack_pro_monthly)' }),
+        JSON.stringify({ error: `Price not available (lookup_key=${lookupKey})` }),
         {
           status: 500,
           headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
@@ -62,7 +108,7 @@ export default async function handler(request: Request): Promise<Response> {
       );
     }
 
-    const priceId = prices.data[0].id;
+    const priceId = price.id;
 
     const allowedOrigins = getAllowedOrigins();
     const siteUrl = process.env.SITE_URL || allowedOrigins[0];

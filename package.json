@@ -44,7 +44,6 @@
     "@genkit-ai/mcp": "^1.19.3",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@sentry/react-native": "~7.2.0",
-    "@stripe/stripe-js": "^7.4.0",
     "@stripe/stripe-react-native": "0.50.3",
     "@supabase/supabase-js": "^2.57.4",
     "@tanstack/react-query": "^5.0.0",

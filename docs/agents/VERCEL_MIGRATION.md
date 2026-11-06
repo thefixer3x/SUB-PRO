@@ -15,7 +15,7 @@ Status: proposed (2026-11-03). Owner decision recorded: Vercel (`sub-pro.lanonas
 Shared context that constrains the design (see the VortexCore Stripe catalog notes held by the owner):
 
 - One Stripe account serves several projects. Webhooks receive **every** project's events, so SubTrack's handler must ignore events for prices whose `metadata.project` is not `subtrack`.
-- Catalog convention: price `lookup_key` = `{project}_{tier}_{interval}`. SubTrack's live price `price_1RiSAL2KF4vMCpn8wUyDio3N` ($4.99/month) is tagged `project=subtrack, tier=pro` but has **no lookup key yet**. Target key: `subtrack_pro_monthly`. Application code resolves prices by lookup key, never by hardcoded ID.
+- Catalog convention: price `lookup_key` = `{project}_{tier}_{interval}`. SubTrack's live prices (2026-11-04): Pro $10/month → `subtrack_pro_monthly`, Team $20/month → `subtrack_team_monthly`, both tagged `project=subtrack` with `tier` = `pro` / `team`. Application code resolves prices by lookup key, never by hardcoded ID.
 - One webhook endpoint per project, tagged `metadata.project`. `we_1RiSB62…` is SubTrack's and is not tagged yet.
 - The Supabase project is shared. VortexCore's `stripe-entitlements` function already writes `public.user_tiers` and `public.stripe_subscriptions` for **all** subscriptions on the account, including SubTrack's (legacy SubTrack prices resolve to `pro` there). Never deploy a Supabase function named `stripe-webhook` from any repo; that name belongs to the Stripe Sync Engine.
 

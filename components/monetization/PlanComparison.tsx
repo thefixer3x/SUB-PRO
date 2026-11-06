@@ -61,7 +61,6 @@ export const PlanComparison: React.FC<PlanComparisonProps> = ({
         <View style={styles.priceContainer}>
           <Text style={styles.price}>
             ${plan.price}
-            {tier === 'team' && <Text style={styles.perUser}>/user</Text>}
           </Text>
           <Text style={styles.billingCycle}>per month</Text>
         </View>
