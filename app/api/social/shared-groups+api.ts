@@ -18,7 +18,7 @@ export async function GET(request: Request) {
       {
         id: 'group_1',
         subscriptionId: '3', // Netflix
-        ownerId: 'user-123',
+        ownerId: userId,
         name: 'Family Netflix',
         description: 'Shared Netflix account for the family',
         totalCost: 19.99,
@@ -52,42 +52,14 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const { subscriptionId, name, description, totalCost, members, splitMethod } = body;
-
-    // Validate input
-    if (!subscriptionId || !name || !totalCost || !members || !splitMethod) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required fields' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // In a real app, create group in database
-    const sharedGroup: SharedGroup = {
-      id: `group_${Date.now()}`,
-      subscriptionId,
-      ownerId: 'user-123', // In real app, get from authenticated user
-      name,
-      description,
-      totalCost,
-      splitMethod,
-      status: 'active',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    // Mock creating members in database
-    console.log('Creating shared group with members:', members);
-
-    return Response.json(sharedGroup);
-  } catch (error) {
-    console.error('Shared group creation error:', error);
-    return new Response(
-      JSON.stringify({ error: 'Failed to create shared group' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
-  }
+/**
+ * Shared groups are not stored anywhere yet, so creating one must not report
+ * success: it used to return a group owned by a fixed placeholder user, and
+ * the app then told people their invitations had been sent.
+ */
+export async function POST(_request: Request) {
+  return new Response(
+    JSON.stringify({ error: 'Creating shared groups is not available yet' }),
+    { status: 501, headers: { 'Content-Type': 'application/json' } }
+  );
 }

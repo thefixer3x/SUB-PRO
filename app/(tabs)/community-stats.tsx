@@ -6,15 +6,18 @@ import { AdBanner } from '@/components/monetization/AdBanner';
 import { FeatureGate } from '@/components/monetization/FeatureGate';
 import { useSubscription } from '@/hooks/useSubscription';
 import { communityStatsService } from '@/services/communityStats';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function CommunityStats() {
   const { currentTier } = useSubscription();
-  const [userId, setUserId] = useState('user-123'); // In a real app, get from auth context
+  const { user } = useAuth();
+  // The signed-in user's own id; nothing is read until there is one.
+  const userId = user?.id ?? '';
   const [dataSharing, setDataSharing] = useState(false);
 
   useEffect(() => {
-    loadDataSharingPreferences();
-  }, []);
+    if (userId) loadDataSharingPreferences();
+  }, [userId]);
 
   const loadDataSharingPreferences = async () => {
     try {
@@ -52,10 +55,12 @@ export default function CommunityStats() {
             </View>
           }
         >
-          <CommunityInsights 
-            userId={userId} 
-            onDataSharingToggle={handleDataSharingToggle} 
-          />
+          {userId ? (
+            <CommunityInsights
+              userId={userId}
+              onDataSharingToggle={handleDataSharingToggle}
+            />
+          ) : null}
         </FeatureGate>
 
         {currentTier === 'free' && <AdBanner placement="community" />}
