@@ -282,15 +282,32 @@ describe('checkout: authentication', () => {
   });
 
   it('returns 503 when Supabase env is missing', async () => {
-    const origUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-    const origKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-    process.env.EXPO_PUBLIC_SUPABASE_URL = '';
-    process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY = '';
-    const req = makeRequestObject({ method: 'POST', headers: { Authorization: 'Bearer valid-token' } });
-    const res = await checkoutHandler(req);
-    expect(res.status).toBe(503);
-    process.env.EXPO_PUBLIC_SUPABASE_URL = origUrl!;
-    process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY = origKey!;
+    // server/auth.ts reads the URL and anon key from several env aliases, so
+    // EVERY alias must be cleared for this to be a real "not configured" state.
+    // Leaving one populated (another test file may set one) lets auth succeed.
+    const aliases = {
+      EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      SUPABASE_URL: process.env.SUPABASE_URL,
+      SUPABASE_PUBLISHABLE_KEY: process.env.SUPABASE_PUBLISHABLE_KEY,
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
+    };
+    for (const key of Object.keys(aliases)) delete process.env[key];
+
+    try {
+      const req = makeRequestObject({ method: 'POST', headers: { Authorization: 'Bearer valid-token' } });
+      const res = await checkoutHandler(req);
+      expect(res.status).toBe(503);
+    } finally {
+      // Restore only the aliases that were actually set, so we never invent one.
+      for (const [key, value] of Object.entries(aliases)) {
+        if (value !== undefined) process.env[key] = value;
+      }
+    }
   });
 });
 

@@ -62,7 +62,7 @@ All seven must hold; "mostly" is a rejection.
 | D3 | Billing address: keep it per request (current), or approve a column migration | S304 | per request |
 | A1 | Netlify env: `ALLOWED_ORIGINS=https://sub-pro.lanonasis.com,https://subtrack-pro.lanonasis.com` | production card calls from the browser | — |
 | A2 | ~~Vercel env~~ **DONE 2026-11-03** — verified via Vercel API: `STRIPE_SECRET_KEY` (dev/preview/prod), `ALLOWED_ORIGINS`, `SITE_URL`, `STRIPE_WEBHOOK_SECRET` (prod) and `SUPABASE_SECRET_KEY` all present | S201 preview test | closed |
-| A3 | ~~Stripe lookup keys~~ **DONE 2026-11-03 (live mode)** — `price_1RiSAL2…` → `subtrack_pro_monthly`, `price_1RiSAi2…` → `subtrack_enterprise_monthly`, endpoint `we_1RiSB62…` has `metadata.project = subtrack`. **Agents use test mode only** and create their own test-mode prices/endpoint with the same lookup keys and metadata. | S201 | closed — does **not** block |
+| A3 | ~~Stripe lookup keys~~ **DONE 2026-11-03 (live mode), superseded by D4 on 2026-11-04** (keys now on the $10 Pro and $20 Team prices; the prices below are archived) — `price_1RiSAL2…` → `subtrack_pro_monthly`, `price_1RiSAi2…` → `subtrack_enterprise_monthly`, endpoint `we_1RiSB62…` has `metadata.project = subtrack`. **Agents use test mode only** and create their own test-mode prices/endpoint with the same lookup keys and metadata. | S201 | closed — does **not** block |
 | A4 | Top up the Anthropic key used by the `claude-review` workflow | automated review | — |
 | A5 | `SPLITWISE_API_KEY`, `HAVEIBEENPWNED_API_KEY` on Vercel — **confirmed still MISSING 2026-11-04** (pulled all three environments: absent from production, preview and development) | S203 | — |
 
@@ -77,7 +77,7 @@ All seven must hold; "mostly" is a rejection.
 - **A2: done, 2026-11-03.** Vercel has `STRIPE_SECRET_KEY` (production, preview, development), `ALLOWED_ORIGINS` and `SITE_URL`. `STRIPE_WEBHOOK_SECRET` is set for production only: S201's preview test needs the **test-mode** signing secret of a test-mode endpoint added to Preview (owner).
 - A4: open.
 - **A5: open.** `SPLITWISE_API_KEY` and `HAVEIBEENPWNED_API_KEY` must be added to Vercel before S203 can run. Owner action.
-- **A3: done in live mode, 2026-11-03.** `price_1RiSAL2…` has lookup key `subtrack_pro_monthly`, `price_1RiSAi2…` has `subtrack_enterprise_monthly`, and endpoint `we_1RiSB62…` carries `metadata.project = subtrack`.
+- **A3: done in live mode, 2026-11-03; superseded by D4 on 2026-11-04** (see the decisions table for the current prices and keys). `price_1RiSAL2…` has lookup key `subtrack_pro_monthly`, `price_1RiSAi2…` has `subtrack_enterprise_monthly`, and endpoint `we_1RiSB62…` carries `metadata.project = subtrack`.
 - **Stripe mode for agents (owner, 2026-11-03):** Hermes workers have Stripe **test and staging** access only, never live. Test mode has its own prices and lookup keys: S201's worker creates (or reuses) test-mode SubTrack Pro and Enterprise prices with the same `lookup_key` values and the same `metadata` (`project=subtrack`, `tier`, `billing`), and a test-mode webhook endpoint for the preview URL. Live mode changes stay with the owner or the orchestrator.
 
 ---

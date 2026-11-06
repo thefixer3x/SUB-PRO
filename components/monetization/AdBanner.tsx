@@ -53,7 +53,7 @@ export const AdBanner: React.FC<AdBannerProps> = ({
   }, []);
 
   // Don't show ads if user shouldn't see them or frequency limits
-  if (!shouldShowAds(currentTier) || !canShowBanner(lastShown)) return null;
+  if (!shouldShowAds(currentTier ?? 'free') || !canShowBanner(lastShown)) return null;
 
   const getAdDimensions = () => {
     switch (size) {
