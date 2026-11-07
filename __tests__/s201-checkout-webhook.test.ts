@@ -857,7 +857,7 @@ describe('webhook: checkout.session.completed idempotency', () => {
           id: 'evt_checkout_1',
           created: 1700000001,
           type: 'checkout.session.completed',
-          data: { object: { id: 'cs_1', metadata: { user_id: SESSION_USER_ID }, subscription: 'sub_checkout' } },
+          data: { object: { id: 'cs_1', customer: 'cus_1', metadata: { user_id: SESSION_USER_ID }, subscription: 'sub_checkout' } },
         };
       }
       const err = new Error('bad sig');

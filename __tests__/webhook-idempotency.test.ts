@@ -29,6 +29,7 @@ let mockInsertError: { table: string; error: { code: string; message: string } }
 let mockClaimResults: ('claimed' | 'duplicate' | 'in_progress')[] = [];
 let mockClaimError: { message: string } | null = null;
 let mockMarkDoneError: { message: string } | null = null;
+let mockClaimCalls: string[] = [];
 let mockDoneCalls: string[] = [];
 let mockReleaseCalls: string[] = [];
 let mockClaimTokenNumber = 0;
@@ -97,6 +98,7 @@ jest.mock('@supabase/supabase-js', () => {
     from: jest.fn((table: string) => createQueryBuilder(table)),
     rpc: jest.fn(async (fn: string, args: Record<string, unknown>) => {
       if (fn === 'claim_webhook_event') {
+        mockClaimCalls.push(String(args.p_event_id));
         if (mockClaimError) {
           const error = mockClaimError;
           mockClaimError = null;
@@ -207,6 +209,7 @@ beforeEach(() => {
   mockClaimResults = [];
   mockClaimError = null;
   mockMarkDoneError = null;
+  mockClaimCalls = [];
   mockDoneCalls = [];
   mockReleaseCalls = [];
   mockClaimTokenNumber = 0;
@@ -446,6 +449,7 @@ describe('idempotency: foreign-project skip still reachable', () => {
     expect(body.skipped).toBe(true);
     expect(body.reason).toBe('foreign_project');
     expect(mockInserts).toHaveLength(0);
+    expect(mockClaimCalls).toEqual(['evt_foreign']);
     expect(mockDoneCalls).toEqual(['evt_foreign']);
   });
 });

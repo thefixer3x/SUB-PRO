@@ -34,11 +34,16 @@ migration ledger.
 
 ## Baseline schema
 
-`20261107000002_baseline_sm_tables.sql` reconciles the live schema needed by the
-webhook and app: `sm_subscriptions`, `sm_payment_records`, and the live
-`virtual_cards.card_id` shape. It is safe after S401: it does not restore `anon`
+`20261107000002_baseline_sm_tables.sql` is a targeted baseline for the live
+tables required by P0/P1: `sm_subscriptions`, `sm_payment_records`, and the live
+`virtual_cards.card_id` shape. It is not a complete dump of every manually
+provisioned VortexCore/MaaS table. It is safe after S401: it does not restore `anon`
 privileges, client writes to cards, `TRUNCATE`, or the broad legacy subscription
 policy. Reapplying it preserves the hardened state.
+
+The baseline adds `card_authorizations.livemode` with a `true` default so
+unmarked legacy rows fail closed; new webhook authorization rows persist
+Stripe's `event.livemode` value.
 
 Payment rows are deduped by `stripe_event_id`, not by a new unique constraint on
 `(stripe_invoice_id, status)`. Existing payment history, including duplicate

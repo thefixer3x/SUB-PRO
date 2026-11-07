@@ -27,21 +27,21 @@ describe('check-migrations', () => {
   }
 
   it('accepts a unique forward migration', () => {
-    add('20261107000002_envelopes.sql');
+    add('20261107000006_example.sql');
     const result = run();
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('Migration check passed');
   });
 
   it('rejects rollback files even with a unique version', () => {
-    add('20261107000002_envelopes.rollback.sql');
+    add('20261107000006_example.rollback.sql');
     const result = run();
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('rollback files belong in supabase/rollbacks');
   });
 
   it('validates uppercase SQL extensions instead of silently ignoring them', () => {
-    add('20261107000002_envelopes.SQL');
+    add('20261107000006_example.SQL');
     const result = run();
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('does not match <version>_<name>.sql');

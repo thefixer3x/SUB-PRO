@@ -32,7 +32,17 @@ values
   ('11111111-1111-4111-8111-111111111111', 'in_legacy_dup', 100, 'usd', 'succeeded'),
   ('11111111-1111-4111-8111-111111111111', 'in_legacy_dup', 100, 'usd', 'succeeded');
 reset role;
+SQL
 
+# P1 migrations are present in the stacked P1 branch; keep the runner useful
+# from the P0-only branch as well.
+if [ -f "$repo/supabase/migrations/20261107000004_envelopes.sql" ]; then
+  q -f "$repo/supabase/migrations/20261107000004_envelopes.sql"
+  q -f "$repo/supabase/migrations/20261107000005_insights.sql"
+  q -f "$here/p1-checks.sql"
+fi
+
+q <<'SQL'
 do $$ begin
   if has_table_privilege('anon', 'public.sm_subscriptions', 'INSERT')
      or has_table_privilege('anon', 'public.sm_subscriptions', 'SELECT')
@@ -61,6 +71,14 @@ do $$ begin
        where table_schema = 'public' and table_name = 'virtual_cards'
          and column_name = 'stripe_card_id') <> 'YES' then
     raise exception 'baseline did not make legacy stripe_card_id nullable';
+  end if;
+  if (select column_default from information_schema.columns
+       where table_schema = 'public' and table_name = 'card_authorizations'
+         and column_name = 'livemode') not like '%true%' then
+    raise exception 'authorization mode default must fail closed to live';
+  end if;
+  if (select livemode from public.card_authorizations where stripe_authorization_id = 'ia_legacy') is not true then
+    raise exception 'legacy authorization row was not defaulted to live mode';
   end if;
   if (select count(*) from public.sm_payment_records where stripe_invoice_id = 'in_legacy_dup') <> 2 then
     raise exception 'baseline did not preserve duplicate payment history';

@@ -136,6 +136,10 @@ grant all on table public.virtual_cards to service_role;
 
 -- 3. card_authorizations join through virtual_cards.card_id -------------------
 -- The 2025-09 policy joins on stripe_card_id, which live writes do not set.
+-- Older authorization rows have no mode provenance, so fail closed as live.
+alter table public.card_authorizations
+  add column if not exists livemode boolean not null default true;
+
 drop policy if exists "Users can view own card authorizations" on public.card_authorizations;
 create policy "Users can view own card authorizations"
   on public.card_authorizations
