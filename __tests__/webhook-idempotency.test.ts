@@ -187,6 +187,7 @@ function authEvent(id = 'evt_auth_1') {
   return {
     id,
     type: 'issuing_authorization.created',
+    livemode: false,
     data: {
       object: {
         id: `iauth_${id}`,
@@ -325,6 +326,7 @@ describe('idempotency: failed effect releases the claim', () => {
     const res2 = await webhookHandler(makeRequest('issuing_authorization.created'));
     expect(res2.status).toBe(200);
     expect((mockTables['card_authorizations'] ?? [])).toHaveLength(1);
+    expect(mockTables['card_authorizations'][0].livemode).toBe(false);
     expect(mockDoneCalls).toEqual(['evt_auth_1']);
   });
 });

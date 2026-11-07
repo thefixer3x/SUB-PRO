@@ -66,10 +66,11 @@ Route map. Every server route lives under `/api`, and the API base URL includes 
 | `/banking/proxy` (`services/mcpBankingService.ts`; change its native constant from `/banking-proxy`) | `/api/banking/proxy` | `api/banking/proxy.ts` |
 | `/splitwise` (`services/sharedSubscriptions.ts`) | `/api/splitwise` | `api/splitwise.ts` |
 | `/hibp-check` | `/api/hibp-check` | `api/hibp-check.ts` |
+| `/embedded-finance/plan/*` (Plan inbox + envelopes) | `/api/embedded-finance/plan/*` | `api/embedded-finance/plan/[...path].ts` |
 
 Any path not in this table must not exist on the client; an unmatched `/api/*` path returns 404 from Vercel (it is excluded from the SPA rewrite), never `index.html`.
 
-Vercel environment (owner sets these; names only, never values in the repo): `STRIPE_SECRET_KEY` (missing on Vercel today), `STRIPE_WEBHOOK_SECRET` (present), `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (present), `ALLOWED_ORIGINS`, `SITE_URL`, `SPLITWISE_API_KEY`, `HAVEIBEENPWNED_API_KEY`. Native clients: `EXPO_PUBLIC_API_BASE_URL=https://sub-pro.lanonasis.com/api` (and the same value for `EXPO_PUBLIC_EMBEDDED_FINANCE_API_BASE_URL`). The `/api` suffix is required: client paths are appended to the base without it. Web uses relative `/api/...` URLs.
+Vercel environment (owner sets these; names only, never values in the repo): `STRIPE_SECRET_KEY` (missing on Vercel today), `STRIPE_WEBHOOK_SECRET` (present), `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (present), `ALLOWED_ORIGINS`, `SITE_URL`, `SPLITWISE_API_KEY`, `HAVEIBEENPWNED_API_KEY`, and `CRON_SECRET` (protects the P1 envelope-spend cron). Native clients: `EXPO_PUBLIC_API_BASE_URL=https://sub-pro.lanonasis.com/api` (and the same value for `EXPO_PUBLIC_EMBEDDED_FINANCE_API_BASE_URL`). The `/api` suffix is required: client paths are appended to the base without it. Web uses relative `/api/...` URLs.
 
 ## 4. Phase 2: Stripe cutover (owner, about 15 minutes)
 
