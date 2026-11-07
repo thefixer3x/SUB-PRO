@@ -31,6 +31,9 @@ describe('api/ functions module format', () => {
     'api/create-checkout-session.ts',
     'api/stripe/webhook.ts',
     'api/embedded-finance/virtual-cards/[...path].ts',
+    'api/banking/proxy.ts',
+    'api/hibp-check.ts',
+    'api/splitwise.ts',
   ])('%s compiles to CommonJS', (entry) => {
     const out = compiledFor(entry);
     expect(out).toMatch(/require\("\.\.\/(\.\.\/)*server\//);

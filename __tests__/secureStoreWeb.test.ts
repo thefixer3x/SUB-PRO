@@ -1,6 +1,6 @@
 /**
  * lib/secureStore.web.ts: expo-secure-store has no web implementation, so the
- * web bundle uses localStorage. It must also survive storage being blocked.
+ * web bundle uses localStorage. Reads survive blocked storage; writes report failure.
  */
 import * as store from '../lib/secureStore.web';
 
@@ -35,15 +35,25 @@ describe('lib/secureStore.web', () => {
     expect(await store.getItemAsync('budgetLimit')).toBeNull();
   });
 
-  it('degrades to no-ops when storage is blocked', async () => {
+  it('reads null but rejects writes when storage is blocked', async () => {
     g.window = {
       get localStorage(): Storage {
         throw new Error('SecurityError: access denied');
       },
     };
-    await expect(store.setItemAsync('k', 'v')).resolves.toBeUndefined();
     await expect(store.getItemAsync('k')).resolves.toBeNull();
-    await expect(store.deleteItemAsync('k')).resolves.toBeUndefined();
+    await expect(store.setItemAsync('k', 'v')).rejects.toThrow('Browser storage is unavailable');
+    await expect(store.deleteItemAsync('k')).rejects.toThrow('Browser storage is unavailable');
+  });
+
+  it('rejects a write the browser refuses (quota exceeded), so the caller can show an error', async () => {
+    const ls = fakeLocalStorage();
+    ls.setItem = () => {
+      throw new Error('QuotaExceededError');
+    };
+    g.window = { localStorage: ls };
+    await expect(store.setItemAsync('budgetLimit', '150')).rejects.toThrow('QuotaExceededError');
+    expect(await store.getItemAsync('budgetLimit')).toBeNull();
   });
 
   it('returns null when there is no window (server render)', async () => {

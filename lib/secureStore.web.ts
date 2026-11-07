@@ -3,8 +3,11 @@
  *
  * Only for non-sensitive preferences (budget limit, toggles). localStorage is
  * readable by any script on the origin, so never store tokens or secrets here.
- * Storage can be unavailable (private mode, blocked site data): reads then
- * return null and writes are dropped, so the screen still renders.
+ *
+ * Reads are soft: when storage is unavailable (private mode, blocked site
+ * data) they return null so the screen still renders. Writes and deletes
+ * reject, as expo-secure-store does on native, so callers can tell the user
+ * a setting was not saved instead of showing it as saved.
  */
 
 function storage(): Storage | null {
@@ -13,6 +16,12 @@ function storage(): Storage | null {
   } catch {
     return null;
   }
+}
+
+function requireStorage(): Storage {
+  const s = storage();
+  if (!s) throw new Error('Browser storage is unavailable');
+  return s;
 }
 
 export async function getItemAsync(key: string): Promise<string | null> {
@@ -24,17 +33,9 @@ export async function getItemAsync(key: string): Promise<string | null> {
 }
 
 export async function setItemAsync(key: string, value: string): Promise<void> {
-  try {
-    storage()?.setItem(key, value);
-  } catch {
-    // Storage full or blocked: keep the in-memory value only.
-  }
+  requireStorage().setItem(key, value);
 }
 
 export async function deleteItemAsync(key: string): Promise<void> {
-  try {
-    storage()?.removeItem(key);
-  } catch {
-    // Nothing to remove.
-  }
+  requireStorage().removeItem(key);
 }

@@ -74,7 +74,7 @@ Your enhanced landing page now showcases:
 - Everything in Pro
 - Team accounts & sharing
 - AI spending advisor
-- Custom budgeting rules
+- Budget alert threshold (alerts not yet sent)
 - White-label options
 - API access
 

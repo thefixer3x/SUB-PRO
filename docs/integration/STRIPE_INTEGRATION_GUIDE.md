@@ -20,7 +20,8 @@ subtrack_team_monthly  Team  $20/month
 ```
 
 The same lookup keys exist in live and test mode. To change a price, create a
-new price with the same metadata and move the lookup key to it
+new **recurring monthly** price (Checkout runs in subscription mode, so a
+one-time price fails) with the same metadata and move the lookup key to it
 (`transfer_lookup_key`); no deploy is needed. The old $4.99 / $9.99 prices are
 retired.
 
