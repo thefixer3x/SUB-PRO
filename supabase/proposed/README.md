@@ -6,7 +6,7 @@ live Supabase project.
 
 | File | Card | Status |
 | --- | --- | --- |
-| `2026-11-sm-permissions.sql` | S401 / C09 (#31) | Proposed: needs owner review and apply |
+| `2026-11-sm-permissions.sql` | S401 / C09 (#31) | **Superseded** — migration applied at `migrations/20261107000000_s401_permissions.sql` |
 | `2026-11-sm-permissions.rollback.sql` | Rollback for the file above | Use only to undo it |
 
 ## 2026-11-sm-permissions.sql

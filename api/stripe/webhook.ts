@@ -32,9 +32,6 @@ const WEBHOOK_EVENTS = [
 
 type WebhookEventType = (typeof WEBHOOK_EVENTS)[number];
 
-// Track processed event ids for idempotency.
-const processedEvents = new Set<string>();
-
 export async function handler(request: Request): Promise<Response> {
   if (request.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405 });
@@ -96,17 +93,6 @@ export async function handler(request: Request): Promise<Response> {
       headers: { 'Content-Type': 'application/json' },
     });
   }
-
-  // Idempotency: skip already-processed events.
-  const eventId = stripeEvent.id;
-  if (processedEvents.has(eventId)) {
-    console.log(`Skipping already-processed event: ${eventId}`);
-    return new Response(JSON.stringify({ received: true }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-  processedEvents.add(eventId);
 
   console.log('Received Stripe webhook:', eventType);
 
@@ -199,6 +185,9 @@ async function handleSubscriptionEvent(
     console.log(`Skipping ${event.type}: price project is '${project}', expected 'subtrack'`);
     return { status: 200, body: JSON.stringify({ skipped: true, reason: `project=${project} !== 'subtrack'` }) };
   }
+
+  // Idempotency: log this event so retries don't produce duplicates.
+  if (await logWebhookEvent(event.id, event.type)) return { status: 200, body: JSON.stringify({ received: true }) };
 
   // Get customer to find user_id.
   let customerIdStr = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
@@ -306,6 +295,9 @@ async function handleInvoiceEvent(
     return { status: 200, body: JSON.stringify({ skipped: true, reason: `project=${project} !== 'subtrack'` }) };
   }
 
+  // Idempotency: log this event so retries don't produce duplicates.
+  if (await logWebhookEvent(event.id, event.type)) return { status: 200, body: JSON.stringify({ received: true }) };
+
   // Get userId and record payment.
   const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
   let userId: string | null = null;
@@ -407,6 +399,9 @@ async function handleCheckoutSessionCompleted(
     return { status: 200, body: JSON.stringify({ skipped: true, reason: `project=${project} !== 'subtrack'` }) };
   }
 
+  // Idempotency: log this event so retries don't produce duplicates.
+  if (await logWebhookEvent(event.id, event.type)) return { status: 200, body: JSON.stringify({ received: true }) };
+
   // D1=(b): Set subscription_tier from price metadata.tier.
   const tier = getTierFromPrice(priceObj);
   if (tier) {
@@ -492,6 +487,9 @@ async function handleIssuingAuthorizationCreated(
     throw new Error('Supabase admin client not available');
   }
 
+  // Idempotency: log this event so retries don't produce duplicates.
+  if (await logWebhookEvent(event.id, event.type)) return { status: 200, body: JSON.stringify({ received: true }) };
+
   const { error } = await adminClient.from('card_authorizations').insert({
     stripe_authorization_id: auth.id,
     stripe_card_id: cardId,
@@ -511,6 +509,26 @@ async function handleIssuingAuthorizationCreated(
 
   console.log(`Stored card authorization ${auth.id}`);
   return { status: 200, body: JSON.stringify({ received: true }) };
+}
+
+// Idempotency helper: log a processed webhook event.
+// Returns true if the event was a duplicate (already processed).
+// A 23505 duplicate-key error means the event was already handled.
+// If the table doesn't exist yet, the insert throws 500 so Stripe retries
+// (on retry the migration will have landed).
+async function logWebhookEvent(eventId: string, eventType: string): Promise<boolean> {
+  // TODO: replace with fin-core's runOnce() when @lanonasis/fin-core is added.
+  // See docs/specs/CARD_FUNDING_AND_AI_MANAGER.md section 7, P0.
+  const adminClient = createSupabaseAdmin();
+  if (!adminClient) return false;
+  const { error } = await adminClient
+    .from('webhook_event_log')
+    .insert({ event_id: eventId, event_type: eventType });
+  if (error && error.code === '23505') {
+    console.log(`Skipping already-processed event: ${eventId}`);
+    return true; // duplicate
+  }
+  return false; // not a duplicate
 }
 
 /** Extract the tier from a Stripe Price's metadata.tier field. */
