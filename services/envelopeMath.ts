@@ -82,13 +82,15 @@ export function matchAuthorizationToEnvelope(
 /** Parse a major-unit input while accepting decimal commas from mobile keyboards. */
 export function parseEnvelopeAmount(input: string, currency = 'USD'): number {
   const value = input.trim();
-  if (!value.includes(',')) return Number(value);
-  if (value.includes('.')) return Number.NaN;
+  if (value.includes(',') && value.includes('.')) return Number.NaN;
 
-  const [whole, fraction, ...extra] = value.split(',');
-  if (!/^\d+$/.test(whole) || !/^\d+$/.test(fraction) || extra.length > 0) {
+  const separator = value.includes(',') ? ',' : '.';
+  const [whole, fraction, ...extra] = value.split(separator);
+  if (!/^\d+$/.test(whole) || extra.length > 0) {
     return Number.NaN;
   }
+  if (fraction === undefined) return Number(whole);
+  if (!/^\d+$/.test(fraction)) return Number.NaN;
 
   let maxFractionDigits = 2;
   try {

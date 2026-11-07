@@ -375,12 +375,13 @@ export function detectDuplicateSubscriptions(subscriptions: SubscriptionRow[]): 
       if ((a.currency || 'USD') !== (b.currency || 'USD')) continue;
 
       const similarity = nameSimilarity(a.name, b.name);
-      const nameA = normalizeName(a.name);
-      const nameB = normalizeName(b.name);
+      const tokensA = tokenSet(a.name);
+      const tokensB = tokenSet(b.name);
       const oneContainsOther =
-        nameA.length > 0 &&
-        nameB.length > 0 &&
-        (nameA.includes(nameB) || nameB.includes(nameA));
+        tokensA.size > 0 &&
+        tokensB.size > 0 &&
+        ([...tokensA].every((token) => tokensB.has(token)) ||
+          [...tokensB].every((token) => tokensA.has(token)));
       if (similarity < 0.5 && !oneContainsOther) continue;
 
       const [first, second] = [a.id, b.id].sort();

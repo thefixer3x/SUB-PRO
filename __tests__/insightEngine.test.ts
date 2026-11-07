@@ -212,6 +212,16 @@ describe('duplicate subscriptions', () => {
     expect(events).toHaveLength(0);
   });
 
+  it('does not flag names that only contain one another as substrings', () => {
+    const events = detectDuplicateSubscriptions([
+      sub({ id: 's1', name: 'Box' }),
+      sub({ id: 's2', name: 'Dropbox' }),
+      sub({ id: 's3', name: 'Max' }),
+      sub({ id: 's4', name: 'Maxwell Fitness' }),
+    ]);
+    expect(events).toHaveLength(0);
+  });
+
   it('does not flag the same service across different currencies', () => {
     const events = detectDuplicateSubscriptions([
       sub({ id: 's1', name: 'Netflix', currency: 'USD' }),

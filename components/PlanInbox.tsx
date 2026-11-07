@@ -220,10 +220,10 @@ export function PlanInbox({ currency = 'USD' }: { currency?: string }) {
           <Sparkles size={19} color={colors.primary} />
           <Text style={styles.title}>Plan inbox</Text>
         </View>
-        {consentEnabled && (
+        {(consentEnabled === true || (consentEnabled === null && Boolean(error))) && (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Check for new insights"
+            accessibilityLabel={consentEnabled ? 'Check for new insights' : 'Retry loading plan inbox'}
             disabled={isChecking || isLoading}
             onPress={() => void refresh()}
             style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
@@ -332,7 +332,7 @@ export function PlanInbox({ currency = 'USD' }: { currency?: string }) {
           />
           <Text style={styles.inputLabel}>Monthly amount ({currency.toUpperCase()})</Text>
           <TextInput
-            accessibilityLabel="Monthly amount in dollars"
+            accessibilityLabel={`Monthly amount in ${currency.toUpperCase()}`}
             value={envelopeAmount}
             onChangeText={setEnvelopeAmount}
             placeholder="30.00"
