@@ -4,16 +4,25 @@
 
 ### 1. **Products Created**
 
-- **Basic Plan**: prod_Sdid8AZs4RXD4c (Free tier)
-- **Pro Plan**: prod_SdideR9hikhJ6V ($4.99/month)
-- **Enterprise Plan**: prod_SdidKo4BZeQRwb ($9.99/month)
+- **Free**: no Stripe price
+- **Pro**: prod_SdideR9hikhJ6V ($10/month)
+- **Team**: prod_SdidKo4BZeQRwb ($20/month, flat)
 
-### 2. **Pricing IDs**
+### 2. **Prices (decision D4)**
+
+Checkout never uses a hard-coded price id. `api/create-checkout-session.ts`
+looks the price up by its Stripe lookup key and only accepts a price whose
+metadata says `project=subtrack` and the matching `tier`:
 
 ```
-Pro Monthly: price_1RiSAL2KF4vMCpn8wUyDio3N ($4.99/month)
-Enterprise Monthly: price_1RiSAi2KF4vMCpn8B18AAI8v ($9.99/month)
+subtrack_pro_monthly   Pro   $10/month
+subtrack_team_monthly  Team  $20/month
 ```
+
+The same lookup keys exist in live and test mode. To change a price, create a
+new price with the same metadata and move the lookup key to it
+(`transfer_lookup_key`); no deploy is needed. The old $4.99 / $9.99 prices are
+retired.
 
 ### 3. **Webhook Configuration**
 

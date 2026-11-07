@@ -1,0 +1,14 @@
+// Vercel compiles each function in api/ (and the server/ modules it imports)
+// with the tsconfig.json nearest to the function. The root config is Expo's
+// ("module": "esnext") while package.json is "type": "commonjs", so without
+// this file the functions are emitted as ESM and crash on load
+// (SyntaxError: Cannot use import statement outside a module).
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    // Set by expo/tsconfig.base; only valid with bundler/node16 resolution.
+    "customConditions": null
+  }
+}

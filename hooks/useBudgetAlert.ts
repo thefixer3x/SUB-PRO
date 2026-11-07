@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/secureStore';
 
 interface BudgetAlertState {
   enabled: boolean;
