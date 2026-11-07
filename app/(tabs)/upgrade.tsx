@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native';
-import { Crown, Check, Zap, Users, Settings, CreditCard } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Crown, Check, Zap, Users, Settings, CreditCard, AlertCircle, X } from 'lucide-react-native';
 import { useSubscription } from '@/hooks/useSubscription';
 import { usePayments } from '@/hooks/usePayments';
 import { PlanComparison } from '@/components/monetization/PlanComparison';
@@ -9,15 +9,37 @@ import { SubscriptionTier } from '@/types/monetization';
 
 export default function UpgradeScreen() {
   const { currentTier, subscription } = useSubscription();
-  const { startUpgrade, openCustomerPortal, isLoading } = usePayments();
+  const { startUpgrade, openCustomerPortal, isLoading, pendingTier, error, clearError } = usePayments();
   const [showComparison, setShowComparison] = useState(false);
 
+  // Stage 1 is choosing a plan (one button per plan); stage 2 is payment,
+  // which starts only from that button and hands off to Stripe Checkout.
   const handleSelectPlan = async (tier: SubscriptionTier) => {
     setShowComparison(false);
-    if (tier !== 'free' && tier !== currentTier) {
-      await startUpgrade(tier);
+    if (isLoading || tier === currentTier) return;
+    if (tier === 'free') {
+      // Downgrades and cancellations go through billing management.
+      await openCustomerPortal();
+      return;
     }
+    await startUpgrade(tier);
   };
+
+  const renderError = () =>
+    error ? (
+      <View style={styles.errorBanner} accessibilityRole="alert" testID="upgrade-error">
+        <AlertCircle size={18} color="#B91C1C" />
+        <Text style={styles.errorBannerText}>{error}</Text>
+        <TouchableOpacity
+          onPress={clearError}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss error"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <X size={16} color="#B91C1C" />
+        </TouchableOpacity>
+      </View>
+    ) : null;
 
   const renderCurrentPlan = () => {
     const tier = currentTier ?? 'free';
@@ -67,14 +89,16 @@ export default function UpgradeScreen() {
       <View style={styles.upgradeSection}>
         <Text style={styles.sectionTitle}>Available Plans</Text>
         
-        {availablePlans.map(({ tier, plan }) => (
-          <TouchableOpacity
+        {availablePlans.map(({ tier, plan }) => {
+          const isPending = pendingTier === tier;
+          const actionLabel = tier === 'free' ? 'Downgrade' : `Choose ${plan.name}`;
+          return (
+          <View
             key={tier}
             style={[
               styles.planOption,
               tier === 'pro' && styles.popularPlan
             ]}
-            onPress={() => handleSelectPlan(tier)}
           >
             {tier === 'pro' && (
               <View style={styles.popularBadge}>
@@ -100,9 +124,6 @@ export default function UpgradeScreen() {
                 </Text>
               </View>
               
-              <Text style={styles.selectText}>
-                {tier === 'free' ? 'Downgrade' : 'Select'}
-              </Text>
             </View>
             
             <Text style={styles.planDescription}>{plan.description}</Text>
@@ -115,8 +136,34 @@ export default function UpgradeScreen() {
                 </View>
               ))}
             </View>
-          </TouchableOpacity>
-        ))}
+
+            <TouchableOpacity
+              style={[
+                styles.selectButton,
+                tier === 'free' && styles.selectButtonSecondary,
+                isLoading && !isPending && styles.selectButtonDisabled,
+              ]}
+              onPress={() => handleSelectPlan(tier)}
+              disabled={isLoading}
+              accessibilityRole="button"
+              accessibilityLabel={`${actionLabel}, ${'$'}${plan.price} per month`}
+              accessibilityState={{ disabled: isLoading, busy: isPending }}
+              testID={`select-plan-${tier}`}
+            >
+              {isPending ? (
+                <>
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <Text style={styles.selectButtonText}>Opening checkout…</Text>
+                </>
+              ) : (
+                <Text style={[styles.selectButtonText, tier === 'free' && styles.selectButtonTextSecondary]}>
+                  {actionLabel}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+          );
+        })}
       </View>
     );
   };
@@ -135,6 +182,8 @@ export default function UpgradeScreen() {
             }
           </Text>
         </View>
+
+        {renderError()}
 
         {renderCurrentPlan()}
         
@@ -349,10 +398,48 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748B',
   },
-  selectText: {
-    fontSize: 14,
+  selectButton: {
+    marginTop: 16,
+    minHeight: 44,
+    borderRadius: 10,
+    backgroundColor: '#3B82F6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+  },
+  selectButtonSecondary: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  selectButtonDisabled: {
+    opacity: 0.5,
+  },
+  selectButtonText: {
+    fontSize: 15,
     fontWeight: '600',
-    color: '#3B82F6',
+    color: '#FFFFFF',
+  },
+  selectButtonTextSecondary: {
+    color: '#334155',
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorBannerText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#B91C1C',
   },
   planDescription: {
     fontSize: 14,
