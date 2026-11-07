@@ -3,6 +3,7 @@
 import { createSupabaseAdmin } from '../../server/supabase-admin';
 import { linkEnvelopeSpend } from '../../server/envelopes';
 import { isStripeTestMode } from '../../server/stripe-mode';
+import { getEnvelopeSpendScanStart } from '../../services/envelopeMath';
 
 export const runtime = 'nodejs';
 
@@ -34,12 +35,12 @@ export async function handler(request: Request): Promise<Response> {
   }
 
   try {
-    // Re-scan the current month on each run so a missed cron window and
-    // pre-deploy authorizations are both recovered. The unique index on
+    // Re-scan from the prior month so the first run of this month also catches
+    // authorizations made after yesterday's cron run. The unique index on
     // card_authorization_id makes overlapping runs safe.
     const now = new Date();
     const result = await linkEnvelopeSpend(admin, {
-      since: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)),
+      since: getEnvelopeSpendScanStart(now),
     });
     return Response.json({ ok: true, ...result });
   } catch (error) {

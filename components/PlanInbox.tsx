@@ -25,6 +25,7 @@ import {
   updateInsightConsent,
 } from '@/services/planInboxApi';
 import { fromMinorUnits, toMinorUnits } from '@/services/insightEngine';
+import { parseEnvelopeAmount } from '@/services/envelopeMath';
 
 const titleForType: Record<string, string> = {
   price_increase: 'Price increase',
@@ -65,21 +66,31 @@ export function PlanInbox({ currency = 'USD' }: { currency?: string }) {
   const canAccept = currentTier === 'pro' || currentTier === 'team';
   const tierKnown = !isTierLoading && currentTier !== undefined;
 
-  const loadData = useCallback(async (token: string, scan: boolean) => {
+  const loadData = useCallback(async (
+    token: string,
+    scan: boolean,
+    isActive: () => boolean = () => true,
+  ) => {
     setError(null);
     const consent = await getInsightConsent(token);
+    if (!isActive()) return;
     setConsentEnabled(consent.enabled);
     if (!consent.enabled) {
       setInsights([]);
-      setEnvelopes(await getEnvelopeSummary(token));
+      const nextEnvelopes = await getEnvelopeSummary(token);
+      if (isActive()) setEnvelopes(nextEnvelopes);
       return;
     }
 
-    if (scan) await scanForInsights(token);
+    if (scan) {
+      await scanForInsights(token);
+      if (!isActive()) return;
+    }
     const [nextInsights, nextEnvelopes] = await Promise.all([
       getInsights(token),
       getEnvelopeSummary(token),
     ]);
+    if (!isActive()) return;
     setInsights(nextInsights);
     setEnvelopes(nextEnvelopes);
   }, []);
@@ -93,7 +104,7 @@ export function PlanInbox({ currency = 'USD' }: { currency?: string }) {
     }
 
     setIsLoading(true);
-    void loadData(accessToken, true)
+    void loadData(accessToken, true, () => active)
       .catch((loadError: unknown) => {
         if (!active) return;
         setError(loadError instanceof Error ? loadError.message : 'Could not load your plan inbox.');
@@ -165,7 +176,7 @@ export function PlanInbox({ currency = 'USD' }: { currency?: string }) {
 
   const handleCreateEnvelope = useCallback(async () => {
     if (!accessToken) return;
-    const amount = Number(envelopeAmount);
+    const amount = parseEnvelopeAmount(envelopeAmount);
     if (!Number.isFinite(amount) || amount <= 0) {
       setError('Enter a monthly amount greater than zero.');
       return;

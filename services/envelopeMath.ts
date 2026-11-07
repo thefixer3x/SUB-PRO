@@ -35,7 +35,7 @@ function tokens(value: string): string[] {
 /**
  * Pick the envelope a charge belongs to:
  *   1. exact category match (`category_filter` vs `merchant_category`);
- *   2. otherwise the merchant name contains the envelope name, or vice versa.
+ *   2. otherwise the envelope and merchant names share all their exact words.
  * Currency must match in both cases.
  */
 export function matchAuthorizationToEnvelope(
@@ -64,31 +64,29 @@ export function matchAuthorizationToEnvelope(
   for (const envelope of candidates) {
     const envelopeName = normalize(envelope.name);
     if (!envelopeName) continue;
-    if (
-      merchant.includes(envelopeName) ||
-      (merchant.length >= 3 && envelopeName.includes(merchant))
-    ) {
-      byName.push(envelope);
-      continue;
-    }
-
     const envelopeTokens = tokens(envelope.name);
-    // A single-word merchant ("Adobe") matches an envelope that has it as one
-    // of its words ("Adobe Creative Cloud").
-    if (merchantTokens.length === 1 && envelopeTokens.includes(merchant)) {
-      byName.push(envelope);
-      continue;
-    }
-
-    if (
-      envelopeTokens.length > 0 &&
-      envelopeTokens.every((token) => merchantTokens.includes(token))
-    ) {
+    // Compare complete words in both directions. Substring matching can map
+    // "Car" to "Carrefour" or "Go" to "Google" and persist spend incorrectly.
+    const sharesAllWords = envelopeTokens.length > 0 && merchantTokens.length > 0 && (
+      envelopeTokens.every((token) => merchantTokens.includes(token)) ||
+      merchantTokens.every((token) => envelopeTokens.includes(token))
+    );
+    if (sharesAllWords) {
       byName.push(envelope);
     }
   }
 
   return byName.length === 1 ? byName[0] : null;
+}
+
+/** Parse a major-unit input while accepting decimal commas from mobile keyboards. */
+export function parseEnvelopeAmount(input: string): number {
+  return Number(input.trim().replace(',', '.'));
+}
+
+/** Start one month back so the first run of a month recovers its prior boundary. */
+export function getEnvelopeSpendScanStart(now: Date): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
 }
 
 /** Month-to-date spend and a straight-line projection for each envelope. */

@@ -1,5 +1,7 @@
 import {
+  getEnvelopeSpendScanStart,
   matchAuthorizationToEnvelope,
+  parseEnvelopeAmount,
   summarizeEnvelopes,
 } from '../services/envelopeMath';
 import type { EnvelopeRow, EnvelopeSpendRow } from '../services/insightEngine';
@@ -59,6 +61,24 @@ describe('matchAuthorizationToEnvelope', () => {
     expect(match).toBeNull();
   });
 
+  it('does not match short envelope names as arbitrary merchant substrings', () => {
+    for (const [name, merchant] of [['Go', 'Google'], ['TV', 'TVA Fuel'], ['Car', 'Carrefour']]) {
+      const match = matchAuthorizationToEnvelope(
+        { merchant_name: merchant, merchant_category: null, currency: 'USD' },
+        [envelope({ id: 'e1', name, category_filter: null })],
+      );
+      expect(match).toBeNull();
+    }
+  });
+
+  it('still matches short names as complete merchant words', () => {
+    const match = matchAuthorizationToEnvelope(
+      { merchant_name: 'Car Rental', merchant_category: null, currency: 'USD' },
+      [envelope({ id: 'e1', name: 'Car', category_filter: null })],
+    );
+    expect(match?.id).toBe('e1');
+  });
+
   it('does not assign a charge arbitrarily when the category is ambiguous', () => {
     const match = matchAuthorizationToEnvelope(
       { merchant_name: 'Corner Shop', merchant_category: 'streaming', currency: 'USD' },
@@ -68,6 +88,23 @@ describe('matchAuthorizationToEnvelope', () => {
       ],
     );
     expect(match).toBeNull();
+  });
+});
+
+describe('getEnvelopeSpendScanStart', () => {
+  it('starts at the previous month boundary and handles year rollover', () => {
+    expect(getEnvelopeSpendScanStart(new Date('2026-11-01T03:00:00.000Z')).toISOString())
+      .toBe('2026-10-01T00:00:00.000Z');
+    expect(getEnvelopeSpendScanStart(new Date('2027-01-01T03:00:00.000Z')).toISOString())
+      .toBe('2026-12-01T00:00:00.000Z');
+  });
+});
+
+describe('parseEnvelopeAmount', () => {
+  it('accepts locale decimal commas and rejects malformed amounts', () => {
+    expect(parseEnvelopeAmount(' 30,50 ')).toBe(30.5);
+    expect(parseEnvelopeAmount('30.50')).toBe(30.5);
+    expect(Number.isNaN(parseEnvelopeAmount('30,5,0'))).toBe(true);
   });
 });
 

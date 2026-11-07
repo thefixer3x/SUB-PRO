@@ -443,6 +443,10 @@ export function detectEnvelopesAtRisk(
 
     const projected = Math.round(spent / fractionElapsed);
     if (projected <= envelope.monthly_amount_minor) continue;
+    // A single subscription charge early in the month creates a misleading
+    // straight-line projection. Require either more elapsed time or material
+    // usage of the budget before notifying.
+    if (fractionElapsed < 0.25 && spent < envelope.monthly_amount_minor * 0.75) continue;
 
     const currency = envelope.currency || 'USD';
     events.push({

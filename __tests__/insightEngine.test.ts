@@ -223,17 +223,31 @@ describe('duplicate subscriptions', () => {
 
 describe('envelopes at risk', () => {
   it('flags a projected overspend', () => {
-    // 7 Nov: 7/30 of the month elapsed. $12 spent projects to ~$51.43 > $30.
+    // 7 Nov: the account has already spent 80% of the envelope's monthly cap.
     const spend: EnvelopeSpendRow[] = [
-      { envelope_id: 'e1', amount_minor: 1200, currency: 'USD', month: '2026-11' },
+      { envelope_id: 'e1', amount_minor: 2400, currency: 'USD', month: '2026-11' },
     ];
     const events = detectEnvelopesAtRisk([envelope({ id: 'e1' })], spend, { now: NOW });
 
     expect(events).toHaveLength(1);
     expect(events[0].type).toBe('envelope_at_risk');
-    expect(events[0].payload.projected_minor).toBe(5143);
-    expect(events[0].explanation).toContain('$12.00');
+    expect(events[0].payload.projected_minor).toBe(10286);
+    expect(events[0].explanation).toContain('$24.00');
     expect(events[0].explanation).toContain('$30.00');
+  });
+
+  it('does not flag a single early-month charge below 75% of the envelope', () => {
+    const spend: EnvelopeSpendRow[] = [
+      { envelope_id: 'e1', amount_minor: 1200, currency: 'USD', month: '2026-11' },
+    ];
+    expect(detectEnvelopesAtRisk([envelope({ id: 'e1' })], spend, { now: NOW })).toHaveLength(0);
+  });
+
+  it('still flags an early-month envelope already above 75% of its cap', () => {
+    const spend: EnvelopeSpendRow[] = [
+      { envelope_id: 'e1', amount_minor: 2400, currency: 'USD', month: '2026-11' },
+    ];
+    expect(detectEnvelopesAtRisk([envelope({ id: 'e1' })], spend, { now: NOW })).toHaveLength(1);
   });
 
   it('does not flag an envelope that is on pace', () => {
@@ -281,7 +295,7 @@ describe('detectAll', () => {
         ],
         envelopes: [envelope({ id: 'e1' })],
         envelopeSpend: [
-          { envelope_id: 'e1', amount_minor: 1200, currency: 'USD', month: '2026-11' },
+          { envelope_id: 'e1', amount_minor: 2400, currency: 'USD', month: '2026-11' },
         ],
       },
       { now: NOW },

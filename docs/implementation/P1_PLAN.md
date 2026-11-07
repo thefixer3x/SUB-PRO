@@ -36,7 +36,9 @@ cards, charge cards, hold funds, or call an AI provider.
 
 - `services/insightEngine.ts`: deterministic detectors for price increases,
   new recurring merchants, unused-before-renewal, duplicate subscriptions,
-  and envelopes at risk. Explanations include the source record ids.
+  and envelopes at risk. Early-month envelope warnings require 75% of the cap
+  to be spent, avoiding false alarms from one monthly renewal. Explanations
+  include the source record ids.
 - `server/insights.ts`: consent is checked before any data reads; owner ids
   from `requireUser` scope every service-role query; insights are deduped by a
   unique key and upsert.
@@ -48,14 +50,15 @@ cards, charge cards, hold funds, or call an AI provider.
 ### Envelopes
 
 - `services/envelopeMath.ts` and `server/envelopes.ts`: currency-safe summaries,
-  input validation, CRUD, and idempotent authorization matching.
+  input validation, CRUD, and idempotent authorization matching by category or
+  complete merchant-name words (not partial substrings).
 - The same Vercel function creates/lists/updates/deletes envelopes and returns
   current-month summaries. The client uses the established `/api` base URL;
   the mobile build appends `embedded-finance/plan/...` to that configured base.
 - `api/jobs/envelope-spend-link.ts`: nightly Vercel job, protected by
-  `CRON_SECRET`, which re-scans the current month to recover missed runs and
-  pre-deploy test authorizations. It skips unless Stripe and the individual
-  authorization are in test mode.
+  `CRON_SECRET`, which re-scans from the previous month boundary to recover
+  missed runs, including the prior month's final hours. It skips unless Stripe
+  and the individual authorization are in test mode.
   `vercel.json` schedules it at 03:00 UTC.
 - `components/PlanInbox.tsx`: dashboard inbox, consent controls, dismiss/Pro
   accept actions, and monthly set-aside creation/progress. It uses the existing
@@ -70,8 +73,9 @@ unit-tested but may not produce results yet.
 
 ## Verification
 
-- Jest covers detector thresholds, currency boundaries, consent-before-read,
-  deduplication, envelope matching, and Pro accept gating.
+- Jest covers detector thresholds, currency boundaries, locale decimal input,
+  prior-month scan windows, consent-before-read, deduplication, envelope
+  matching, and Pro accept gating.
 - A fresh PostgreSQL 17 migration chain applies all migration files and checks
   P1 RLS/table grants.
 - The older `20250701_rls_policy_wrappers.sql` had a nested dollar-quote parse
