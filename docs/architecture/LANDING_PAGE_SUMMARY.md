@@ -62,7 +62,7 @@ Your enhanced landing page now showcases:
 - Mobile & web access
 - Community support
 
-### **Pro Tier ($4.99/month)**
+### **Pro Tier ($10/month)**
 - Everything in Free
 - Auto-detection & sync
 - Virtual card masking
@@ -70,11 +70,11 @@ Your enhanced landing page now showcases:
 - Cancellation automation
 - Priority support
 
-### **Premium Tier ($9.99/month)**
+### **Team Tier ($20/month)**
 - Everything in Pro
 - Team accounts & sharing
 - AI spending advisor
-- Custom budgeting rules
+- Budget alert threshold (alerts not yet sent)
 - White-label options
 - API access
 
@@ -99,7 +99,7 @@ Your enhanced landing page now showcases:
 - **Scroll Animations**: Parallax and fade effects
 
 ### **Pricing Section**
-- **3-Tier Structure**: Free, Pro ($4.99), Premium ($9.99)
+- **3-Tier Structure**: Free, Pro ($10), Team ($20)
 - **Popular Highlight**: Pro tier emphasized as "Most Popular"
 - **Feature Comparison**: Clear feature lists for each tier
 - **Trial Emphasis**: 14-day free trial messaging

@@ -1,10 +1,26 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@/contexts/AuthContext';
 import { SubscriptionTier } from '@/types/monetization';
 import { SUBSCRIPTION_PLANS } from '@/config/subscriptionPlans';
-import { buildApiBases, requestWithFallback } from '@/lib/apiClient';
+import { ApiHttpError, buildApiBases, requestWithFallback } from '@/lib/apiClient';
+
+/** The Vercel function that creates a Stripe Checkout session. */
+export const CHECKOUT_PATH = '/api/create-checkout-session';
+
+/**
+ * What the user sees when checkout cannot start. The raw error (status, URL,
+ * server text) still goes to the console for debugging.
+ */
+export function checkoutErrorMessage(err: unknown): string {
+  if (err instanceof ApiHttpError) {
+    if (err.status === 401) return 'Your session has expired. Please sign in again, then choose your plan.';
+    if (err.status === 400) return 'That plan is not available right now. Please contact support if this continues.';
+    if (err.status === 429) return 'Too many attempts. Please wait a moment and try again.';
+  }
+  return 'We could not open checkout. Please try again in a moment.';
+}
 
 const unique = <T,>(values: T[]): T[] => values.filter((value, index) => values.indexOf(value) === index);
 
@@ -12,8 +28,13 @@ export const usePayments = () => {
   const { user, session } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingTier, setPendingTier] = useState<SubscriptionTier | null>(null);
+  // Synchronous guard: state updates are async, so two quick taps could both
+  // see isLoading === false and create two checkout sessions.
+  const inFlight = useRef(false);
 
   const startUpgrade = useCallback(async (targetTier?: SubscriptionTier) => {
+    if (inFlight.current) return;
     setError(null);
 
     if (!user?.id) {
@@ -36,7 +57,6 @@ export const usePayments = () => {
       [
         process.env.EXPO_PUBLIC_CHECKOUT_URL?.trim(),
         process.env.EXPO_PUBLIC_CHECKOUT_FALLBACK_URL?.trim(),
-        includeRelative ? '/api/create-checkout-session' : null,
       ].filter((value): value is string => Boolean(value))
     );
 
@@ -45,13 +65,19 @@ export const usePayments = () => {
       return;
     }
 
+    const tier = targetTier ?? 'pro';
+    if (!SUBSCRIPTION_PLANS[tier] || tier === 'free') {
+      setError('Choose Pro or Team to upgrade.');
+      return;
+    }
+
+    inFlight.current = true;
+    setPendingTier(tier);
     setIsLoading(true);
 
     try {
-      const plan = targetTier ? SUBSCRIPTION_PLANS[targetTier] : SUBSCRIPTION_PLANS['pro'];
-
       const data = await requestWithFallback<{ url: string }>(
-        '/create-checkout-session',
+        CHECKOUT_PATH,
         {
           method: 'POST',
           headers: {
@@ -61,13 +87,18 @@ export const usePayments = () => {
           body: JSON.stringify({
             userId: user.id,
             email: (user as any).email || user.id,
-            plan: targetTier ?? 'pro',
+            plan: tier,
           }),
         },
         {
+          // Candidates: configured URLs, then each configured base, then the
+          // same-origin path on web.
           bases: baseCandidates,
           urls: directUrls,
           allowRelative: includeRelative,
+          // Only move on when the endpoint is missing. Any other answer
+          // (401, 400, 500) is final, so one tap never creates two sessions.
+          tryNextOnStatus: (status) => status === 404 || status === 405,
         }
       );
 
@@ -85,10 +116,11 @@ export const usePayments = () => {
         });
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Payment failed';
-      setError(message);
+      setError(checkoutErrorMessage(err));
       console.error('Payment error:', err);
     } finally {
+      inFlight.current = false;
+      setPendingTier(null);
       setIsLoading(false);
     }
   }, [user, session]);
@@ -146,6 +178,7 @@ export const usePayments = () => {
     openCustomerPortal,
     cancelSubscription,
     isLoading,
+    pendingTier,
     error,
     clearError: () => setError(null),
   };

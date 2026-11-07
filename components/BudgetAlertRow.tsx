@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { DollarSign, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/secureStore';
 import { TYPOGRAPHY, TEXT_COLORS, SPACING } from '@/constants/Typography';
 
 interface BudgetAlertRowProps {

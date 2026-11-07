@@ -83,6 +83,8 @@ export const PlanComparison: React.FC<PlanComparisonProps> = ({
               isSelected && styles.selectButtonSelected
             ]}
             onPress={() => onSelectPlan(tier)}
+            accessibilityRole="button"
+            accessibilityLabel={`${tier === 'free' ? 'Downgrade to' : 'Choose'} ${plan.name}`}
           >
             <Text style={[
               styles.selectButtonText,

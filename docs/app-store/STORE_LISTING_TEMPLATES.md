@@ -162,9 +162,9 @@ Start your journey to smarter subscription management today!
 ## Monetization Information
 
 ### Subscription Plans
-- **Basic:** Free with ads, limited features
-- **Pro:** $4.99/month, advanced features, no ads
-- **Enterprise:** $9.99/month, team features, priority support
+- **Free:** Free with ads, limited features
+- **Pro:** $10/month, advanced features, no ads
+- **Team:** $20/month, team features, priority support
 
 ### Advertising
 - Banner ads (AdMob)

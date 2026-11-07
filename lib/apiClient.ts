@@ -67,6 +67,25 @@ export interface RequestWithFallbackOptions<T> {
   urls?: string[];
   allowRelative?: boolean;
   parser?: (response: Response) => Promise<T>;
+  /**
+   * Whether a non-2xx response should fall through to the next candidate
+   * URL. Defaults to always. Pass a predicate for non-idempotent requests
+   * (e.g. creating a checkout session) so a real answer from the server,
+   * such as 401 or 400, is final instead of being re-sent elsewhere.
+   */
+  tryNextOnStatus?: (status: number) => boolean;
+}
+
+/** An HTTP error from requestWithFallback that was not retried. */
+export class ApiHttpError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly serverMessage: string | null,
+  ) {
+    super(message);
+    this.name = 'ApiHttpError';
+  }
 }
 
 export const requestWithFallback = async <T>(
@@ -80,6 +99,7 @@ export const requestWithFallback = async <T>(
     urls = [],
     allowRelative = true,
     parser,
+    tryNextOnStatus = () => true,
   } = options;
 
   const parse = parser ?? (async (response: Response) => (await response.json()) as T);
@@ -100,11 +120,16 @@ export const requestWithFallback = async <T>(
       const response = await fetchWithTimeout(url, init, timeoutMs);
       if (!response.ok) {
         const message = await safeExtractError(response);
-        errors.push(`${response.status} ${response.statusText} for ${url}${message ? `: ${message}` : ''}`);
+        const detail = `${response.status} ${response.statusText} for ${url}${message ? `: ${message}` : ''}`;
+        if (!tryNextOnStatus(response.status)) {
+          throw new ApiHttpError([...errors, detail].join('; '), response.status, message);
+        }
+        errors.push(detail);
         continue;
       }
       return await parse(response);
     } catch (error) {
+      if (error instanceof ApiHttpError) throw error;
       const reason = error instanceof Error ? error.message : 'Unknown error';
       errors.push(`Request to ${url} failed: ${reason}`);
     }

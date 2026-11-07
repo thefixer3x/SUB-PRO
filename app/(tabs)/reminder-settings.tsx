@@ -13,16 +13,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { TYPOGRAPHY, TEXT_COLORS, SPACING } from '@/constants/Typography';
 
-// Conditionally import SecureStore for platform compatibility
-let SecureStore: any;
-if (Platform.OS !== 'web') {
-  SecureStore = require('expo-secure-store');
-} else {
-  SecureStore = {
-    getItemAsync: async () => null,
-    setItemAsync: async () => {},
-  };
-}
+import * as SecureStore from '@/lib/secureStore';
 
 type ReminderTiming = '1' | '3' | '7';
 type ReportDay = 'monday' | 'friday';

@@ -235,7 +235,6 @@ const LandingPage = () => {
         'Everything in Pro',
         'Team accounts & sharing',
         'AI spending advisor',
-        'Custom budgeting rules',
         'White-label options',
         'API access',
       ],

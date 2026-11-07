@@ -5,7 +5,7 @@ A comprehensive subscription management platform with embedded finance features 
 ## Features
 
 ### Core Subscription Management
-- **Three-tier monetization**: Free, Pro ($4.99/month), Team ($2/user/month)
+- **Three-tier monetization**: Free, Pro ($10/month), Team ($20/month)
 - **Feature gating**: Smart component system for premium features
 - **Stripe integration**: Payment processing with Customer Portal
 - **Ad system**: Mobile (AdMob) and Web (AdSense) advertising
