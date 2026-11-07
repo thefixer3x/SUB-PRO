@@ -18,7 +18,9 @@ jobs:
         image: postgres:17
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
+          # Throwaway CI database on localhost only: trust auth, so no password
+          # literal lives in the repo.
+          POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: postgres
         ports:
           - 5432:5432
@@ -52,7 +54,6 @@ jobs:
           PGHOST: 127.0.0.1
           PGPORT: 5432
           PGUSER: postgres
-          PGPASSWORD: postgres
         run: npm run test:migrations
         
       - name: TypeScript Check
