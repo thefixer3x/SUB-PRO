@@ -1,16 +1,16 @@
 /**
- * Webhook idempotency tests (P0 Part B, claim -> effect -> done).
+ * Webhook idempotency tests (P0 Part B, token-fenced claim -> effect -> done).
  *
  * The handler now calls `claim_webhook_event` before touching the target
  * tables and `mark_webhook_event_done` only after the effect succeeds. These
  * tests pin the semantics we care about:
  *
- *   1. duplicate / in_progress -> 200, no effect
+ *   1. duplicate -> 200; in_progress -> 500, no effect
  *   2. claimed + success       -> effect runs once, then done
  *   3. claimed + failed effect -> release + 500, retry applies the effect
  *   4. claim error             -> 500 (fail closed, no effect)
  *   5. foreign project         -> 200 skipped, no claim
- *   6. mark-done failure       -> still 200 (effect already ran)
+ *   6. mark-done failure       -> 500 + release so Stripe can retry
  *   7. no admin client         -> 500 (fail closed)
  */
 
@@ -24,17 +24,18 @@ let webhookHandler: (req: Request) => Promise<Response>;
 
 // ── Mock state ──────────────────────────────────────────────────────
 let mockTables: Record<string, Record<string, unknown>[]> = {};
-let mockInserts: Array<{ table: string; row: Record<string, unknown> }> = [];
+let mockInserts: { table: string; row: Record<string, unknown> }[] = [];
 let mockInsertError: { table: string; error: { code: string; message: string } } | null = null;
-let mockClaimResults: Array<'claimed' | 'duplicate' | 'in_progress'> = [];
+let mockClaimResults: ('claimed' | 'duplicate' | 'in_progress')[] = [];
 let mockClaimError: { message: string } | null = null;
 let mockMarkDoneError: { message: string } | null = null;
 let mockDoneCalls: string[] = [];
 let mockReleaseCalls: string[] = [];
+let mockClaimTokenNumber = 0;
 
 jest.mock('@supabase/supabase-js', () => {
   const createQueryBuilder = (table: string) => {
-    const filters: Array<[string, unknown]> = [];
+    const filters: [string, unknown][] = [];
     let rowLimit: number | undefined;
     let pendingUpdate: Record<string, unknown> | null = null;
 
@@ -94,7 +95,7 @@ jest.mock('@supabase/supabase-js', () => {
 
   const serviceClient = {
     from: jest.fn((table: string) => createQueryBuilder(table)),
-    rpc: jest.fn(async (fn: string, args: Record<string, string>) => {
+    rpc: jest.fn(async (fn: string, args: Record<string, unknown>) => {
       if (fn === 'claim_webhook_event') {
         if (mockClaimError) {
           const error = mockClaimError;
@@ -102,7 +103,14 @@ jest.mock('@supabase/supabase-js', () => {
           return { data: null, error };
         }
         const result = mockClaimResults.length > 0 ? mockClaimResults.shift() : 'claimed';
-        return { data: result, error: null };
+        if (result === 'claimed') {
+          mockClaimTokenNumber += 1;
+          return {
+            data: [{ claim_status: result, claim_token: `claim-token-${mockClaimTokenNumber}` }],
+            error: null,
+          };
+        }
+        return { data: [{ claim_status: result, claim_token: null }], error: null };
       }
       if (fn === 'mark_webhook_event_done') {
         if (mockMarkDoneError) {
@@ -110,12 +118,15 @@ jest.mock('@supabase/supabase-js', () => {
           mockMarkDoneError = null;
           return { data: null, error };
         }
-        mockDoneCalls.push(args.p_event_id);
-        return { data: null, error: null };
+        mockDoneCalls.push(String(args.p_event_id));
+        return { data: true, error: null };
       }
       if (fn === 'release_webhook_event') {
-        mockReleaseCalls.push(args.p_event_id);
-        return { data: null, error: null };
+        mockReleaseCalls.push(String(args.p_event_id));
+        return { data: true, error: null };
+      }
+      if (fn === 'apply_subscription_tier_event') {
+        return { data: 'applied', error: null };
       }
       return { data: null, error: { message: `unexpected rpc ${fn}` } };
     }),
@@ -198,6 +209,7 @@ beforeEach(() => {
   mockMarkDoneError = null;
   mockDoneCalls = [];
   mockReleaseCalls = [];
+  mockClaimTokenNumber = 0;
 
   mockCustomersRetrieve.mockResolvedValue({
     id: 'cus_1',
@@ -229,22 +241,54 @@ beforeEach(() => {
 // ═══════════════════════════════════════════════════════════════════
 
 describe('idempotency: duplicate and in-flight events', () => {
-  it.each(['duplicate', 'in_progress'] as const)(
-    'returns 200 without writing when the claim says %s',
-    async (claim) => {
-      mockClaimResults = [claim];
+  it('returns 200 without running the effect for a completed duplicate', async () => {
+    mockClaimResults = ['duplicate'];
 
-      const res = await webhookHandler(makeRequest('issuing_authorization.created'));
-      expect(res.status).toBe(200);
+    const res = await webhookHandler(makeRequest('issuing_authorization.created'));
+    expect(res.status).toBe(200);
 
-      const body = await res.json() as { received?: boolean; skipped?: string };
-      expect(body.received).toBe(true);
-      expect(body.skipped).toBe(claim);
+    const body = await res.json() as { received?: boolean; skipped?: string };
+    expect(body.received).toBe(true);
+    expect(body.skipped).toBe('duplicate');
+    expect(mockInserts.filter((i) => i.table === 'card_authorizations')).toHaveLength(0);
+    expect(mockDoneCalls).toHaveLength(0);
+    expect(mockReleaseCalls).toHaveLength(0);
+  });
 
-      expect(mockInserts.filter((i) => i.table === 'card_authorizations')).toHaveLength(0);
-      expect(mockDoneCalls).toHaveLength(0);
-    },
-  );
+  it('returns a retryable 500 while another attempt owns the event', async () => {
+    mockClaimResults = ['in_progress'];
+
+    const res = await webhookHandler(makeRequest('issuing_authorization.created'));
+    expect(res.status).toBe(500);
+    expect(mockInserts.filter((i) => i.table === 'card_authorizations')).toHaveLength(0);
+    expect(mockDoneCalls).toHaveLength(0);
+    expect(mockReleaseCalls).toHaveLength(0);
+  });
+
+  it('skips a duplicate subscription before Stripe lookups', async () => {
+    mockClaimResults = ['duplicate'];
+    mockConstructEvent.mockImplementation((_payload: string, _sig: string, secret: string) => {
+      if (secret !== WEBHOOK_SECRET) throw new Error('bad signature');
+      return {
+        id: 'evt_subscription_duplicate',
+        type: 'customer.subscription.created',
+        data: {
+          object: {
+            id: 'sub_1',
+            customer: 'cus_1',
+            status: 'active',
+            items: { data: [{ price: 'price_test' }] },
+          },
+        },
+      };
+    });
+
+    const res = await webhookHandler(makeRequest('customer.subscription.created'));
+    expect(res.status).toBe(200);
+    expect(mockSubscriptionsRetrieve).not.toHaveBeenCalled();
+    expect(mockPricesRetrieve).not.toHaveBeenCalled();
+    expect(mockCustomersRetrieve).not.toHaveBeenCalled();
+  });
 
   it('processes a claimed event once and marks it done', async () => {
     mockClaimResults = ['claimed'];
@@ -292,33 +336,38 @@ describe('idempotency: fail closed', () => {
   });
 
   it('returns 500 and writes nothing when the admin client is unavailable', async () => {
-    const saved = {
-      url: process.env.EXPO_PUBLIC_SUPABASE_URL,
-      key: process.env.SUPABASE_SECRET_KEY,
-    };
-    delete process.env.EXPO_PUBLIC_SUPABASE_URL;
-    delete process.env.SUPABASE_SECRET_KEY;
+    const envKeys = [
+      'EXPO_PUBLIC_SUPABASE_URL',
+      'NEXT_PUBLIC_SUPABASE_URL',
+      'SUPABASE_URL',
+      'SUPABASE_SECRET_KEY',
+      'SUPABASE_SERVICE_ROLE_KEY',
+    ];
+    const saved = envKeys.map((key) => [key, process.env[key]] as const);
+    for (const key of envKeys) process.env[key] = '';
 
     try {
       const res = await webhookHandler(makeRequest('issuing_authorization.created'));
       expect(res.status).toBe(500);
       expect(mockInserts.filter((i) => i.table === 'card_authorizations')).toHaveLength(0);
     } finally {
-      if (saved.url !== undefined) process.env.EXPO_PUBLIC_SUPABASE_URL = saved.url;
-      if (saved.key !== undefined) process.env.SUPABASE_SECRET_KEY = saved.key;
+      for (const [key, value] of saved) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
     }
   });
 });
 
-describe('idempotency: mark-done failure does not retry the effect', () => {
-  it('still returns 200 when mark done fails after the write succeeded', async () => {
+describe('idempotency: mark-done failure is retryable', () => {
+  it('returns 500 and releases the owned claim when mark-done fails', async () => {
     mockClaimResults = ['claimed'];
     mockMarkDoneError = { message: 'timeout' };
 
     const res = await webhookHandler(makeRequest('issuing_authorization.created'));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(500);
     expect(mockInserts.filter((i) => i.table === 'card_authorizations')).toHaveLength(1);
-    expect(mockReleaseCalls).toHaveLength(0);
+    expect(mockReleaseCalls).toEqual(['evt_auth_1']);
   });
 });
 
@@ -365,7 +414,7 @@ describe('invoice events: stripe ids never go into a uuid column', () => {
 // ═══════════════════════════════════════════════════════════════════
 
 describe('idempotency: foreign-project skip still reachable', () => {
-  it('returns 200 skipped and never claims a foreign-project event', async () => {
+  it('returns 200 skipped without target writes for a foreign-project event', async () => {
     mockPricesRetrieve.mockResolvedValue({
       id: 'price_foreign',
       metadata: { project: 'vortexcore', tier: 'pro' },
@@ -395,8 +444,8 @@ describe('idempotency: foreign-project skip still reachable', () => {
 
     const body = await res.json() as { skipped?: boolean; reason?: string };
     expect(body.skipped).toBe(true);
-    expect(body.reason).toContain('project=vortexcore');
+    expect(body.reason).toBe('foreign_project');
     expect(mockInserts).toHaveLength(0);
-    expect(mockDoneCalls).toHaveLength(0);
+    expect(mockDoneCalls).toEqual(['evt_foreign']);
   });
 });

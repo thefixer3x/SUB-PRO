@@ -138,6 +138,15 @@ export async function handler(request: Request): Promise<Response> {
       cancel_url: cancelUrl,
       metadata: {
         user_id: userId,
+        project: 'subtrack',
+        tier: plan,
+      },
+      subscription_data: {
+        metadata: {
+          user_id: userId,
+          project: 'subtrack',
+          tier: plan,
+        },
       },
     });
 

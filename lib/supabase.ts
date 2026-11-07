@@ -436,6 +436,7 @@ export type Database = {
           currency: string;
           status: 'succeeded' | 'failed' | 'pending';
           subscription_id: string | null;
+          stripe_event_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -447,6 +448,7 @@ export type Database = {
           currency: string;
           status: 'succeeded' | 'failed' | 'pending';
           subscription_id?: string | null;
+          stripe_event_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -458,6 +460,7 @@ export type Database = {
           currency?: string;
           status?: 'succeeded' | 'failed' | 'pending';
           subscription_id?: string | null;
+          stripe_event_id?: string | null;
           created_at?: string;
         };
       };

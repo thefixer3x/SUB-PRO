@@ -55,27 +55,42 @@ grant execute on function public.sm_update_feature_flag(character varying, boole
 
 -- 2. virtual_cards: owners read, only the service role writes -------------------
 drop policy if exists "Users can manage own virtual cards" on public.virtual_cards;
--- Kept as is: "Users can view their own virtual cards" (SELECT, authenticated).
+-- The baseline later in this migration sequence ensures the owner SELECT
+-- policy exists. Table privileges also need narrowing: TRUNCATE bypasses RLS.
+revoke all on table public.virtual_cards from anon, authenticated;
+grant select on table public.virtual_cards to authenticated;
+grant all on table public.virtual_cards to service_role;
 
--- 3. sm_subscriptions: owner CRUD, explicit WITH CHECK, authenticated only ------
-drop policy if exists "Users can manage own sm_subscriptions" on public.sm_subscriptions;
+-- 3. sm_subscriptions: it is created by the later baseline migration on a
+-- fresh reset, so skip this section there. Existing installations have the
+-- table and receive the same owner CRUD policies as before.
+do $do$
+begin
+  if to_regclass('public.sm_subscriptions') is not null then
+    execute 'drop policy if exists "Users can manage own sm_subscriptions" on public.sm_subscriptions';
+    execute 'drop policy if exists "sm_subscriptions_owner_select" on public.sm_subscriptions';
+    execute 'drop policy if exists "sm_subscriptions_owner_insert" on public.sm_subscriptions';
+    execute 'drop policy if exists "sm_subscriptions_owner_update" on public.sm_subscriptions';
+    execute 'drop policy if exists "sm_subscriptions_owner_delete" on public.sm_subscriptions';
 
-create policy "sm_subscriptions_owner_select" on public.sm_subscriptions
-  for select to authenticated
-  using ((select auth.uid()) = user_id);
+    execute 'create policy "sm_subscriptions_owner_select" on public.sm_subscriptions
+      for select to authenticated using ((select auth.uid()) = user_id)';
+    execute 'create policy "sm_subscriptions_owner_insert" on public.sm_subscriptions
+      for insert to authenticated with check ((select auth.uid()) = user_id)';
+    execute 'create policy "sm_subscriptions_owner_update" on public.sm_subscriptions
+      for update to authenticated using ((select auth.uid()) = user_id)
+      with check ((select auth.uid()) = user_id)';
+    execute 'create policy "sm_subscriptions_owner_delete" on public.sm_subscriptions
+      for delete to authenticated using ((select auth.uid()) = user_id)';
 
-create policy "sm_subscriptions_owner_insert" on public.sm_subscriptions
-  for insert to authenticated
-  with check ((select auth.uid()) = user_id);
-
-create policy "sm_subscriptions_owner_update" on public.sm_subscriptions
-  for update to authenticated
-  using ((select auth.uid()) = user_id)
-  with check ((select auth.uid()) = user_id);
-
-create policy "sm_subscriptions_owner_delete" on public.sm_subscriptions
-  for delete to authenticated
-  using ((select auth.uid()) = user_id);
+    execute 'revoke all on table public.sm_subscriptions from anon, authenticated';
+    execute 'grant select, insert, update, delete on table public.sm_subscriptions to authenticated';
+    execute 'grant all on table public.sm_subscriptions to service_role';
+  else
+    raise notice 'Skipping sm_subscriptions policies; baseline migration creates it later';
+  end if;
+end
+$do$;
 
 -- 4. profiles: billing fields are written by the billing service only ----------
 create or replace function public.protect_profile_billing_fields()
@@ -107,10 +122,6 @@ drop trigger if exists trg_profiles_protect_billing on public.profiles;
 create trigger trg_profiles_protect_billing
   before insert or update on public.profiles
   for each row execute function public.protect_profile_billing_fields();
-
--- 5. No direct table access for anon on the SubTrack tables -------------------
-revoke all on table public.sm_subscriptions from anon;
-revoke all on table public.virtual_cards from anon;
 
 commit;
 

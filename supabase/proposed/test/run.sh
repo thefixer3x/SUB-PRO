@@ -29,3 +29,5 @@ q -f "$here/../../rollbacks/20261107000000_s401_permissions.rollback.sql"
 after="$(snapshot)"
 if [ "$before" = "$after" ]; then echo "ROLLBACK RESTORES ORIGINAL STATE"; else
   echo "ROLLBACK DIFFERS:"; diff <(echo "$before") <(echo "$after") || true; exit 1; fi
+
+bash "$here/run-baseline.sh"

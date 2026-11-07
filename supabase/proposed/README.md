@@ -23,13 +23,13 @@ The file's header lists each change and the live state it replaces. In short:
 - Confirm the app has no client code path that writes `virtual_cards`, or the billing fields on `profiles`. As of 2026-11-06 there is none in SubTrack Pro or VortexCore.
 
 ### Test it locally first
-`test/` holds a minimal stand-in for the live state, behaviour checks, and a runner. The runner applies the shipped migration (`migrations/20261107000000_s401_permissions.sql`), checks it, applies the shipped rollback (`rollbacks/20261107000000_s401_permissions.rollback.sql`), and confirms the original grants and policies come back. Use a throwaway local Postgres, never a real project:
+`test/` holds a minimal stand-in for the live state, behavior checks, and runners. `run.sh` tests S401 and its rollback; it then calls `run-baseline.sh`, which applies S401 before the forward baseline, reapplies the baseline to check it does not restore client privileges, and exercises claim-token lifecycle RPCs. Use a throwaway local Postgres, never a real project:
 
 ```bash
 PGHOST=localhost PGPORT=5432 PGUSER=postgres supabase/proposed/test/run.sh
 ```
 
-The expected output is `ALL CHECKS PASSED` followed by `ROLLBACK RESTORES ORIGINAL STATE`.
+The expected output includes `ALL CHECKS PASSED`, `ROLLBACK RESTORES ORIGINAL STATE`, and `P0 BASELINE + WEBHOOK RPC CHECKS PASSED`.
 
 ### Apply
 In the Supabase SQL editor, run the whole file once; it is a single transaction. Then run the read-only checks at the bottom of the file, and in the app:

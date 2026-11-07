@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-env node */
 /**
  * Validates the files in supabase/migrations.
  *
@@ -25,8 +26,14 @@ const DEFAULT_DIR = path.join(__dirname, '..', 'supabase', 'migrations');
 // Versions that already shipped with more than one file. Both files were
 // applied historically, so renaming either one would desync the migration
 // history in every existing environment. New duplicates still fail.
-const KNOWN_LEGACY_DUPLICATES = new Set(['20250701']);
+const KNOWN_LEGACY_DUPLICATES = new Map([
+  [
+    '20250701',
+    new Set(['20250701_rls_policy_wrappers.sql', '20250701_security_and_perf_hardening.sql']),
+  ],
+]);
 
+/** Resolve the target migration directory from the optional --dir argument. */
 function parseArgs(argv) {
   const index = argv.indexOf('--dir');
   if (index !== -1) {
@@ -39,6 +46,7 @@ function parseArgs(argv) {
   return DEFAULT_DIR;
 }
 
+/** Validate filenames, version uniqueness, and rollback placement. */
 function main() {
   const dir = parseArgs(process.argv.slice(2));
 
@@ -49,7 +57,7 @@ function main() {
 
   const files = fs
     .readdirSync(dir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.sql'))
+    .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.sql'))
     .map((entry) => entry.name)
     .sort();
 
@@ -57,6 +65,11 @@ function main() {
   const byVersion = new Map();
 
   for (const file of files) {
+    if (file.toLowerCase().endsWith('.rollback.sql')) {
+      problems.push(`${file}: rollback files belong in supabase/rollbacks/`);
+      continue;
+    }
+
     const match = MIGRATION_NAME.exec(file);
     if (!match) {
       problems.push(
@@ -73,7 +86,12 @@ function main() {
 
   for (const [version, group] of byVersion) {
     if (group.length > 1) {
-      if (KNOWN_LEGACY_DUPLICATES.has(version)) {
+      const knownFiles = KNOWN_LEGACY_DUPLICATES.get(version);
+      if (
+        knownFiles &&
+        group.length === knownFiles.size &&
+        group.every((file) => knownFiles.has(file))
+      ) {
         console.warn(
           `Legacy duplicate version ${version} (already applied, left as is): ${group.join(', ')}`,
         );

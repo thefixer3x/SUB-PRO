@@ -11,7 +11,9 @@
 -- is `if not exists`, the policy replacement is drop-then-create, and the
 -- stripe_card_id backfill only runs when that column is present.
 --
--- It must run before 20261107000000_s401_permissions.sql.
+-- It follows the already-shipped S401/webhook migrations. S401 skips the
+-- sm_subscriptions section when the table is absent on a fresh reset; this
+-- migration creates its final owner-CRUD, service-write policy state.
 -- =============================================================================
 
 -- 1. sm_subscriptions ---------------------------------------------------------
@@ -63,12 +65,21 @@ create index if not exists sm_subscriptions_user_id_idx
 alter table public.sm_subscriptions enable row level security;
 
 drop policy if exists "Users can manage own sm_subscriptions" on public.sm_subscriptions;
-create policy "Users can manage own sm_subscriptions"
-  on public.sm_subscriptions
-  for all
-  to public
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+drop policy if exists "sm_subscriptions_owner_select" on public.sm_subscriptions;
+drop policy if exists "sm_subscriptions_owner_insert" on public.sm_subscriptions;
+drop policy if exists "sm_subscriptions_owner_update" on public.sm_subscriptions;
+drop policy if exists "sm_subscriptions_owner_delete" on public.sm_subscriptions;
+
+create policy "sm_subscriptions_owner_select" on public.sm_subscriptions
+  for select to authenticated using ((select auth.uid()) = user_id);
+create policy "sm_subscriptions_owner_insert" on public.sm_subscriptions
+  for insert to authenticated with check ((select auth.uid()) = user_id);
+create policy "sm_subscriptions_owner_update" on public.sm_subscriptions
+  for update to authenticated
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
+create policy "sm_subscriptions_owner_delete" on public.sm_subscriptions
+  for delete to authenticated using ((select auth.uid()) = user_id);
 
 drop policy if exists "Service role has full access to sm_subscriptions"
   on public.sm_subscriptions;
@@ -77,7 +88,11 @@ create policy "Service role has full access to sm_subscriptions"
   for all
   using (auth.jwt() ->> 'role' = 'service_role');
 
-grant all on table public.sm_subscriptions to anon, authenticated;
+-- Do not restore `anon` or TRUNCATE access if this baseline is re-applied
+-- after S401. RLS does not restrict TRUNCATE.
+revoke all on table public.sm_subscriptions from anon, authenticated;
+grant select, insert, update, delete on table public.sm_subscriptions to authenticated;
+grant all on table public.sm_subscriptions to service_role;
 
 -- 2. virtual_cards: align with the fields the app and webhook write ----------
 -- The 2025-09 schema used stripe_card_id; live code uses card_id.
@@ -115,6 +130,9 @@ create policy "Users can view their own virtual cards"
   for select
   to authenticated
   using ((select auth.uid()) = user_id);
+revoke all on table public.virtual_cards from anon, authenticated;
+grant select on table public.virtual_cards to authenticated;
+grant all on table public.virtual_cards to service_role;
 
 -- 3. card_authorizations join through virtual_cards.card_id -------------------
 -- The 2025-09 policy joins on stripe_card_id, which live writes do not set.
@@ -143,13 +161,18 @@ create table if not exists public.sm_payment_records (
   status text not null default 'pending'
     check (status in ('succeeded', 'failed', 'pending')),
   subscription_id uuid,
+  stripe_event_id text,
   created_at timestamptz not null default now()
 );
 
--- The webhook tolerates 23505 on this index, making an invoice replay safe.
-create unique index if not exists sm_payment_records_invoice_status_key
-  on public.sm_payment_records (stripe_invoice_id, status)
-  where stripe_invoice_id is not null;
+alter table public.sm_payment_records
+  add column if not exists stripe_event_id text;
+
+-- Dedupe webhook deliveries by Stripe event id. Existing payment history is
+-- retained as-is, including any invoice/status duplicates from older code.
+create unique index if not exists sm_payment_records_stripe_event_id_key
+  on public.sm_payment_records (stripe_event_id)
+  where stripe_event_id is not null;
 
 create index if not exists sm_payment_records_user_id_idx
   on public.sm_payment_records (user_id);
@@ -170,5 +193,6 @@ create policy "Service role has full access to sm_payment_records"
   for all
   using (auth.jwt() ->> 'role' = 'service_role');
 
+revoke all on table public.sm_payment_records from anon, authenticated;
 grant select on table public.sm_payment_records to authenticated;
 grant all on table public.sm_payment_records to service_role;

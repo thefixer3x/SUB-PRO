@@ -23,14 +23,22 @@ do $$ begin
     raise exception 'FAIL 1: authenticated could execute sm_update_feature_flag';
   exception when insufficient_privilege then null; end;
 
-  -- 2. virtual_cards: own row readable, no client inserts or updates.
+  -- 2. virtual_cards: own row readable, no client DML or TRUNCATE privileges.
   if (select count(*) from public.virtual_cards) <> 1 then raise exception 'FAIL 2a: owner cannot read own card'; end if;
+  if has_table_privilege('authenticated', 'public.virtual_cards', 'INSERT')
+     or has_table_privilege('authenticated', 'public.virtual_cards', 'UPDATE')
+     or has_table_privilege('authenticated', 'public.virtual_cards', 'DELETE')
+     or has_table_privilege('authenticated', 'public.virtual_cards', 'TRUNCATE') then
+    raise exception 'FAIL 2b: authenticated retains a virtual_cards write privilege';
+  end if;
   begin
     insert into public.virtual_cards (user_id, card_id, status) values (auth.uid(), 'ic_fake', 'active');
-    raise exception 'FAIL 2b: client could insert a card row';
+    raise exception 'FAIL 2c: client could insert a card row';
   exception when insufficient_privilege then null; end;
-  update public.virtual_cards set status = 'canceled';
-  if (select status from public.virtual_cards) <> 'active' then raise exception 'FAIL 2c: client could update a card row'; end if;
+  begin
+    update public.virtual_cards set status = 'canceled';
+    raise exception 'FAIL 2d: client could update a card row';
+  exception when insufficient_privilege then null; end;
 
   -- 3. sm_subscriptions: full CRUD on own rows, nothing on other users' rows.
   insert into public.sm_subscriptions (user_id, name) values (auth.uid(), 'Netflix');
@@ -38,9 +46,12 @@ do $$ begin
   if (select name from public.sm_subscriptions where user_id = auth.uid()) <> 'Netflix HD' then raise exception 'FAIL 3a: owner update'; end if;
   delete from public.sm_subscriptions where name = 'Netflix HD';
   if (select count(*) from public.sm_subscriptions) <> 0 then raise exception 'FAIL 3b: owner sees other rows or delete failed'; end if;
+  if has_table_privilege('authenticated', 'public.sm_subscriptions', 'TRUNCATE') then
+    raise exception 'FAIL 3c: authenticated can truncate subscriptions';
+  end if;
   begin
     insert into public.sm_subscriptions (user_id, name) values ('22222222-2222-4222-8222-222222222222', 'planted');
-    raise exception 'FAIL 3c: could insert a row for another user';
+    raise exception 'FAIL 3d: could insert a row for another user';
   exception when insufficient_privilege then null; end;
 
   -- 4. profiles: name edits work, billing fields are refused.
@@ -76,6 +87,13 @@ do $$ begin
     perform 1 from public.sm_subscriptions;
     raise exception 'FAIL 5: anon could read sm_subscriptions';
   exception when insufficient_privilege then null; end;
+  if has_table_privilege('anon', 'public.virtual_cards', 'SELECT') then
+    raise exception 'FAIL 5a: anon could read virtual_cards';
+  end if;
+  if has_table_privilege('anon', 'public.sm_subscriptions', 'TRUNCATE')
+     or has_table_privilege('anon', 'public.virtual_cards', 'TRUNCATE') then
+    raise exception 'FAIL 5b: anon can truncate a SubTrack table';
+  end if;
 end $$;
 reset role;
 

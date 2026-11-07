@@ -41,8 +41,9 @@ alter table public.sm_subscriptions enable row level security;
 alter table public.virtual_cards enable row level security;
 -- Live (Postgres 15) anon had arwdDxt, not MAINTAIN; grant explicitly so the
 -- rollback snapshot is meaningful on newer local Postgres servers too.
-grant all on public.profiles, public.sm_subscriptions, public.virtual_cards
-  to authenticated, service_role;
+grant select, insert, update, delete, truncate, references, trigger
+  on public.profiles, public.sm_subscriptions, public.virtual_cards to authenticated;
+grant all on public.profiles, public.sm_subscriptions, public.virtual_cards to service_role;
 grant select, insert, update, delete, truncate, references, trigger
   on public.profiles, public.sm_subscriptions, public.virtual_cards to anon;
 
