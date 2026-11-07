@@ -7,6 +7,11 @@
  * `issuing_*` events are never skipped — they are the only writers of
  * `virtual_cards` / `card_authorizations`.
  *
+ * Idempotency is database-backed and runs as claim -> effect -> mark done
+ * (see supabase/migrations/20261107000001_webhook_idempotency.sql). An effect
+ * that fails releases the claim and returns 500, so Stripe's retry can apply
+ * it. A finished event returns 200 without touching the target tables.
+ *
  * D1=(b): sets `profiles.subscription_tier` through the service role from
  * the price's `metadata.tier` — never from the product/plan name.  Writes
  * nothing to `user_tiers` or `stripe_subscriptions`.
@@ -31,6 +36,15 @@ const WEBHOOK_EVENTS = [
 ] as const;
 
 type WebhookEventType = (typeof WEBHOOK_EVENTS)[number];
+
+type HandlerResult = { status: number; body: string } | undefined;
+type ClaimResult = 'claimed' | 'duplicate' | 'in_progress';
+
+// Stripe ids (sub_…) are not UUIDs. `sm_payment_records.subscription_id` is a
+// uuid column, so passing the Stripe id straight through fails the insert.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const asUuid = (value: string | null | undefined): string | null =>
+  value && UUID_RE.test(value) ? value : null;
 
 export async function handler(request: Request): Promise<Response> {
   if (request.method !== 'POST') {
@@ -128,7 +142,7 @@ export async function handler(request: Request): Promise<Response> {
 async function handleEvent(
   stripe: Stripe,
   event: Stripe.Event,
-): Promise<{ status: number; body: string } | undefined> {
+): Promise<HandlerResult> {
   switch (event.type) {
     case 'customer.subscription.created':
     case 'customer.subscription.updated':
@@ -153,13 +167,46 @@ async function handleEvent(
   }
 }
 
+/**
+ * Claim the event, run the effect, then mark it done.
+ *
+ * `duplicate` and `in_progress` both return 200: the former has already been
+ * applied, the latter is being applied by another invocation. A thrown effect
+ * releases the claim so Stripe's retry can run it again.
+ */
+async function runIdempotently(
+  event: Stripe.Event,
+  run: () => Promise<HandlerResult>,
+): Promise<HandlerResult> {
+  const claim = await claimWebhookEvent(event.id, event.type);
+
+  if (claim !== 'claimed') {
+    console.log(`Skipping ${event.type} ${event.id}: ${claim}`);
+    return {
+      status: 200,
+      body: JSON.stringify({ received: true, skipped: claim }),
+    };
+  }
+
+  try {
+    const result = await run();
+    await markWebhookEventDone(event.id);
+    return result;
+  } catch (error) {
+    await releaseWebhookEvent(event.id);
+    throw error;
+  }
+}
+
 /** Subscription events: check project metadata, skip foreign projects. */
 async function handleSubscriptionEvent(
   stripe: Stripe,
   event: Stripe.Event,
-): Promise<{ status: number; body: string } | undefined> {
+): Promise<HandlerResult> {
   const subscription = event.data.object as Stripe.Subscription;
-  const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
+  const customerId = typeof subscription.customer === 'string'
+    ? subscription.customer
+    : subscription.customer.id;
 
   // Retrieve the price to check project metadata.
   const price = subscription.items.data[0]?.price;
@@ -175,61 +222,64 @@ async function handleSubscriptionEvent(
     priceObj = await stripe.prices.retrieve(priceId);
   } catch (e) {
     console.error('Failed to retrieve price for subscription event:', e);
-    return { status: 200, body: JSON.stringify({ received: true }) };
+    // Throw so Stripe retries. Returning 200 here would drop the event.
+    throw e;
   }
 
   const project = (priceObj.metadata?.project as string) ?? '';
 
-  // Skip events for other projects.
+  // Skip events for other projects. No claim is written for a skipped event.
   if (project && project !== 'subtrack') {
     console.log(`Skipping ${event.type}: price project is '${project}', expected 'subtrack'`);
     return { status: 200, body: JSON.stringify({ skipped: true, reason: `project=${project} !== 'subtrack'` }) };
   }
 
-  // Idempotency: log this event so retries don't produce duplicates.
-  if (await logWebhookEvent(event.id, event.type)) return { status: 200, body: JSON.stringify({ received: true }) };
+  return await runIdempotently(event, async () => {
+    // Get customer to find user_id.
+    const customerIdStr = typeof subscription.customer === 'string'
+      ? subscription.customer
+      : subscription.customer.id;
+    let userId: string | null = null;
 
-  // Get customer to find user_id.
-  let customerIdStr = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
-  let userId: string | null = null;
+    let customer: Stripe.Customer | Stripe.DeletedCustomer;
+    try {
+      customer = await stripe.customers.retrieve(customerIdStr);
+    } catch (error) {
+      console.error(`Could not retrieve customer ${customerIdStr} for subscription event`, error);
+      // Transient Stripe failure: throw so Stripe retries.
+      throw error;
+    }
 
-  try {
-    const customer = await stripe.customers.retrieve(customerIdStr);
     if ('deleted' in customer && customer.deleted) {
       console.log(`Skipping ${event.type}: customer ${customerIdStr} is deleted`);
       return { status: 200, body: JSON.stringify({ received: true }) };
     }
     userId = (customer as Stripe.Customer).metadata?.user_id ?? null;
-  } catch {
-    // If we can't retrieve the customer, skip silently.
-    console.warn(`Could not retrieve customer ${customerIdStr} for subscription event`);
-    return { status: 200, body: JSON.stringify({ received: true }) };
-  }
 
-  if (!userId) {
-    // Try to find user by stripe_customer_id in profiles.
-    const adminClient = createSupabaseAdmin();
-    if (adminClient) {
-      const { data } = await adminClient
+    if (!userId) {
+      // Try to find user by stripe_customer_id in profiles.
+      const adminClient = getAdminClient();
+      const { data, error } = await adminClient
         .from('profiles')
         .select('id')
         .eq('stripe_customer_id', customerIdStr)
         .single();
+      if (error && error.code !== 'PGRST116') {
+        throw new Error(`profile lookup failed: ${error.message}`);
+      }
       userId = (data as { id: string } | null)?.id ?? null;
     }
-  }
 
-  if (!userId) {
-    console.error(`No user ID found for subscription ${subscription.id}`);
-    return { status: 200, body: JSON.stringify({ received: true }) };
-  }
+    if (!userId) {
+      console.error(`No user ID found for subscription ${subscription.id}`);
+      return { status: 200, body: JSON.stringify({ received: true }) };
+    }
 
-  // Determine tier from price metadata (D1=(b)).
-  const tier = getTierFromPrice(priceObj);
+    // Determine tier from price metadata (D1=(b)).
+    const tier = getTierFromPrice(priceObj);
 
-  // Apply the tier change using the service role client.
-  const adminClient = createSupabaseAdmin();
-  if (adminClient) {
+    // Apply the tier change using the service role client.
+    const adminClient = getAdminClient();
     const status = subscription.status;
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
@@ -245,20 +295,19 @@ async function handleSubscriptionEvent(
       .eq('id', userId);
 
     if (error) {
-      console.error(`Failed to update subscription_tier for user ${userId}:`, error.message);
-    } else {
-      console.log(`Updated subscription_tier for user ${userId}:`, updateData.subscription_tier);
+      throw new Error(`Failed to update subscription_tier for user ${userId}: ${error.message}`);
     }
-  }
 
-  return { status: 200, body: JSON.stringify({ received: true }) };
+    console.log(`Updated subscription_tier for user ${userId}:`, updateData.subscription_tier);
+    return { status: 200, body: JSON.stringify({ received: true }) };
+  });
 }
 
 /** Invoice events: skip foreign projects, record payments for SubTrack. */
 async function handleInvoiceEvent(
   stripe: Stripe,
   event: Stripe.Event,
-): Promise<{ status: number; body: string } | undefined> {
+): Promise<HandlerResult> {
   const invoice = event.data.object as Stripe.Invoice;
   const subRef = (invoice as unknown as { subscription?: string | null }).subscription;
   const subscriptionId = subRef ?? '';
@@ -271,9 +320,9 @@ async function handleInvoiceEvent(
   let sub: Stripe.Subscription;
   try {
     sub = await stripe.subscriptions.retrieve(subscriptionId);
-  } catch {
-    console.warn(`Could not retrieve subscription ${subscriptionId} for invoice event`);
-    return { status: 200, body: JSON.stringify({ received: true }) };
+  } catch (error) {
+    console.warn(`Could not retrieve subscription ${subscriptionId} for invoice event`, error);
+    throw error;
   }
 
   const price = sub.items.data[0]?.price;
@@ -285,8 +334,8 @@ async function handleInvoiceEvent(
   let priceObj: Stripe.Price;
   try {
     priceObj = await stripe.prices.retrieve(priceId);
-  } catch {
-    return { status: 200, body: JSON.stringify({ received: true }) };
+  } catch (error) {
+    throw error;
   }
 
   const project = (priceObj.metadata?.project as string) ?? '';
@@ -295,43 +344,44 @@ async function handleInvoiceEvent(
     return { status: 200, body: JSON.stringify({ skipped: true, reason: `project=${project} !== 'subtrack'` }) };
   }
 
-  // Idempotency: log this event so retries don't produce duplicates.
-  if (await logWebhookEvent(event.id, event.type)) return { status: 200, body: JSON.stringify({ received: true }) };
+  return await runIdempotently(event, async () => {
+    // Get userId and record payment.
+    const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
+    let userId: string | null = null;
 
-  // Get userId and record payment.
-  const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
-  let userId: string | null = null;
+    let customer: Stripe.Customer | Stripe.DeletedCustomer;
+    try {
+      customer = await stripe.customers.retrieve(customerId);
+    } catch (error) {
+      console.warn(`Could not retrieve customer ${customerId} for invoice event`, error);
+      throw error;
+    }
 
-  try {
-    const customer = await stripe.customers.retrieve(customerId);
     if ('deleted' in customer && customer.deleted) {
       return { status: 200, body: JSON.stringify({ received: true }) };
     }
     userId = (customer as Stripe.Customer).metadata?.user_id ?? null;
-  } catch {
-    console.warn(`Could not retrieve customer ${customerId} for invoice event`);
-    return { status: 200, body: JSON.stringify({ received: true }) };
-  }
 
-  if (!userId) {
-    const adminClient = createSupabaseAdmin();
-    if (adminClient) {
-      const { data } = await adminClient
+    if (!userId) {
+      const adminClient = getAdminClient();
+      const { data, error } = await adminClient
         .from('profiles')
         .select('id')
         .eq('stripe_customer_id', customerId)
         .single();
+      if (error && error.code !== 'PGRST116') {
+        throw new Error(`profile lookup failed: ${error.message}`);
+      }
       userId = (data as { id: string } | null)?.id ?? null;
     }
-  }
 
-  if (!userId) {
-    return { status: 200, body: JSON.stringify({ received: true }) };
-  }
+    if (!userId) {
+      return { status: 200, body: JSON.stringify({ received: true }) };
+    }
 
-  // Store the payment record.
-  const adminClient = createSupabaseAdmin();
-  if (adminClient) {
+    // Store the payment record. The (stripe_invoice_id, status) unique index
+    // makes a replay safe if a stale claim is ever reclaimed.
+    const adminClient = getAdminClient();
     const isSucceeded = event.type === 'invoice.payment_succeeded';
     const { error } = await adminClient.from('sm_payment_records').insert({
       user_id: userId,
@@ -339,23 +389,23 @@ async function handleInvoiceEvent(
       amount: invoice.total || 0,
       currency: invoice.currency || 'usd',
       status: isSucceeded ? 'succeeded' : 'failed',
-      subscription_id: subscriptionId,
+      subscription_id: asUuid(subscriptionId),
       created_at: new Date().toISOString(),
     } as Record<string, unknown>);
 
-    if (error) {
-      console.error(`Failed to store payment record for invoice ${invoice.id}:`, error.message);
+    if (error && error.code !== '23505') {
+      throw new Error(`Failed to store payment record for invoice ${invoice.id}: ${error.message}`);
     }
-  }
 
-  return { status: 200, body: JSON.stringify({ received: true }) };
+    return { status: 200, body: JSON.stringify({ received: true }) };
+  });
 }
 
 /** checkout.session.completed: idempotent, set subscription tier from price metadata. */
 async function handleCheckoutSessionCompleted(
   stripe: Stripe,
   event: Stripe.Event,
-): Promise<{ status: number; body: string } | undefined> {
+): Promise<HandlerResult> {
   const session = event.data.object as Stripe.Checkout.Session;
 
   const userId = session.metadata?.user_id ?? null;
@@ -366,7 +416,9 @@ async function handleCheckoutSessionCompleted(
   }
 
   // Retrieve the subscription to get the price.
-  const subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id;
+  const subscriptionId = typeof session.subscription === 'string'
+    ? session.subscription
+    : session.subscription?.id;
   if (!subscriptionId) {
     console.warn('checkout.session.completed: no subscription ID in session');
     return { status: 200, body: JSON.stringify({ received: true }) };
@@ -375,9 +427,9 @@ async function handleCheckoutSessionCompleted(
   let sub: Stripe.Subscription;
   try {
     sub = await stripe.subscriptions.retrieve(subscriptionId);
-  } catch {
-    console.warn(`Could not retrieve subscription ${subscriptionId} for checkout.session.completed`);
-    return { status: 200, body: JSON.stringify({ received: true }) };
+  } catch (error) {
+    console.warn(`Could not retrieve subscription ${subscriptionId} for checkout.session.completed`, error);
+    throw error;
   }
 
   const price = sub.items.data[0]?.price;
@@ -389,8 +441,8 @@ async function handleCheckoutSessionCompleted(
   let priceObj: Stripe.Price;
   try {
     priceObj = await stripe.prices.retrieve(priceId);
-  } catch {
-    return { status: 200, body: JSON.stringify({ received: true }) };
+  } catch (error) {
+    throw error;
   }
 
   const project = (priceObj.metadata?.project as string) ?? '';
@@ -399,136 +451,160 @@ async function handleCheckoutSessionCompleted(
     return { status: 200, body: JSON.stringify({ skipped: true, reason: `project=${project} !== 'subtrack'` }) };
   }
 
-  // Idempotency: log this event so retries don't produce duplicates.
-  if (await logWebhookEvent(event.id, event.type)) return { status: 200, body: JSON.stringify({ received: true }) };
-
-  // D1=(b): Set subscription_tier from price metadata.tier.
-  const tier = getTierFromPrice(priceObj);
-  if (tier) {
-    const adminClient = createSupabaseAdmin();
-    if (adminClient) {
+  return await runIdempotently(event, async () => {
+    // D1=(b): Set subscription_tier from price metadata.tier.
+    const tier = getTierFromPrice(priceObj);
+    if (tier) {
+      const adminClient = getAdminClient();
       const { error } = await adminClient
         .from('profiles')
         .update({ subscription_tier: tier, updated_at: new Date().toISOString() })
         .eq('id', userId);
 
       if (error) {
-        console.error(`Failed to set subscription_tier for user ${userId}:`, error.message);
-      } else {
-        console.log(`Set subscription_tier to '${tier}' for user ${userId} via checkout.session.completed`);
+        throw new Error(`Failed to set subscription_tier for user ${userId}: ${error.message}`);
       }
+      console.log(`Set subscription_tier to '${tier}' for user ${userId} via checkout.session.completed`);
     }
-  }
 
-  return { status: 200, body: JSON.stringify({ received: true }) };
+    return { status: 200, body: JSON.stringify({ received: true }) };
+  });
 }
 
 /** issuing_card.created: only writer of virtual_cards / card_authorizations. */
 async function handleIssuingCardCreated(
   _stripe: Stripe,
   event: Stripe.Event,
-): Promise<{ status: number; body: string } | undefined> {
-  const card = event.data.object as Stripe.Issuing.Card;
+): Promise<HandlerResult> {
+  return await runIdempotently(event, async () => {
+    const card = event.data.object as Stripe.Issuing.Card;
 
-  const userId = card.metadata?.user_id ?? null;
-  if (!userId) {
-    console.error('No user ID in issuing_card.created metadata:', card.id);
-    // Throw so Stripe retries.
-    throw new Error(`No user_id in issuing_card ${card.id}`);
-  }
+    const userId = card.metadata?.user_id ?? null;
+    if (!userId) {
+      // Throw so Stripe retries once the metadata is fixed.
+      throw new Error(`No user_id in issuing_card ${card.id}`);
+    }
 
-  const adminClient = createSupabaseAdmin();
-  if (!adminClient) {
-    throw new Error('Supabase admin client not available');
-  }
+    const adminClient = getAdminClient();
 
-  // Idempotent insert: skip if row already exists.
-  const { data: existing } = await adminClient
-    .from('virtual_cards')
-    .select('card_id')
-    .eq('card_id', card.id)
-    .limit(1);
+    // Secondary guard: skip if the card row already exists.
+    const { data: existing, error: selectError } = await adminClient
+      .from('virtual_cards')
+      .select('card_id')
+      .eq('card_id', card.id)
+      .limit(1);
 
-  if (Array.isArray(existing) && existing.length > 0) {
-    console.log(`virtual_card ${card.id} already exists for user ${userId}`);
+    if (selectError) {
+      throw new Error(`Failed to check virtual card ${card.id}: ${selectError.message}`);
+    }
+
+    if (Array.isArray(existing) && existing.length > 0) {
+      console.log(`virtual_card ${card.id} already exists for user ${userId}`);
+      return { status: 200, body: JSON.stringify({ received: true }) };
+    }
+
+    const { error } = await adminClient.from('virtual_cards').insert({
+      user_id: userId,
+      card_id: card.id,
+      last4: card.last4,
+      brand: card.brand,
+      status: card.status,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as Record<string, unknown>);
+
+    if (error && error.code !== '23505') {
+      throw new Error(`Failed to store virtual card reference: ${card.id}: ${error.message}`);
+    }
+
+    console.log(`Stored virtual card ${card.id} for user ${userId}`);
     return { status: 200, body: JSON.stringify({ received: true }) };
-  }
-
-  const { error } = await adminClient.from('virtual_cards').insert({
-    user_id: userId,
-    card_id: card.id,
-    last4: card.last4,
-    brand: card.brand,
-    status: card.status,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  } as Record<string, unknown>);
-
-  if (error) {
-    console.error(`Failed to store virtual card ${card.id}:`, error.message);
-    throw new Error(`Failed to store virtual card reference: ${card.id}`);
-  }
-
-  console.log(`Stored virtual card ${card.id} for user ${userId}`);
-  return { status: 200, body: JSON.stringify({ received: true }) };
+  });
 }
 
 /** issuing_authorization.created: only writer of card_authorizations. */
 async function handleIssuingAuthorizationCreated(
   _stripe: Stripe,
   event: Stripe.Event,
-): Promise<{ status: number; body: string } | undefined> {
-  const auth = event.data.object as Stripe.Issuing.Authorization;
+): Promise<HandlerResult> {
+  return await runIdempotently(event, async () => {
+    const auth = event.data.object as Stripe.Issuing.Authorization;
+    const cardId = typeof auth.card === 'string' ? auth.card : auth.card.id;
+    const adminClient = getAdminClient();
 
-  const cardId = typeof auth.card === 'string' ? auth.card : auth.card.id;
+    const { error } = await adminClient.from('card_authorizations').insert({
+      stripe_authorization_id: auth.id,
+      stripe_card_id: cardId,
+      amount: auth.amount,
+      currency: auth.currency,
+      merchant_name: (auth.merchant_data as { name?: string })?.name || 'Unknown',
+      merchant_category: (auth.merchant_data as { category?: string })?.category || 'general',
+      approved: auth.approved ?? false,
+      transaction_date: new Date(auth.created * 1000).toISOString(),
+      created_at: new Date().toISOString(),
+    } as Record<string, unknown>);
 
+    if (error && error.code !== '23505') {
+      throw new Error(`Failed to store card authorization: ${auth.id}: ${error.message}`);
+    }
+
+    console.log(`Stored card authorization ${auth.id}`);
+    return { status: 200, body: JSON.stringify({ received: true }) };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Idempotency helpers (RPCs live in 20261107000001_webhook_idempotency.sql)
+// ---------------------------------------------------------------------------
+
+function getAdminClient() {
   const adminClient = createSupabaseAdmin();
   if (!adminClient) {
     throw new Error('Supabase admin client not available');
   }
-
-  // Idempotency: log this event so retries don't produce duplicates.
-  if (await logWebhookEvent(event.id, event.type)) return { status: 200, body: JSON.stringify({ received: true }) };
-
-  const { error } = await adminClient.from('card_authorizations').insert({
-    stripe_authorization_id: auth.id,
-    stripe_card_id: cardId,
-    amount: auth.amount,
-    currency: auth.currency,
-    merchant_name: (auth.merchant_data as { name?: string })?.name || 'Unknown',
-    merchant_category: (auth.merchant_data as { category?: string })?.category || 'general',
-    approved: auth.approved ?? false,
-    transaction_date: new Date(auth.created * 1000).toISOString(),
-    created_at: new Date().toISOString(),
-  } as Record<string, unknown>);
-
-  if (error) {
-    console.error(`Failed to store card authorization ${auth.id}:`, error.message);
-    throw new Error(`Failed to store card authorization: ${auth.id}`);
-  }
-
-  console.log(`Stored card authorization ${auth.id}`);
-  return { status: 200, body: JSON.stringify({ received: true }) };
+  return adminClient;
 }
 
-// Idempotency helper: log a processed webhook event.
-// Returns true if the event was a duplicate (already processed).
-// A 23505 duplicate-key error means the event was already handled.
-// If the table doesn't exist yet, the insert throws 500 so Stripe retries
-// (on retry the migration will have landed).
-async function logWebhookEvent(eventId: string, eventType: string): Promise<boolean> {
-  // TODO: replace with fin-core's runOnce() when @lanonasis/fin-core is added.
-  // See docs/specs/CARD_FUNDING_AND_AI_MANAGER.md section 7, P0.
-  const adminClient = createSupabaseAdmin();
-  if (!adminClient) return false;
-  const { error } = await adminClient
-    .from('webhook_event_log')
-    .insert({ event_id: eventId, event_type: eventType });
-  if (error && error.code === '23505') {
-    console.log(`Skipping already-processed event: ${eventId}`);
-    return true; // duplicate
+async function claimWebhookEvent(
+  eventId: string,
+  eventType: string,
+): Promise<ClaimResult> {
+  const adminClient = getAdminClient();
+  const { data, error } = await adminClient.rpc('claim_webhook_event', {
+    p_event_id: eventId,
+    p_event_type: eventType,
+  });
+
+  if (error) {
+    // Fail closed: without the claim we cannot guarantee dedup.
+    throw new Error(`webhook claim failed for ${eventId}: ${error.message}`);
   }
-  return false; // not a duplicate
+
+  const result = Array.isArray(data) ? data[0] : data;
+  if (result === 'claimed' || result === 'duplicate' || result === 'in_progress') {
+    return result;
+  }
+  throw new Error(`webhook claim returned an unexpected result for ${eventId}: ${String(result)}`);
+}
+
+async function markWebhookEventDone(eventId: string): Promise<void> {
+  const adminClient = createSupabaseAdmin();
+  if (!adminClient) return;
+  const { error } = await adminClient.rpc('mark_webhook_event_done', { p_event_id: eventId });
+  if (error) {
+    // The effect already ran. Log and return 200 rather than retrying and
+    // risking a duplicate; a stale claim will be reclaimed after the window.
+    console.error(`Failed to mark webhook event ${eventId} done: ${error.message}`);
+  }
+}
+
+async function releaseWebhookEvent(eventId: string): Promise<void> {
+  const adminClient = createSupabaseAdmin();
+  if (!adminClient) return;
+  const { error } = await adminClient.rpc('release_webhook_event', { p_event_id: eventId });
+  if (error) {
+    console.error(`Failed to release webhook event ${eventId}: ${error.message}`);
+  }
 }
 
 /** Extract the tier from a Stripe Price's metadata.tier field. */

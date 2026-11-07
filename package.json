@@ -22,6 +22,7 @@
     "lint": "expo lint",
     "lint:fix": "expo lint --fix",
     "test": "jest",
+    "check-migrations": "node scripts/check-migrations.js",
     "bump:runtime": "node scripts/bump-runtime-version.js",
     "test:coverage": "jest --coverage",
     "lighthouse": "lhci autorun",

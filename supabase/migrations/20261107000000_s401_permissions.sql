@@ -41,8 +41,8 @@
 -- Not changed: the "Service role has full access ..." policies (redundant,
 -- since service_role bypasses RLS, but harmless), and VortexCore-only tables.
 --
--- Rollback: see 20261107000000_s401_permissions.rollback.sql (restores the exact
--- previous grants and policies).
+-- Rollback: see supabase/rollbacks/20261107000000_s401_permissions.rollback.sql
+-- (restores the exact previous grants and policies).
 -- =============================================================================
 
 begin;

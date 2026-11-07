@@ -135,6 +135,9 @@ jest.mock('@supabase/supabase-js', () => {
       mockTrackedTables.push(table);
       return createQueryBuilder(table);
     }),
+    // The webhook claims/complete events through RPCs. Default to "claimed"
+    // so the existing handler assertions still exercise the effect path.
+    rpc: jest.fn(async () => ({ data: 'claimed', error: null })),
     auth: { getUser: jest.fn() },
   };
 

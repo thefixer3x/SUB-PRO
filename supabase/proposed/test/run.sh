@@ -10,7 +10,7 @@ trap 'dropdb --if-exists "$db"' EXIT
 q() { psql -X -q -v ON_ERROR_STOP=1 -d "$db" "$@" 2> >(grep -v "NOTICE" >&2); }
 
 q -f "$here/fixture.sql"
-q -f "$here/../migrations/20261107000000_s401_permissions.sql"
+q -f "$here/../../migrations/20261107000000_s401_permissions.sql"
 q -f "$here/checks.sql" -tA | tail -1
 
 # The rollback must restore the original policies and grants exactly.
@@ -25,7 +25,7 @@ snapshot() {
 fresh="sm_permissions_fresh_$$"
 createdb "$fresh"; trap 'dropdb --if-exists "$db"; dropdb --if-exists "$fresh"' EXIT
 before="$(psql -X -q -v ON_ERROR_STOP=1 -d "$fresh" -f "$here/fixture.sql" >/dev/null && db="$fresh" snapshot)"
-q -f "$here/../2026-11-sm-permissions.rollback.sql"
+q -f "$here/../../rollbacks/20261107000000_s401_permissions.rollback.sql"
 after="$(snapshot)"
 if [ "$before" = "$after" ]; then echo "ROLLBACK RESTORES ORIGINAL STATE"; else
   echo "ROLLBACK DIFFERS:"; diff <(echo "$before") <(echo "$after") || true; exit 1; fi
