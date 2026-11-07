@@ -10,7 +10,7 @@ trap 'dropdb --if-exists "$db"' EXIT
 q() { psql -X -q -v ON_ERROR_STOP=1 -d "$db" "$@" 2> >(grep -v "NOTICE" >&2); }
 
 q -f "$here/fixture.sql"
-q -f "$here/../2026-11-sm-permissions.sql"
+q -f "$here/../migrations/20261107000000_s401_permissions.sql"
 q -f "$here/checks.sql" -tA | tail -1
 
 # The rollback must restore the original policies and grants exactly.
