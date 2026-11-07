@@ -198,6 +198,7 @@ async function dispatchP1Request(
             auth.userId,
             id,
             validateEnvelopeInput(body),
+            body,
           );
           if (!envelope) return jsonFrom(request, 404, { error: 'Envelope not found' });
           return jsonFrom(request, 200, { envelope });

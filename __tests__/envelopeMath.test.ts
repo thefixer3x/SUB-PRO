@@ -105,6 +105,9 @@ describe('parseEnvelopeAmount', () => {
     expect(parseEnvelopeAmount(' 30,50 ')).toBe(30.5);
     expect(parseEnvelopeAmount('30.50')).toBe(30.5);
     expect(Number.isNaN(parseEnvelopeAmount('30,5,0'))).toBe(true);
+    expect(Number.isNaN(parseEnvelopeAmount('1,000'))).toBe(true);
+    expect(parseEnvelopeAmount('12,345', 'KWD')).toBe(12.345);
+    expect(Number.isNaN(parseEnvelopeAmount('12,3', 'JPY'))).toBe(true);
   });
 });
 

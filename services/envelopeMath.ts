@@ -80,8 +80,28 @@ export function matchAuthorizationToEnvelope(
 }
 
 /** Parse a major-unit input while accepting decimal commas from mobile keyboards. */
-export function parseEnvelopeAmount(input: string): number {
-  return Number(input.trim().replace(',', '.'));
+export function parseEnvelopeAmount(input: string, currency = 'USD'): number {
+  const value = input.trim();
+  if (!value.includes(',')) return Number(value);
+  if (value.includes('.')) return Number.NaN;
+
+  const [whole, fraction, ...extra] = value.split(',');
+  if (!/^\d+$/.test(whole) || !/^\d+$/.test(fraction) || extra.length > 0) {
+    return Number.NaN;
+  }
+
+  let maxFractionDigits = 2;
+  try {
+    maxFractionDigits = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+    }).resolvedOptions().maximumFractionDigits ?? 2;
+  } catch {
+    // The downstream amount validator handles unsupported currency codes.
+  }
+  if (maxFractionDigits === 0 || fraction.length > maxFractionDigits) return Number.NaN;
+
+  return Number(`${whole}.${fraction}`);
 }
 
 /** Start one month back so the first run of a month recovers its prior boundary. */

@@ -122,10 +122,23 @@ export async function updateEnvelope(
   userId: string,
   envelopeId: string,
   input: EnvelopeInput,
+  provided: Record<string, unknown> = {},
 ): Promise<EnvelopeRecord | null> {
+  const patch: Record<string, unknown> = {
+    name: input.name,
+    monthly_amount_minor: input.monthly_amount_minor,
+    updated_at: new Date().toISOString(),
+  };
+  if (Object.prototype.hasOwnProperty.call(provided, 'currency')) {
+    patch.currency = input.currency;
+  }
+  if (Object.prototype.hasOwnProperty.call(provided, 'category_filter')) {
+    patch.category_filter = input.category_filter;
+  }
+
   const { data, error } = await admin
     .from('sm_envelopes')
-    .update({ ...input, updated_at: new Date().toISOString() })
+    .update(patch)
     .eq('id', envelopeId)
     .eq('user_id', userId)
     .select('*')

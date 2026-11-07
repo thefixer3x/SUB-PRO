@@ -82,8 +82,13 @@ export function PlanInbox({ currency = 'USD' }: { currency?: string }) {
       return;
     }
 
+    let scanError: unknown = null;
     if (scan) {
-      await scanForInsights(token);
+      try {
+        await scanForInsights(token);
+      } catch (error) {
+        scanError = error;
+      }
       if (!isActive()) return;
     }
     const [nextInsights, nextEnvelopes] = await Promise.all([
@@ -93,6 +98,9 @@ export function PlanInbox({ currency = 'USD' }: { currency?: string }) {
     if (!isActive()) return;
     setInsights(nextInsights);
     setEnvelopes(nextEnvelopes);
+    if (scanError) {
+      setError(scanError instanceof Error ? scanError.message : 'Could not check for new insights.');
+    }
   }, []);
 
   useEffect(() => {
@@ -176,7 +184,7 @@ export function PlanInbox({ currency = 'USD' }: { currency?: string }) {
 
   const handleCreateEnvelope = useCallback(async () => {
     if (!accessToken) return;
-    const amount = parseEnvelopeAmount(envelopeAmount);
+    const amount = parseEnvelopeAmount(envelopeAmount, currency);
     if (!Number.isFinite(amount) || amount <= 0) {
       setError('Enter a monthly amount greater than zero.');
       return;
