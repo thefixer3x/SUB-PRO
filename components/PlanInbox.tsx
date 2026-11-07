@@ -253,7 +253,7 @@ export function PlanInbox({ currency = 'USD' }: { currency?: string }) {
             <Text style={styles.mutedText}>Spending insights are on</Text>
             <Pressable
               accessibilityRole="button"
-              disabled={isSaving}
+              disabled={isSaving || isChecking || isLoading}
               onPress={() => void changeConsent(false)}
               hitSlop={8}
             >

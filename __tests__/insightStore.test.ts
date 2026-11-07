@@ -19,6 +19,7 @@ function makeStore(overrides: Partial<InsightStore> = {}): InsightStore {
     listEnvelopeSpend: jest.fn(async (): Promise<EnvelopeSpendRow[]> => []),
     listInsightKeys: jest.fn(async () => new Set<string>()),
     insertInsights: jest.fn(async (_userId: string, events: InsightEvent[]) => events.length),
+    deleteInsights: jest.fn(async () => {}),
     ...overrides,
   };
 }
@@ -93,5 +94,20 @@ describe('scanInsights consent and deduplication', () => {
         }),
       ]),
     );
+  });
+
+  it('deletes scan results if consent is revoked while a scan is running', async () => {
+    const getConsent = jest.fn()
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    const store = makeStore({
+      getConsent,
+      listSubscriptions: jest.fn(async () => [unusedSubscription]),
+    });
+
+    const result = await scanInsights(store, USER_ID, { now: NOW });
+
+    expect(result).toEqual({ consented: false, detected: 1, created: 0 });
+    expect(store.deleteInsights).toHaveBeenCalledWith(USER_ID);
   });
 });

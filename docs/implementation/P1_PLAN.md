@@ -24,11 +24,11 @@ cards, charge cards, hold funds, or call an AI provider.
 
 ### Database
 
-- `20261107000002_envelopes.sql`: owner-readable `sm_envelopes` and
+- `20261107000004_envelopes.sql`: owner-readable `sm_envelopes` and
   `sm_envelope_spend`; writes are service-role-only. A unique authorization
-  index prevents double-counting. The migration also adds `livemode` to card
-  authorizations, defaulting existing/unmarked rows to live.
-- `20261107000003_insights.sql`: owner-readable `sm_insights` and opt-in
+  index prevents double-counting. It ensures the P0 `livemode` provenance
+  column exists, defaulting existing/unmarked rows to live.
+- `20261107000005_insights.sql`: owner-readable `sm_insights` and opt-in
   `sm_ai_consent`; writes are service-role-only. Insights cascade-delete with
   the user profile and have a unique user/dedupe key.
 

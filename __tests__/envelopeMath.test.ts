@@ -94,4 +94,17 @@ describe('summarizeEnvelopes', () => {
     expect(summary.remaining_minor).toBe(3000);
     expect(summary.projected_minor).toBe(0);
   });
+
+  it('does not add spend recorded in a different currency', () => {
+    const spend: EnvelopeSpendRow[] = [
+      { envelope_id: 'e1', amount_minor: 99999, currency: 'USD', month: '2026-11' },
+    ];
+    const [summary] = summarizeEnvelopes(
+      [envelope({ id: 'e1', currency: 'EUR' })],
+      spend,
+      NOW,
+    );
+    expect(summary.spent_minor).toBe(0);
+    expect(summary.remaining_minor).toBe(3000);
+  });
 });

@@ -23,6 +23,7 @@ import {
   type SubscriptionRow,
 } from '../services/insightEngine';
 import { isStripeTestMode } from './stripe-mode';
+import { chunks, readAllPages } from './pagination';
 
 export interface InsightStore {
   getConsent(userId: string): Promise<boolean>;
@@ -32,6 +33,7 @@ export interface InsightStore {
   listEnvelopeSpend(envelopeIds: string[], month: string): Promise<EnvelopeSpendRow[]>;
   listInsightKeys(userId: string): Promise<Set<string>>;
   insertInsights(userId: string, events: InsightEvent[]): Promise<number>;
+  deleteInsights(userId: string): Promise<void>;
 }
 
 export interface ScanResult {
@@ -57,69 +59,99 @@ export function createSupabaseInsightStore(admin: SupabaseClient): InsightStore 
     },
 
     async listAuthorizations(userId) {
-      // The persisted authorization table does not record Stripe's `livemode`
-      // bit. Until it does, do not analyze card events unless this deployment
-      // is explicitly configured with a Stripe test-mode key.
+      // Require both deployment-level test mode and per-row Stripe provenance.
+      // The migration backfills unknown legacy rows as live.
       if (!isStripeTestMode()) return [];
 
-      const { data: cards, error: cardError } = await admin
-        .from('virtual_cards')
-        .select('card_id')
-        .eq('user_id', userId)
-        .not('card_id', 'is', null);
-      if (cardError) fail('failed to list virtual cards', cardError);
+      const cards = await readAllPages<{ card_id: string | null }>(
+        (from, to) => admin
+          .from('virtual_cards')
+          .select('card_id')
+          .eq('user_id', userId)
+          .not('card_id', 'is', null)
+          .order('card_id', { ascending: true })
+          .range(from, to),
+        'failed to list virtual cards',
+      );
 
-      const cardIds = ((cards ?? []) as { card_id: string | null }[])
+      const cardIds = cards
         .map((row) => row.card_id)
         .filter((id): id is string => typeof id === 'string' && id.length > 0);
       if (cardIds.length === 0) return [];
 
-      const { data, error } = await admin
-        .from('card_authorizations')
-        .select('id, merchant_name, merchant_category, amount, currency, transaction_date, approved, livemode')
-        .in('stripe_card_id', cardIds)
-        .eq('livemode', false)
-        .order('transaction_date', { ascending: true });
-      if (error) fail('failed to list card authorizations', error);
-      return (data ?? []) as CardAuthorizationRow[];
+      const authorizations: CardAuthorizationRow[] = [];
+      for (const ids of chunks(cardIds, 100)) {
+        const rows = await readAllPages<CardAuthorizationRow>(
+          (from, to) => admin
+            .from('card_authorizations')
+            .select('id, merchant_name, merchant_category, amount, currency, transaction_date, approved, livemode')
+            .in('stripe_card_id', ids)
+            .eq('livemode', false)
+            .order('transaction_date', { ascending: true })
+            .order('id', { ascending: true })
+            .range(from, to),
+          'failed to list card authorizations',
+        );
+        authorizations.push(...rows);
+      }
+      return authorizations;
     },
 
     async listSubscriptions(userId) {
-      const { data, error } = await admin
-        .from('sm_subscriptions')
-        .select('id, name, category, monthly_cost, currency, renewal_date, last_used, status')
-        .eq('user_id', userId);
-      if (error) fail('failed to list subscriptions', error);
-      return (data ?? []) as SubscriptionRow[];
+      return readAllPages<SubscriptionRow>(
+        (from, to) => admin
+          .from('sm_subscriptions')
+          .select('id, name, category, monthly_cost, currency, renewal_date, last_used, status')
+          .eq('user_id', userId)
+          .order('id', { ascending: true })
+          .range(from, to),
+        'failed to list subscriptions',
+      );
     },
 
     async listEnvelopes(userId) {
-      const { data, error } = await admin
-        .from('sm_envelopes')
-        .select('id, name, currency, monthly_amount_minor, category_filter')
-        .eq('user_id', userId);
-      if (error) fail('failed to list envelopes', error);
-      return (data ?? []) as EnvelopeRow[];
+      return readAllPages<EnvelopeRow>(
+        (from, to) => admin
+          .from('sm_envelopes')
+          .select('id, name, currency, monthly_amount_minor, category_filter')
+          .eq('user_id', userId)
+          .order('id', { ascending: true })
+          .range(from, to),
+        'failed to list envelopes',
+      );
     },
 
     async listEnvelopeSpend(envelopeIds, month) {
       if (envelopeIds.length === 0) return [];
-      const { data, error } = await admin
-        .from('sm_envelope_spend')
-        .select('id, envelope_id, amount_minor, currency, month')
-        .in('envelope_id', envelopeIds)
-        .eq('month', month);
-      if (error) fail('failed to list envelope spend', error);
-      return (data ?? []) as EnvelopeSpendRow[];
+      const spend: EnvelopeSpendRow[] = [];
+      for (const ids of chunks(envelopeIds, 100)) {
+        const rows = await readAllPages<EnvelopeSpendRow>(
+          (from, to) => admin
+            .from('sm_envelope_spend')
+            .select('id, envelope_id, amount_minor, currency, month')
+            .in('envelope_id', ids)
+            .eq('month', month)
+            .order('envelope_id', { ascending: true })
+            .order('id', { ascending: true })
+            .range(from, to),
+          'failed to list envelope spend',
+        );
+        spend.push(...rows);
+      }
+      return spend;
     },
 
     async listInsightKeys(userId) {
-      const { data, error } = await admin
-        .from('sm_insights')
-        .select('dedupe_key')
-        .eq('user_id', userId);
-      if (error) fail('failed to list existing insights', error);
-      return new Set(((data ?? []) as { dedupe_key: string }[]).map((row) => row.dedupe_key));
+      const rows = await readAllPages<{ dedupe_key: string }>(
+        (from, to) => admin
+          .from('sm_insights')
+          .select('dedupe_key')
+          .eq('user_id', userId)
+          .order('dedupe_key', { ascending: true })
+          .range(from, to),
+        'failed to list existing insights',
+      );
+      return new Set(rows.map((row) => row.dedupe_key));
     },
 
     async insertInsights(userId, events) {
@@ -139,6 +171,10 @@ export function createSupabaseInsightStore(admin: SupabaseClient): InsightStore 
         .select('id');
       if (error) fail('failed to insert insights', error);
       return (data ?? []).length;
+    },
+
+    async deleteInsights(userId) {
+      await deleteUserInsights(admin, userId);
     },
   };
 }
@@ -171,7 +207,19 @@ export async function scanInsights(
   const fresh = detected.filter((event) => !existing.has(event.dedupeKey));
   const created = await store.insertInsights(userId, fresh);
 
+  // Consent can be revoked while the source reads and insert are in flight.
+  // Re-check after the write and clean up anything that raced with revocation.
+  if (!(await store.getConsent(userId))) {
+    await store.deleteInsights(userId);
+    return { consented: false, detected: detected.length, created: 0 };
+  }
+
   return { consented: true, detected: detected.length, created };
+}
+
+export async function deleteUserInsights(admin: SupabaseClient, userId: string): Promise<void> {
+  const { error } = await admin.from('sm_insights').delete().eq('user_id', userId);
+  if (error) fail('failed to delete insights', error);
 }
 
 // ---------------------------------------------------------------------------
@@ -183,16 +231,19 @@ export async function listInsights(
   userId: string,
   status?: InsightStatus,
 ): Promise<InsightRecord[]> {
-  let query = admin
-    .from('sm_insights')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
-  if (status) query = query.eq('status', status);
-
-  const { data, error } = await query;
-  if (error) fail('failed to list insights', error);
-  return (data ?? []) as InsightRecord[];
+  return readAllPages<InsightRecord>(
+    (from, to) => {
+      let query = admin
+        .from('sm_insights')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true });
+      if (status) query = query.eq('status', status);
+      return query.range(from, to);
+    },
+    'failed to list insights',
+  );
 }
 
 export async function updateInsightStatus(

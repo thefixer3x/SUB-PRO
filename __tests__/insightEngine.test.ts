@@ -251,6 +251,18 @@ describe('envelopes at risk', () => {
     const events = detectEnvelopesAtRisk([envelope({ id: 'e1' })], spend, { now: NOW });
     expect(events).toHaveLength(0);
   });
+
+  it('does not project spend from a different currency', () => {
+    const spend: EnvelopeSpendRow[] = [
+      { envelope_id: 'e1', amount_minor: 50000, currency: 'EUR', month: '2026-11' },
+    ];
+    const events = detectEnvelopesAtRisk(
+      [envelope({ id: 'e1', currency: 'USD' })],
+      spend,
+      { now: NOW },
+    );
+    expect(events).toHaveLength(0);
+  });
 });
 
 describe('detectAll', () => {

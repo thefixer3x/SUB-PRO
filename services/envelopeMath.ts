@@ -103,9 +103,13 @@ export function summarizeEnvelopes(
   const fractionElapsed = Math.min(daysElapsed / daysInMonth, 1);
   const daysLeft = Math.max(daysInMonth - now.getUTCDate(), 0);
 
+  const currencyByEnvelope = new Map(
+    envelopes.map((envelope) => [envelope.id, (envelope.currency || 'USD').toUpperCase()]),
+  );
   const spentByEnvelope = new Map<string, number>();
   for (const row of spend) {
     if (row.month !== month) continue;
+    if ((row.currency || 'USD').toUpperCase() !== currencyByEnvelope.get(row.envelope_id)) continue;
     spentByEnvelope.set(
       row.envelope_id,
       (spentByEnvelope.get(row.envelope_id) ?? 0) + row.amount_minor,

@@ -19,8 +19,8 @@ export async function handler(request: Request): Promise<Response> {
     });
   }
 
-  // The table does not currently store Stripe's `livemode` bit, so keep the
-  // matcher strictly in test mode until that provenance is persisted.
+  // Require an explicit test-mode key; the linker also filters each row by
+  // Stripe's persisted livemode bit (legacy/unknown rows default to live).
   if (!isStripeTestMode()) {
     return Response.json({ ok: true, skipped: 'stripe_test_mode_required' });
   }

@@ -11,6 +11,7 @@ import {
 } from './envelopes';
 import {
   createSupabaseInsightStore,
+  deleteUserInsights,
   getConsent,
   getUserTier,
   listInsights,
@@ -109,11 +110,7 @@ async function dispatchP1Request(
 
         await setConsent(auth.admin, auth.userId, body.enabled);
         if (!body.enabled) {
-          const { error } = await auth.admin
-            .from('sm_insights')
-            .delete()
-            .eq('user_id', auth.userId);
-          if (error) throw new Error(`Could not remove saved insights: ${error.message}`);
+          await deleteUserInsights(auth.admin, auth.userId);
           return jsonFrom(request, 200, { enabled: false, deletedInsights: true });
         }
 
