@@ -40,4 +40,21 @@ describe('api/ functions module format', () => {
     expect(out).not.toMatch(/^import\s/m);
     expect(out).not.toMatch(/^export\s/m);
   });
+
+  // The launcher unwraps `default` and only builds a Web Request when it finds
+  // `fetch` (or GET/POST/...). A bare default function is called as a Node
+  // (req, res) handler, and our Web-style handlers crash on req.headers.
+  it.each([
+    'api/create-checkout-session',
+    'api/stripe/webhook',
+    'api/embedded-finance/virtual-cards/[...path]',
+    'api/banking/proxy',
+    'api/hibp-check',
+    'api/splitwise',
+  ])('%s default-exports a Web fetch handler', (entry) => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mod = require(path.join(root, entry));
+    expect(typeof mod.default).toBe('object');
+    expect(typeof mod.default.fetch).toBe('function');
+  });
 });

@@ -35,7 +35,7 @@ type WebhookEventType = (typeof WEBHOOK_EVENTS)[number];
 // Track processed event ids for idempotency.
 const processedEvents = new Set<string>();
 
-export default async function handler(request: Request): Promise<Response> {
+export async function handler(request: Request): Promise<Response> {
   if (request.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405 });
   }
@@ -526,3 +526,8 @@ function getTierFromPrice(price: Stripe.Price): string | null {
   if (lower.includes('pro') || lower.includes('premium')) return 'pro';
   return 'free';
 }
+
+// Vercel's Node runtime passes a Web Request only to a `fetch` (or GET/POST/...)
+// export. A bare default function is called as a Node (req, res) handler and
+// crashes ("request.headers.entries is not a function").
+export default { fetch: handler };

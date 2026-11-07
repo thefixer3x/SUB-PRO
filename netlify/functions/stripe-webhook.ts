@@ -5,7 +5,7 @@
  * Vercel handler.  This file can be retired once Netlify is fully retired.
  */
 
-import vercelHandler from '../../api/stripe/webhook';
+import { handler as vercelHandler } from '../../api/stripe/webhook';
 
 interface NetlifyEvent {
   httpMethod: string;

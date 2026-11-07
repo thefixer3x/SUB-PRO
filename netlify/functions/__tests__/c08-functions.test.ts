@@ -17,9 +17,9 @@ jest.mock('../../../server/auth', () => ({
 }));
 
 // eslint-disable-next-line import/order
-import hibpHandler from '../../../api/hibp-check';
+import { handler as hibpHandler } from '../../../api/hibp-check';
 // eslint-disable-next-line import/order
-import splitwiseHandler from '../../../api/splitwise';
+import { handler as splitwiseHandler } from '../../../api/splitwise';
 
 const ORIGIN = 'https://sub-pro.lanonasis.com';
 

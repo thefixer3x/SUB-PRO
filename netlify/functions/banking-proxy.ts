@@ -8,7 +8,7 @@
  * which is now fixed by routing through server/cors.ts (origin-specific).
  */
 
-import vercelHandler from '../../api/banking/proxy';
+import { handler as vercelHandler } from '../../api/banking/proxy';
 
 /**
  * Canonical (title-cased) spellings for the headers the server layer emits.

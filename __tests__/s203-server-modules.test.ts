@@ -140,12 +140,18 @@ import * as vcServer from '../server/virtual-cards';
 import * as bankServer from '../server/banking';
 import * as hibpServer from '../server/hibp';
 import * as swServer from '../server/splitwise';
-import vcHandler from '../api/embedded-finance/virtual-cards/[...path]';
-import bankHandler from '../api/banking/proxy';
-import hibpHandler from '../api/hibp-check';
-import swHandler from '../api/splitwise';
+import vcExport from '../api/embedded-finance/virtual-cards/[...path]';
+import bankExport from '../api/banking/proxy';
+import hibpExport from '../api/hibp-check';
+import swExport from '../api/splitwise';
 import nfVcHandler from '../netlify/functions/embedded-finance-virtual-cards';
 import nfBankHandler from '../netlify/functions/banking-proxy';
+
+// Vercel calls the default export's fetch (Web Request -> Response).
+const vcHandler = vcExport.fetch;
+const bankHandler = bankExport.fetch;
+const hibpHandler = hibpExport.fetch;
+const swHandler = swExport.fetch;
 
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGINS!;
 
