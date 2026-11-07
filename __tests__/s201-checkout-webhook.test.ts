@@ -37,9 +37,9 @@ beforeAll(() => {
   process.env.ALLOWED_ORIGINS = `${ALLOWED_ORIGIN},https://subtrack.lanonasis.com`;
   process.env.SITE_URL = ALLOWED_ORIGIN;
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  checkoutHandler = require('../api/create-checkout-session').default;
+  checkoutHandler = require('../api/create-checkout-session').default.fetch;
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  webhookHandler = require('../api/stripe/webhook').default;
+  webhookHandler = require('../api/stripe/webhook').default.fetch;
 });
 
 // ── Mock Supabase ──────────────────────────────────────────────────

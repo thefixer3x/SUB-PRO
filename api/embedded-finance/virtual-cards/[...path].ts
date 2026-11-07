@@ -31,7 +31,7 @@ const json = (status: number, body: unknown, origin: string | undefined) =>
     headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
   });
 
-export default async function handler(request: Request): Promise<Response> {
+export async function handler(request: Request): Promise<Response> {
   // --- OPTIONS preflight ---
   if (request.method === 'OPTIONS') {
     const headers = Object.fromEntries(request.headers.entries());
@@ -189,3 +189,8 @@ interface CreateCardBillingAddress {
   postal_code: string;
   country: string;
 }
+
+// Vercel's Node runtime passes a Web Request only to a `fetch` (or GET/POST/...)
+// export. A bare default function is called as a Node (req, res) handler and
+// crashes ("request.headers.entries is not a function").
+export default { fetch: handler };

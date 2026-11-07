@@ -9,7 +9,7 @@
  * moved to server/virtual-cards.ts with thin api/ handler wrappers.
  */
 
-import vercelHandler from '../../api/embedded-finance/virtual-cards/[...path]';
+import { handler as vercelHandler } from '../../api/embedded-finance/virtual-cards/[...path]';
 
 /**
  * Canonical (title-cased) spellings for the headers the server layer emits.

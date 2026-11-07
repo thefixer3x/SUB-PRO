@@ -5,7 +5,7 @@
  * Vercel handler.  This file can be retired once Netlify is fully retired.
  */
 
-import vercelHandler from '../../api/create-checkout-session';
+import { handler as vercelHandler } from '../../api/create-checkout-session';
 
 interface NetlifyHandlerEvent {
   httpMethod: string;
