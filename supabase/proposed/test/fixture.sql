@@ -39,7 +39,13 @@ create table public.virtual_cards (id uuid primary key default gen_random_uuid()
 alter table public.profiles enable row level security;
 alter table public.sm_subscriptions enable row level security;
 alter table public.virtual_cards enable row level security;
-grant all on public.profiles, public.sm_subscriptions, public.virtual_cards to anon, authenticated, service_role;
+-- Live (Postgres 15) anon had arwdDxt, not MAINTAIN; grant explicitly so the
+-- rollback snapshot is meaningful on newer local Postgres servers too.
+grant select, insert, update, delete, truncate, references, trigger
+  on public.profiles, public.sm_subscriptions, public.virtual_cards to authenticated;
+grant all on public.profiles, public.sm_subscriptions, public.virtual_cards to service_role;
+grant select, insert, update, delete, truncate, references, trigger
+  on public.profiles, public.sm_subscriptions, public.virtual_cards to anon;
 
 create policy "profiles_insert_policy" on public.profiles for insert to authenticated with check (id = (select auth.uid()));
 create policy "profiles_select_policy" on public.profiles for select to authenticated using (id = (select auth.uid()));

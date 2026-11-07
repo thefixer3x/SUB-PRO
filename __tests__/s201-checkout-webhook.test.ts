@@ -44,16 +44,19 @@ beforeAll(() => {
 
 // ── Mock Supabase ──────────────────────────────────────────────────
 let mockTables: Record<string, Record<string, unknown>[]> = {};
-let mockInserts: Array<{ table: string; row: Record<string, unknown> }> = [];
-let mockUpdateCalls: Array<{ table: string; data: Record<string, unknown> }> = [];
+let mockInserts: { table: string; row: Record<string, unknown> }[] = [];
+let mockUpdateCalls: { table: string; data: Record<string, unknown> }[] = [];
 let mockTrackedTables: string[] = [];
+let mockRpcCalls: { name: string; args: Record<string, unknown> }[] = [];
+let mockApplyTierResult: 'applied' | 'stale' | 'missing_profile' = 'applied';
+let mockNeedsBillingSync = false;
 let mockAuthUser: { id: string; email: string | null; user_metadata: Record<string, unknown> } | null = null;
 let mockAuthError: { message: string; status?: number; code?: string } | null = null;
 let mockAuthThrows = false;
 
 jest.mock('@supabase/supabase-js', () => {
   const createQueryBuilder = (table: string) => {
-    const filters: Array<[string, unknown]> = [];
+    const filters: [string, unknown][] = [];
     let rowLimit: number | undefined;
     let pendingUpdate: Record<string, unknown> | null = null;
 
@@ -135,6 +138,19 @@ jest.mock('@supabase/supabase-js', () => {
       mockTrackedTables.push(table);
       return createQueryBuilder(table);
     }),
+    rpc: jest.fn(async (name: string, args: Record<string, unknown>) => {
+      mockRpcCalls.push({ name, args });
+      if (name === 'claim_webhook_event') {
+        return { data: [{ claim_status: 'claimed', claim_token: 'claim-token-test' }], error: null };
+      }
+      if (name === 'mark_webhook_event_done') return { data: true, error: null };
+      if (name === 'release_webhook_event') return { data: true, error: null };
+      if (name === 'begin_subscription_tier_sync') {
+        return { data: [{ sync_status: 'claimed', generation: 1, needs_sync: mockNeedsBillingSync }], error: null };
+      }
+      if (name === 'apply_subscription_tier_event') return { data: mockApplyTierResult, error: null };
+      return { data: null, error: { message: `unexpected rpc ${name}` } };
+    }),
     auth: { getUser: jest.fn() },
   };
 
@@ -151,14 +167,16 @@ interface MockStripeApi {
   prices: { list: jest.Mock; retrieve: jest.Mock };
   checkout: MockCheckout;
   customers: { retrieve: jest.Mock };
-  subscriptions: { retrieve: jest.Mock };
+  subscriptions: { retrieve: jest.Mock; list: jest.Mock };
+  issuing: { cards: { retrieve: jest.Mock } };
   webhooks: { constructEvent: jest.Mock };
 }
 const mockStripeApi: MockStripeApi = {
   prices: { list: jest.fn(), retrieve: jest.fn() },
   checkout: { sessions: { create: jest.fn() } },
   customers: { retrieve: jest.fn() },
-  subscriptions: { retrieve: jest.fn() },
+  subscriptions: { retrieve: jest.fn(), list: jest.fn() },
+  issuing: { cards: { retrieve: jest.fn() } },
   webhooks: { constructEvent: jest.fn() },
 };
 
@@ -167,6 +185,7 @@ class MockStripe {
   checkout = mockStripeApi.checkout;
   customers = mockStripeApi.customers;
   subscriptions = mockStripeApi.subscriptions;
+  issuing = mockStripeApi.issuing;
   webhooks = mockStripeApi.webhooks;
   key: string;
   constructor(key: string) { this.key = key; }
@@ -199,6 +218,9 @@ beforeEach(() => {
   mockInserts = [];
   mockUpdateCalls = [];
   mockTrackedTables = [];
+  mockRpcCalls = [];
+  mockApplyTierResult = 'applied';
+  mockNeedsBillingSync = false;
   mockAuthUser = {
     id: SESSION_USER_ID,
     email: 'user@example.com',
@@ -232,12 +254,30 @@ beforeEach(() => {
   });
   mockStripeApi.subscriptions.retrieve.mockResolvedValue({
     id: 'sub_1',
+    created: 1700000000,
     customer: 'cus_1',
     status: 'active',
     items: {
       data: [{ price: { id: 'price_subtrack_monthly', metadata: { project: 'subtrack', tier: 'pro' } } }],
     },
   });
+  mockStripeApi.subscriptions.list.mockResolvedValue({
+    data: [{
+      id: 'sub_1',
+      created: 1700000000,
+      customer: 'cus_1',
+      status: 'active',
+      items: { data: [{ price: { id: 'price_subtrack_monthly', metadata: { project: 'subtrack', tier: 'pro' } } }] },
+    }],
+    has_more: false,
+  });
+  mockStripeApi.issuing.cards.retrieve.mockImplementation(async (cardId: string) => ({
+    id: cardId,
+    last4: '4242',
+    brand: 'visa',
+    status: 'active',
+    metadata: { user_id: SESSION_USER_ID },
+  }));
   mockStripeApi.webhooks.constructEvent.mockImplementation((_payload: string, _sig: string, secret: string) => {
     if (secret === 'BAD_SECRET') {
       const err = new Error('No webhook signature found');
@@ -246,6 +286,7 @@ beforeEach(() => {
     }
     return {
       id: 'evt_test_1',
+      created: 1700000001,
       type: 'customer.subscription.created',
       data: { object: {} },
     };
@@ -328,6 +369,11 @@ describe('checkout: user identity', () => {
     expect(mockStripeApi.checkout.sessions.create).toHaveBeenCalled();
     const call = (mockStripeApi.checkout.sessions.create as jest.Mock).mock.calls[0][0] as Record<string, unknown>;
     expect((call.metadata as Record<string, unknown>)['user_id']).toBe(SESSION_USER_ID);
+    expect((call.subscription_data as { metadata?: Record<string, unknown> }).metadata).toMatchObject({
+      user_id: SESSION_USER_ID,
+      project: 'subtrack',
+      tier: 'pro',
+    });
   });
 
   it('ignores body userId/email differing from the session', async () => {
@@ -365,7 +411,7 @@ describe('checkout: plan selection (D4)', () => {
 
   const lineItemPrice = () => {
     const call = (mockStripeApi.checkout.sessions.create as jest.Mock).mock.calls[0][0] as {
-      line_items: Array<{ price: string }>;
+      line_items: { price: string }[];
     };
     return call.line_items[0].price;
   };
@@ -467,7 +513,7 @@ describe('webhook: bad signature', () => {
 
 describe('webhook: foreign-project price', () => {
   it('returns 200 with no DB call for a foreign-project subscription event', async () => {
-    mockStripeApi.prices.retrieve.mockResolvedValueOnce({
+    mockStripeApi.prices.retrieve.mockResolvedValue({
       id: 'price_foreign',
       metadata: { project: 'vortexcore', tier: 'pro' },
       nickname: 'VortexCore Pro',
@@ -518,6 +564,7 @@ describe('webhook: SubTrack price sets subscription_tier', () => {
       if (secret === WEBHOOK_SECRET) {
         return {
           id: 'evt_subtrack',
+          created: 1700000001,
           type: 'customer.subscription.created',
           data: {
             object: {
@@ -541,15 +588,15 @@ describe('webhook: SubTrack price sets subscription_tier', () => {
     const res = await webhookHandler(req);
     expect(res.status).toBe(200);
 
-    const proUpdates = mockUpdateCalls.filter((u) => u.table === 'profiles');
-    expect(proUpdates.length).toBeGreaterThan(0);
-    expect(proUpdates[0].data).toHaveProperty('subscription_tier', 'pro');
+    const tierCalls = mockRpcCalls.filter((call) => call.name === 'apply_subscription_tier_event');
+    expect(tierCalls).toHaveLength(1);
+    expect(tierCalls[0].args).toMatchObject({ p_user_id: SESSION_USER_ID, p_tier: 'pro' });
     expect(mockTrackedTables).not.toContain('user_tiers');
     expect(mockTrackedTables).not.toContain('stripe_subscriptions');
   });
 
   it('sets tier to the value in metadata.tier (e.g. team)', async () => {
-    mockStripeApi.prices.retrieve.mockResolvedValueOnce({
+    mockStripeApi.prices.retrieve.mockResolvedValue({
       id: 'price_team',
       metadata: { project: 'subtrack', tier: 'team' },
       nickname: 'SubTrack Team Monthly',
@@ -560,6 +607,7 @@ describe('webhook: SubTrack price sets subscription_tier', () => {
     });
     mockStripeApi.subscriptions.retrieve.mockResolvedValueOnce({
       id: 'sub_team',
+      created: 1700000000,
       customer: 'cus_team',
       status: 'active',
       items: { data: [{ price: 'price_team' }] },
@@ -572,6 +620,7 @@ describe('webhook: SubTrack price sets subscription_tier', () => {
       if (secret === WEBHOOK_SECRET) {
         return {
           id: 'evt_team',
+          created: 1700000001,
           type: 'customer.subscription.created',
           data: {
             object: { customer: 'cus_team', status: 'active', items: { data: [{ price: 'price_team' }] } },
@@ -591,9 +640,114 @@ describe('webhook: SubTrack price sets subscription_tier', () => {
     const res = await webhookHandler(req);
     expect(res.status).toBe(200);
 
-    const teamUpdates = mockUpdateCalls.filter((u) => u.table === 'profiles');
-    expect(teamUpdates.length).toBeGreaterThan(0);
-    expect(teamUpdates[0].data).toHaveProperty('subscription_tier', 'team');
+    const teamCalls = mockRpcCalls.filter((call) => call.name === 'apply_subscription_tier_event');
+    expect(teamCalls).toHaveLength(1);
+    expect(teamCalls[0].args).toMatchObject({ p_user_id: SESSION_USER_ID, p_tier: 'team' });
+  });
+
+  it('ignores an older subscription event rejected by the billing-state RPC', async () => {
+    mockApplyTierResult = 'stale';
+    mockStripeApi.webhooks.constructEvent.mockImplementationOnce((_payload: string, _sig: string, secret: string) => {
+      if (secret === WEBHOOK_SECRET) {
+        return {
+          id: 'evt_stale_subscription',
+          created: 1700000001,
+          type: 'customer.subscription.updated',
+          data: {
+            object: {
+              id: 'sub_old',
+              customer: 'cus_1',
+              status: 'active',
+              items: { data: [{ price: 'price_subtrack_monthly' }] },
+            },
+          },
+        };
+      }
+      throw new Error('bad signature');
+    });
+    mockStripeApi.subscriptions.retrieve.mockResolvedValueOnce({
+      id: 'sub_old',
+      created: 1600000000,
+      customer: 'cus_1',
+      status: 'active',
+      items: { data: [{ price: 'price_subtrack_monthly' }] },
+    });
+
+    const response = await webhookHandler(makeRequestObject({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'stripe-signature': 'sig_ok' },
+      body: JSON.stringify({ type: 'customer.subscription.updated' }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ skipped: 'stale' });
+    expect(mockRpcCalls.find((call) => call.name === 'apply_subscription_tier_event')?.args)
+      .toMatchObject({
+        p_user_id: SESSION_USER_ID,
+        p_subscription_id: 'sub_old',
+        p_subscription_created: 1600000000,
+      });
+  });
+
+  it('returns a retryable error when no profile row is found', async () => {
+    mockApplyTierResult = 'missing_profile';
+    const response = await webhookHandler(makeRequestObject({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'stripe-signature': 'sig_ok' },
+      body: JSON.stringify({ type: 'customer.subscription.created' }),
+    }));
+    expect(response.status).toBe(500);
+  });
+
+  it('initially syncs from the latest SubTrack subscription for the customer', async () => {
+    mockNeedsBillingSync = true;
+    mockStripeApi.webhooks.constructEvent.mockImplementationOnce((_payload: string, _sig: string, secret: string) => {
+      if (secret === WEBHOOK_SECRET) {
+        return {
+          id: 'evt_old_subscription',
+          created: 1700000001,
+          type: 'customer.subscription.created',
+          data: {
+            object: {
+              id: 'sub_old',
+              customer: 'cus_1',
+              status: 'active',
+              items: { data: [{ price: 'price_subtrack_monthly' }] },
+            },
+          },
+        };
+      }
+      throw new Error('bad signature');
+    });
+    mockStripeApi.subscriptions.list.mockResolvedValueOnce({
+      data: [
+        {
+          id: 'sub_latest',
+          created: 1800000000,
+          customer: 'cus_1',
+          status: 'active',
+          items: { data: [{ price: { id: 'price_team', metadata: { project: 'subtrack', tier: 'team' } } }] },
+        },
+        {
+          id: 'sub_old',
+          created: 1600000000,
+          customer: 'cus_1',
+          status: 'canceled',
+          items: { data: [{ price: { id: 'price_pro', metadata: { project: 'subtrack', tier: 'pro' } } }] },
+        },
+      ],
+      has_more: false,
+    });
+
+    const response = await webhookHandler(makeRequestObject({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'stripe-signature': 'sig_ok' },
+      body: JSON.stringify({ type: 'customer.subscription.created' }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(mockRpcCalls.find((call) => call.name === 'apply_subscription_tier_event')?.args)
+      .toMatchObject({ p_subscription_id: 'sub_latest', p_tier: 'team' });
   });
 });
 
@@ -632,6 +786,10 @@ describe('webhook: issuing_card.created', () => {
   });
 
   it('throws (500) when issuing_card has no user_id in metadata', async () => {
+    mockStripeApi.issuing.cards.retrieve.mockResolvedValueOnce({
+      id: 'ic_orphan',
+      metadata: {},
+    });
     mockStripeApi.webhooks.constructEvent.mockImplementationOnce((_payload: string, _sig: string, secret: string) => {
       if (secret === WEBHOOK_SECRET) {
         return {
@@ -657,6 +815,37 @@ describe('webhook: issuing_card.created', () => {
     });
     const res = await webhookHandler(req);
     expect(res.status).toBe(500);
+    expect(mockStripeApi.issuing.cards.retrieve).toHaveBeenCalledWith('ic_orphan');
+  });
+
+  it('recovers a user id from the current Stripe card when the event metadata is stale', async () => {
+    mockStripeApi.webhooks.constructEvent.mockImplementationOnce((_payload: string, _sig: string, secret: string) => {
+      if (secret === WEBHOOK_SECRET) {
+        return {
+          id: 'evt_ic_late_metadata',
+          type: 'issuing_card.created',
+          data: { object: { id: 'ic_late', last4: '4242', brand: 'visa', status: 'active', metadata: {} } },
+        };
+      }
+      throw new Error('bad signature');
+    });
+    mockStripeApi.issuing.cards.retrieve.mockResolvedValueOnce({
+      id: 'ic_late',
+      last4: '4242',
+      brand: 'visa',
+      status: 'active',
+      metadata: { user_id: SESSION_USER_ID },
+    });
+
+    const res = await webhookHandler(makeRequestObject({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'stripe-signature': 'sig_ok' },
+      body: JSON.stringify({ type: 'issuing_card.created' }),
+    }));
+
+    expect(res.status).toBe(200);
+    expect(mockStripeApi.issuing.cards.retrieve).toHaveBeenCalledWith('ic_late');
+    expect(mockInserts.filter((row) => row.table === 'virtual_cards')[0].row.user_id).toBe(SESSION_USER_ID);
   });
 });
 
@@ -666,8 +855,9 @@ describe('webhook: checkout.session.completed idempotency', () => {
       if (secret === WEBHOOK_SECRET) {
         return {
           id: 'evt_checkout_1',
+          created: 1700000001,
           type: 'checkout.session.completed',
-          data: { object: { id: 'cs_1', metadata: { user_id: SESSION_USER_ID }, subscription: 'sub_checkout' } },
+          data: { object: { id: 'cs_1', customer: 'cus_1', metadata: { user_id: SESSION_USER_ID }, subscription: 'sub_checkout' } },
         };
       }
       const err = new Error('bad sig');
@@ -675,7 +865,7 @@ describe('webhook: checkout.session.completed idempotency', () => {
       throw err;
     });
     mockStripeApi.subscriptions.retrieve.mockResolvedValueOnce({
-      id: 'sub_checkout', customer: 'cus_1', status: 'active',
+      id: 'sub_checkout', created: 1700000000, customer: 'cus_1', status: 'active',
       items: { data: [{ price: { id: 'price_subtrack_monthly', metadata: { project: 'subtrack', tier: 'pro' } } }] },
     });
     mockStripeApi.customers.retrieve.mockResolvedValueOnce({
@@ -690,9 +880,9 @@ describe('webhook: checkout.session.completed idempotency', () => {
     const res = await webhookHandler(req);
     expect(res.status).toBe(200);
 
-    const coUpdates = mockUpdateCalls.filter((u) => u.table === 'profiles');
-    expect(coUpdates.length).toBeGreaterThan(0);
-    expect(coUpdates[0].data).toHaveProperty('subscription_tier', 'pro');
+    const checkoutCalls = mockRpcCalls.filter((call) => call.name === 'apply_subscription_tier_event');
+    expect(checkoutCalls).toHaveLength(1);
+    expect(checkoutCalls[0].args).toMatchObject({ p_user_id: SESSION_USER_ID, p_tier: 'pro' });
   });
 
   it('skips duplicate event id (idempotency)', async () => {

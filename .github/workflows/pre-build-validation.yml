@@ -13,6 +13,22 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     name: Validate Before EAS Build
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          # Throwaway CI database on localhost only: trust auth, so no password
+          # literal lives in the repo.
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     
     steps:
       - name: Checkout code
@@ -26,6 +42,19 @@ jobs:
           
       - name: Install dependencies
         run: npm ci
+
+      - name: Validate Supabase migration names
+        run: npm run check-migrations
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Test P0 baseline and webhook migrations
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: postgres
+        run: npm run test:migrations
         
       - name: TypeScript Check
         run: npm run type-check

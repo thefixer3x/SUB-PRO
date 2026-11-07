@@ -398,6 +398,7 @@ export type Database = {
           merchant_name: string;
           merchant_category: string;
           approved: boolean;
+          livemode: boolean;
           transaction_date: string;
           created_at: string;
         };
@@ -410,6 +411,7 @@ export type Database = {
           merchant_name: string;
           merchant_category: string;
           approved: boolean;
+          livemode?: boolean;
           transaction_date: string;
           created_at?: string;
         };
@@ -422,6 +424,7 @@ export type Database = {
           merchant_name?: string;
           merchant_category?: string;
           approved?: boolean;
+          livemode?: boolean;
           transaction_date?: string;
           created_at?: string;
         };
@@ -436,6 +439,7 @@ export type Database = {
           currency: string;
           status: 'succeeded' | 'failed' | 'pending';
           subscription_id: string | null;
+          stripe_event_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -447,6 +451,7 @@ export type Database = {
           currency: string;
           status: 'succeeded' | 'failed' | 'pending';
           subscription_id?: string | null;
+          stripe_event_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -458,6 +463,7 @@ export type Database = {
           currency?: string;
           status?: 'succeeded' | 'failed' | 'pending';
           subscription_id?: string | null;
+          stripe_event_id?: string | null;
           created_at?: string;
         };
       };

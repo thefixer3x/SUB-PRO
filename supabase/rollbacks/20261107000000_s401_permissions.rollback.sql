@@ -35,5 +35,9 @@ grant select, insert, update, delete, truncate, references, trigger
   on table public.sm_subscriptions to anon;
 grant select, insert, update, delete, truncate, references, trigger
   on table public.virtual_cards to anon;
+grant select, insert, update, delete, truncate, references, trigger
+  on table public.sm_subscriptions to authenticated;
+grant select, insert, update, delete, truncate, references, trigger
+  on table public.virtual_cards to authenticated;
 
 commit;
