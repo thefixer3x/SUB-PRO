@@ -478,6 +478,7 @@ async function handleIssuingAuthorizationCreated(
     merchant_name: (auth.merchant_data as { name?: string })?.name || 'Unknown',
     merchant_category: (auth.merchant_data as { category?: string })?.category || 'general',
     approved: auth.approved ?? false,
+    livemode: event.livemode,
     transaction_date: new Date(auth.created * 1000).toISOString(),
     created_at: new Date().toISOString(),
   } as Record<string, unknown>);

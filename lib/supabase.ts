@@ -398,6 +398,7 @@ export type Database = {
           merchant_name: string;
           merchant_category: string;
           approved: boolean;
+          livemode: boolean;
           transaction_date: string;
           created_at: string;
         };
@@ -410,6 +411,7 @@ export type Database = {
           merchant_name: string;
           merchant_category: string;
           approved: boolean;
+          livemode?: boolean;
           transaction_date: string;
           created_at?: string;
         };
@@ -422,6 +424,7 @@ export type Database = {
           merchant_name?: string;
           merchant_category?: string;
           approved?: boolean;
+          livemode?: boolean;
           transaction_date?: string;
           created_at?: string;
         };
