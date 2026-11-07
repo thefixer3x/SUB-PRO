@@ -4,7 +4,7 @@
 
 CREATE SCHEMA IF NOT EXISTS private;
 
-DO $$
+DO $do$
 BEGIN
   IF to_regclass('public.team_members') IS NULL THEN
     RAISE NOTICE 'Skipping private.is_team_member helper because public.team_members is missing';
@@ -29,7 +29,7 @@ BEGIN
 
   REVOKE ALL ON FUNCTION private.is_team_member(uuid, uuid) FROM PUBLIC;
   GRANT EXECUTE ON FUNCTION private.is_team_member(uuid, uuid) TO anon, authenticated, service_role;
-END $$;
+END $do$;
 
 DO $$
 DECLARE
