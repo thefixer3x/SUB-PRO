@@ -98,7 +98,7 @@
     "zod-validation-error": "^5.0.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.20.0",
+    "@babel/core": "^7.29.13",
     "@babel/plugin-proposal-optional-chaining": "^7.21.0",
     "@babel/plugin-transform-shorthand-properties": "7.24.7",
     "@babel/plugin-transform-template-literals": "^7.22.5",
