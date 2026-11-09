@@ -48,7 +48,7 @@ let mockInserts: { table: string; row: Record<string, unknown> }[] = [];
 let mockUpdateCalls: { table: string; data: Record<string, unknown> }[] = [];
 let mockTrackedTables: string[] = [];
 let mockRpcCalls: { name: string; args: Record<string, unknown> }[] = [];
-let mockApplyTierResult: 'applied' | 'stale' | 'missing_profile' = 'applied';
+let mockApplyTierResult: 'applied' | 'stale' | 'superseded' | 'missing_profile' = 'applied';
 let mockNeedsBillingSync = false;
 let mockAuthUser: { id: string; email: string | null; user_metadata: Record<string, unknown> } | null = null;
 let mockAuthError: { message: string; status?: number; code?: string } | null = null;
@@ -697,6 +697,18 @@ describe('webhook: SubTrack price sets subscription_tier', () => {
       body: JSON.stringify({ type: 'customer.subscription.created' }),
     }));
     expect(response.status).toBe(500);
+  });
+
+  it('releases the event for retry when a newer billing sync superseded it', async () => {
+    mockApplyTierResult = 'superseded';
+    const response = await webhookHandler(makeRequestObject({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'stripe-signature': 'sig_ok' },
+      body: JSON.stringify({ type: 'customer.subscription.created' }),
+    }));
+    expect(response.status).toBe(500);
+    expect(mockRpcCalls.some((call) => call.name === 'release_webhook_event')).toBe(true);
+    expect(mockRpcCalls.some((call) => call.name === 'mark_webhook_event_done')).toBe(false);
   });
 
   it('initially syncs from the latest SubTrack subscription for the customer', async () => {

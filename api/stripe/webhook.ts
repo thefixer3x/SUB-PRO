@@ -619,6 +619,12 @@ async function applySubscriptionTierEvent(
 
   const result = Array.isArray(data) ? data[0] : data;
   if (result === 'applied' || result === 'stale') return result;
+  if (result === 'superseded') {
+    // A newer sync for this user started meanwhile. Throwing releases the
+    // claim and returns 500, so Stripe redelivers the event and it is applied
+    // under the new generation (or rejected as stale by subscription order).
+    throw new Error(`Subscription event ${event.id} was superseded by a newer sync; retrying`);
+  }
   if (result === 'missing_profile') {
     throw new Error(`Profile ${userId} is missing for subscription event ${event.id}`);
   }

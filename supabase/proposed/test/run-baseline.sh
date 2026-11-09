@@ -72,9 +72,10 @@ do $$ begin
          and column_name = 'stripe_card_id') <> 'YES' then
     raise exception 'baseline did not make legacy stripe_card_id nullable';
   end if;
-  if (select column_default from information_schema.columns
+  -- coalesce: with no default at all, NULL NOT LIKE ... is NULL and the check would pass.
+  if coalesce((select column_default from information_schema.columns
        where table_schema = 'public' and table_name = 'card_authorizations'
-         and column_name = 'livemode') not like '%true%' then
+         and column_name = 'livemode'), '') not like '%true%' then
     raise exception 'authorization mode default must fail closed to live';
   end if;
   if (select livemode from public.card_authorizations where stripe_authorization_id = 'ia_legacy') is not true then
@@ -178,7 +179,7 @@ begin
     '11111111-1111-4111-8111-111111111111', first_generation,
     'sub_old_attempt', 1000, 'evt_old_attempt', 'free'
   );
-  if outcome <> 'stale' then raise exception 'old concurrent billing sync was not fenced'; end if;
+  if outcome <> 'superseded' then raise exception 'old concurrent billing sync was not fenced as superseded'; end if;
 
   outcome := public.apply_subscription_tier_event(
     '11111111-1111-4111-8111-111111111111', current_generation,
@@ -196,6 +197,33 @@ begin
   if (select subscription_tier from public.profiles
        where id = '11111111-1111-4111-8111-111111111111') <> 'team' then
     raise exception 'stale billing event changed profile tier';
+  end if;
+
+  -- An older generation can carry the newer subscription: it must be retried
+  -- (superseded), and the retry under a fresh generation must win.
+  select * into sync from public.begin_subscription_tier_sync('11111111-1111-4111-8111-111111111111');
+  first_generation := sync.generation;
+  select * into sync from public.begin_subscription_tier_sync('11111111-1111-4111-8111-111111111111');
+  current_generation := sync.generation;
+  outcome := public.apply_subscription_tier_event(
+    '11111111-1111-4111-8111-111111111111', current_generation,
+    'sub_mid', 2500, 'evt_mid', 'pro'
+  );
+  if outcome <> 'applied' then raise exception 'newer generation with older subscription was not applied'; end if;
+  outcome := public.apply_subscription_tier_event(
+    '11111111-1111-4111-8111-111111111111', first_generation,
+    'sub_latest', 3000, 'evt_latest', 'team'
+  );
+  if outcome <> 'superseded' then raise exception 'older generation was not reported as superseded'; end if;
+  select * into sync from public.begin_subscription_tier_sync('11111111-1111-4111-8111-111111111111');
+  outcome := public.apply_subscription_tier_event(
+    '11111111-1111-4111-8111-111111111111', sync.generation,
+    'sub_latest', 3000, 'evt_latest', 'team'
+  );
+  if outcome <> 'applied' then raise exception 'retried superseded event did not apply the newer subscription'; end if;
+  if (select subscription_tier from public.profiles
+       where id = '11111111-1111-4111-8111-111111111111') <> 'team' then
+    raise exception 'newer subscription tier was lost';
   end if;
 
   select * into sync from public.begin_subscription_tier_sync('33333333-3333-4333-8333-333333333333');
