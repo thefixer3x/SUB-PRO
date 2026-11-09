@@ -7,7 +7,7 @@ live Supabase project.
 | File | Card | Status |
 | --- | --- | --- |
 | `2026-11-sm-permissions.sql` | S401 / C09 (#31) | **Superseded** — migration applied at `migrations/20261107000000_s401_permissions.sql` |
-| `2026-11-sm-permissions.rollback.sql` | Rollback for the file above | Use only to undo it |
+| `2026-11-sm-permissions.rollback.sql` | Rollback for the file above | **Superseded** — shipped at `rollbacks/20261107000000_s401_permissions.rollback.sql` |
 
 ## 2026-11-sm-permissions.sql
 
@@ -23,13 +23,13 @@ The file's header lists each change and the live state it replaces. In short:
 - Confirm the app has no client code path that writes `virtual_cards`, or the billing fields on `profiles`. As of 2026-11-06 there is none in SubTrack Pro or VortexCore.
 
 ### Test it locally first
-`test/` holds a minimal stand-in for the live state, behaviour checks, and a runner. The runner applies the change, checks it, applies the rollback, and confirms the original grants and policies come back. Use a throwaway local Postgres, never a real project:
+`test/` holds a minimal stand-in for the live state, behavior checks, and runners. `run.sh` tests S401 and its rollback; it then calls `run-baseline.sh`, which applies S401 before the forward baseline, reapplies the baseline to check it does not restore client privileges, and exercises claim-token lifecycle RPCs. Use a throwaway local Postgres, never a real project:
 
 ```bash
 PGHOST=localhost PGPORT=5432 PGUSER=postgres supabase/proposed/test/run.sh
 ```
 
-The expected output is `ALL CHECKS PASSED` followed by `ROLLBACK RESTORES ORIGINAL STATE`.
+The expected output includes `ALL CHECKS PASSED`, `ROLLBACK RESTORES ORIGINAL STATE`, and `P0 BASELINE + WEBHOOK RPC CHECKS PASSED`.
 
 ### Apply
 In the Supabase SQL editor, run the whole file once; it is a single transaction. Then run the read-only checks at the bottom of the file, and in the app:
@@ -39,4 +39,4 @@ In the Supabase SQL editor, run the whole file once; it is a single transaction.
 - run a test-mode checkout and confirm the plan changes.
 
 ### Roll back
-Run `2026-11-sm-permissions.rollback.sql`. It restores the exact previous grants and policies.
+Run `supabase/rollbacks/20261107000000_s401_permissions.rollback.sql`. It restores the exact previous grants and policies.

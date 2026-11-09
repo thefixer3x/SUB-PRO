@@ -64,6 +64,7 @@ migrate_database() {
     
     # Run migrations
     print_step "Applying database migrations..."
+    npm run check-migrations
     if supabase db push; then
         print_success "Database migrations completed successfully"
     else

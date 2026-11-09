@@ -1,104 +1,100 @@
-# Plan: P0 — S401 permissions + database-backed webhook idempotency
+# P0 — S401 permissions and webhook idempotency
 
-Status: **implemented** — all files written and tests passing (68/68 across 4 suites).
+Status: **implementation complete; forward migrations and PR review pending**.
 
-## P0 done-when (verified)
+## Migration rollout
 
-> [x] S401 permissions migration is in `supabase/migrations/` and passes its own test harness
-> [x] `supabase/proposed/2026-11-sm-permissions.sql` is superseded by the migration file
-> [x] Webhook idempotency is backed by a `webhook_event_log` table — retries produce zero duplicates
-> [x] No client role can write to `virtual_cards`, `profiles.subscription_tier`, or `profiles.stripe_customer_id`
+The default branch already recorded versions `20261107000000` and
+`20261107000001`; those versions are not rewritten to carry new SQL. The P0
+upgrade is forward-only:
 
----
+| Version | File | Purpose |
+| --- | --- | --- |
+| `20261107000000` | `20261107000000_s401_permissions.sql` | Shipped S401. Its `sm_subscriptions` block skips a missing table on fresh reset. |
+| `20261107000001` | `20261107000001_webhook_idempotency.sql` | Existing insert-first event log migration; unchanged from `main`. |
+| `20261107000002` | `20261107000002_baseline_sm_tables.sql` | Baseline for existing live tables not represented in the repo schema. |
+| `20261107000003` | `20261107000003_webhook_claim_idempotency.sql` | Forward upgrade to token-fenced claim/complete/release semantics and billing-state ordering. |
 
-## Part A: Move S401 from `proposed/` → `migrations/` — **DONE**
+Versions `02` and `03` sort after the versions already recorded remotely, so
+normal `supabase db push` applies them without editing or repairing the remote
+migration ledger.
 
-### Files created
+## S401 permissions
 
-- **`supabase/migrations/20261107000000_s401_permissions.sql`** — copy of `proposed/2026-11-sm-permissions.sql` with updated header
-- **`supabase/migrations/20261107000000_s401_permissions.rollback.sql`** — copy of rollback
+- `virtual_cards`: authenticated users can read their own rows; only the service
+  role can insert/update/delete. RLS does not cover `TRUNCATE`, so client write
+  and truncate privileges are revoked explicitly.
+- `sm_subscriptions`: authenticated users retain owner-scoped CRUD, but not
+  `TRUNCATE`; `anon` has no table access. On a fresh reset, S401 skips this table
+  because the baseline creates it later in the final owner-CRUD state.
+- `profiles`: client roles cannot change `subscription_tier` or
+  `stripe_customer_id`.
+- The rollback is under `supabase/rollbacks/`, outside the Supabase CLI's
+  migration filename scan.
 
-### Files modified
+## Baseline schema
 
-- **`supabase/proposed/README.md`** — S401 row updated to "Superseded"
-- **`supabase/proposed/test/run.sh`** — path updated to `migrations/20261107000000_s401_permissions.sql`
+`20261107000002_baseline_sm_tables.sql` is a targeted baseline for the live
+tables required by P0/P1: `sm_subscriptions`, `sm_payment_records`, and the live
+`virtual_cards.card_id` shape. It is not a complete dump of every manually
+provisioned VortexCore/MaaS table. It is safe after S401: it does not restore `anon`
+privileges, client writes to cards, `TRUNCATE`, or the broad legacy subscription
+policy. Reapplying it preserves the hardened state.
 
----
+The baseline adds `card_authorizations.livemode` with a `true` default so
+unmarked legacy rows fail closed; new webhook authorization rows persist
+Stripe's `event.livemode` value.
 
-## Part B: Database-backed webhook idempotency — **DONE**
+Payment rows are deduped by `stripe_event_id`, not by a new unique constraint on
+`(stripe_invoice_id, status)`. Existing payment history, including duplicate
+invoice/status pairs, is left intact.
 
-### B1. Migration: `webhook_event_log` table
+## Webhook idempotency
 
-**File:** `supabase/migrations/20261107000001_webhook_idempotency.sql`
+The new `20261107000003` migration upgrades the already-shipped event table:
 
-Creates `webhook_event_log(event_id TEXT UNIQUE, event_type, processed_at)` with:
-- RLS (service_role only)
-- `clean_webhook_event_log(max_age_days)` cleanup function (90-day default)
+- Legacy rows and legacy inserts default to `done`.
+- `claim_webhook_event` returns `claimed` with a unique claim token,
+  `duplicate`, or `in_progress`.
+- A stale claim is reclaimed with a new token. Complete/release RPCs only act
+  when their token matches the current claim, so an old invocation cannot
+  release or complete a newer attempt.
+- A completed duplicate returns 200. `in_progress` returns a retryable 500.
+  Effect/complete errors release only the current token and return 500.
+- RPC/table access is service-role-only.
 
-### B2. Webhook handler update
+`api/stripe/webhook.ts` claims before Stripe or database reads, so duplicate
+deliveries are cheap. Foreign-project events still have no target-table effect;
+they are acknowledged as skipped after the event claim is completed.
 
-**File:** `api/stripe/webhook.ts`
+### Subscription ordering and retry safety
 
-**Changes:**
+- Subscription handlers retrieve the current Stripe subscription rather than
+  trusting a potentially stale event snapshot.
+- `begin_subscription_tier_sync` gives each per-user billing sync a monotonic
+  generation before Stripe state is retrieved. Initial sync reconciles against
+  the customer's latest SubTrack subscription.
+- `apply_subscription_tier_event` atomically checks the generation and
+  subscription creation before updating `profiles.subscription_tier`. It
+  reports stale events without overwriting a newer state and reports missing
+  profiles as retryable failures; it does not rely on Stripe event timestamps
+  for ordering.
+- Invoice records use the Stripe event id for secondary deduplication.
+- `issuing_card.created` retrieves the current card once if its event snapshot
+  lacks `metadata.user_id`, then retries if metadata is still missing.
 
-1. **Removed the in-memory `Set<string>`.** Deleted `const processedEvents = new Set<string>();` and all `.has()` / `.add()` calls.
+## Tests and checks
 
-2. **Added `logWebhookEvent(eventId, eventType)` helper** — returns `boolean`:
-   - Inserts into `webhook_event_log` via service role
-   - Returns `true` on 23505 duplicate-key (skip processing)
-   - Returns `false` on success or error (proceed)
-   - TODO comment pointing to fin-core when adopted
+- `npm run check-migrations` runs in CI and immediately before the deployment
+  script invokes `supabase db push`. It rejects rollback files, mixed-case or
+  malformed SQL filenames, and duplicate versions; only the exact existing
+  `20250701` pair is allowlisted.
+- `supabase/proposed/test/run.sh` tests S401 and rollback, then runs
+  `run-baseline.sh`. The baseline runner applies S401, the forward baseline and
+  webhook upgrade, re-applies the baseline, and checks grants/RLS, claim token
+  fencing, retry release, legacy-row defaults, payment history and subscription
+  event ordering.
+- `jest.config.js` scopes `.worktrees` exclusion to the active Jest root.
 
-3. **Called from every handler after the project filter:**
-   - `handleSubscriptionEvent` — after project skip, before customer lookup
-   - `handleInvoiceEvent` — after project skip, before userId lookup
-   - `handleCheckoutSessionCompleted` — after project skip, before tier update
-   - `handleIssuingAuthorizationCreated` — after admin client check, before card_authorizations insert
-
-4. **Issuing card handler (`handleIssuingCardCreated`) unchanged** — it already has its own idempotency check (select-then-insert).
-
-### B3. Tests
-
-**File:** `__tests__/webhook-idempotency.test.ts`
-
-Five test cases:
-
-```
-✓ skips duplicate issuing_authorization.created via 23505
-✓ skips duplicate subscription.created via 23505
-✓ skips event after Vercel cold start (DB has row from prior invocation)
-✓ returns 200 (skipped) for a foreign-project event even with idempotency
-✓ falls through (does not throw) when Supabase admin is unavailable
-```
-
-All 68 tests pass across 4 test suites (5 new + 63 existing).
-
-### Design decisions
-
-- **Idempotency after project filter** for subscription/invoice/checkout events — avoids writing `webhook_event_log` rows for events we're going to skip (e.g., foreign-project `vortexcore` events).
-- **Issuing handlers get idempotency at the top** — they have no project filter, so they always process. `handleIssuingCardCreated` keeps its own pre-insert check; `handleIssuingAuthorizationCreated` gets the new helper.
-- **23505 → skip** — when the duplicate-key error fires, the handler returns `{ received: true }` without processing. No duplicate rows in any target table.
-- **No table / no client → fall through** — if the DB is unreachable or the table doesn't exist yet, the insert throws 500, which makes Stripe retry. On retry, the migration will have landed and the 23505 path kicks in.
-
----
-
-## Part C: `@lanonasis/fin-core` — **DEFERRED**
-
-TODO comments added in `logWebhookEvent()` and at the top-level handler pointing to:
-`docs/specs/CARD_FUNDING_AND_AI_MANAGER.md` section 7, P0.
-
-When `@lanonasis/fin-core` is added, replace `logWebhookEvent()` calls with `runOnce(adminClient, 'webhook_event_log', { event_id, event_type })`.
-
----
-
-## Files changed
-
-| File | Action | Purpose |
-|------|--------|---------|
-| `supabase/migrations/20261107000000_s401_permissions.sql` | Created | S401 permission fixes |
-| `supabase/migrations/20261107000000_s401_permissions.rollback.sql` | Created | Rollback for S401 |
-| `supabase/migrations/20261107000001_webhook_idempotency.sql` | Created | `webhook_event_log` table + cleanup function |
-| `api/stripe/webhook.ts` | Modified | Replaced in-memory Set with DB-backed idempotency |
-| `supabase/proposed/README.md` | Modified | S401 row → "Superseded" |
-| `supabase/proposed/test/run.sh` | Modified | Path → migration file |
-| `__tests__/webhook-idempotency.test.ts` | Created | 5 idempotency test cases |
+Do not change an already-recorded migration to deploy new behavior; add a new
+versioned migration instead. `@lanonasis/fin-core` remains deferred.
