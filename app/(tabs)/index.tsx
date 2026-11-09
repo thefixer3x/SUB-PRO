@@ -130,6 +130,20 @@ export default function Dashboard() {
           )}
         </View>
 
+        {split.excluded.length > 0 && (
+          <View style={dynamicStyles.section}>
+            <View style={dynamicStyles.insightCard}>
+              <Text style={dynamicStyles.insightTitle}>Multiple Currencies</Text>
+              <Text style={dynamicStyles.insightText}>
+                Totals are in {currency}. {split.excluded.length} subscription
+                {split.excluded.length > 1 ? 's' : ''} billed in {split.otherCurrencies.join(', ')}{' '}
+                {split.excluded.length > 1 ? 'are' : 'is'} not included, because amounts in different
+                currencies can't be added without an exchange rate.
+              </Text>
+            </View>
+          </View>
+        )}
+
         <PlanInbox currency={currency} />
 
         {currentTier === 'free' && <AdBanner placement="home" size="medium-rectangle" />}
