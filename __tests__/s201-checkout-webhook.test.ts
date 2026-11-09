@@ -701,12 +701,41 @@ describe('webhook: SubTrack price sets subscription_tier', () => {
 
   it('releases the event for retry when a newer billing sync superseded it', async () => {
     mockApplyTierResult = 'superseded';
+    mockStripeApi.webhooks.constructEvent.mockImplementationOnce((_payload: string, _sig: string, secret: string) => {
+      if (secret === WEBHOOK_SECRET) {
+        return {
+          id: 'evt_superseded_subscription',
+          created: 1700000002,
+          type: 'customer.subscription.updated',
+          data: {
+            object: {
+              id: 'sub_latest',
+              customer: 'cus_1',
+              status: 'active',
+              items: { data: [{ price: 'price_subtrack_monthly' }] },
+            },
+          },
+        };
+      }
+      throw new Error('bad signature');
+    });
+    mockStripeApi.subscriptions.retrieve.mockResolvedValueOnce({
+      id: 'sub_latest',
+      created: 1700000000,
+      customer: 'cus_1',
+      status: 'active',
+      items: { data: [{ price: 'price_subtrack_monthly' }] },
+    });
+
     const response = await webhookHandler(makeRequestObject({
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'stripe-signature': 'sig_ok' },
-      body: JSON.stringify({ type: 'customer.subscription.created' }),
+      body: JSON.stringify({ type: 'customer.subscription.updated' }),
     }));
     expect(response.status).toBe(500);
+    // The superseded branch was reached: the tier RPC ran for this subscription.
+    expect(mockRpcCalls.find((call) => call.name === 'apply_subscription_tier_event')?.args)
+      .toMatchObject({ p_subscription_id: 'sub_latest' });
     expect(mockRpcCalls.some((call) => call.name === 'release_webhook_event')).toBe(true);
     expect(mockRpcCalls.some((call) => call.name === 'mark_webhook_event_done')).toBe(false);
   });
