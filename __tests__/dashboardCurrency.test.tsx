@@ -25,6 +25,7 @@ jest.mock('@/components/monetization/FeatureGate', () => ({
   FeatureGate: ({ children }: { children: React.ReactNode }) => children,
 }));
 jest.mock('@/components/branding/PoweredByLanOnasis', () => ({ PoweredByLanOnasis: () => null }));
+jest.mock('@/components/PlanInbox', () => ({ PlanInbox: () => null }));
 
 // eslint-disable-next-line import/first
 import Dashboard from '@/app/(tabs)/index';

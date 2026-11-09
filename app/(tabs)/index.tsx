@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, ActivityIndicator } from 'react-native';
 import { UpgradeRibbon } from '@/components/monetization/UpgradeRibbon';
 import { AdBanner } from '@/components/monetization/AdBanner';
-import { FeatureGate } from '@/components/monetization/FeatureGate';
+import { PlanInbox } from '@/components/PlanInbox';
 import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -130,53 +130,21 @@ export default function Dashboard() {
           )}
         </View>
 
-        <FeatureGate
-          feature="smartInsights"
-          requiredTier="pro"
-          fallback={
-            <View style={dynamicStyles.section}>
-              <Text style={dynamicStyles.sectionTitle}>Insights</Text>
-              <Text style={dynamicStyles.emptyText}>Upgrade to Pro for AI-powered insights.</Text>
-            </View>
-          }
-        >
+        {split.excluded.length > 0 && (
           <View style={dynamicStyles.section}>
-            <Text style={dynamicStyles.sectionTitle}>Smart Insights</Text>
-
-            {money && money.categoryBreakdown.length > 0 && (
-              <View style={dynamicStyles.insightCard}>
-                <Text style={dynamicStyles.insightTitle}>Top Category</Text>
-                <Text style={dynamicStyles.insightText}>
-                  {money.categoryBreakdown[0]?.category} is your largest expense at{' '}
-                  {fmtCurrency(money.categoryBreakdown[0]?.amount ?? 0, currency)}.
-                </Text>
-              </View>
-            )}
-
-            {split.excluded.length > 0 && (
-              <View style={dynamicStyles.insightCard}>
-                <Text style={dynamicStyles.insightTitle}>Multiple Currencies</Text>
-                <Text style={dynamicStyles.insightText}>
-                  Totals are in {currency}. {split.excluded.length} subscription
-                  {split.excluded.length > 1 ? 's' : ''} billed in {split.otherCurrencies.join(', ')}{' '}
-                  {split.excluded.length > 1 ? 'are' : 'is'} not included, because amounts in different
-                  currencies can't be added without an exchange rate.
-                </Text>
-              </View>
-            )}
-
-            {stats && (
-              <View style={dynamicStyles.insightCard}>
-                <Text style={dynamicStyles.insightTitle}>Renewal Alert</Text>
-                <Text style={dynamicStyles.insightText}>
-                  {stats.upcomingRenewals.length > 0
-                    ? `${stats.upcomingRenewals.length} renewal${stats.upcomingRenewals.length > 1 ? 's' : ''} in the next 7 days.`
-                    : 'No renewals coming up soon.'}
-                </Text>
-              </View>
-            )}
+            <View style={dynamicStyles.insightCard}>
+              <Text style={dynamicStyles.insightTitle}>Multiple Currencies</Text>
+              <Text style={dynamicStyles.insightText}>
+                Totals are in {currency}. {split.excluded.length} subscription
+                {split.excluded.length > 1 ? 's' : ''} billed in {split.otherCurrencies.join(', ')}{' '}
+                {split.excluded.length > 1 ? 'are' : 'is'} not included, because amounts in different
+                currencies can't be added without an exchange rate.
+              </Text>
+            </View>
           </View>
-        </FeatureGate>
+        )}
+
+        <PlanInbox currency={currency} />
 
         {currentTier === 'free' && <AdBanner placement="home" size="medium-rectangle" />}
 
