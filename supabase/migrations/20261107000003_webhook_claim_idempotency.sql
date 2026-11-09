@@ -269,8 +269,10 @@ begin
      and state.generation = p_generation
      for update;
 
+  -- A newer sync for this user has started. This attempt may still carry the
+  -- newer subscription, so it is retried rather than dropped.
   if not found then
-    return 'stale';
+    return 'superseded';
   end if;
 
   if v_existing_created is not null
@@ -296,7 +298,7 @@ begin
    returning user_id into v_applied_user_id;
 
   if not found then
-    return 'stale';
+    return 'superseded';
   end if;
 
   update public.profiles
