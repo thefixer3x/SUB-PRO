@@ -15,7 +15,6 @@ import {
 } from '../services/insightEngine';
 
 const NOW = new Date('2026-11-07T12:00:00.000Z');
-const USER = '11111111-1111-4111-8111-111111111111';
 
 function auth(overrides: Partial<CardAuthorizationRow> & { id: string }): CardAuthorizationRow {
   const { id, ...rest } = overrides;
