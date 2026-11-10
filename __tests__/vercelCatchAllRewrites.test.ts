@@ -47,3 +47,16 @@ describe('catch-all API functions on Vercel', () => {
     expect(nested).toBeLessThan(spa);
   });
 });
+
+// Stripe's SubTrack endpoint still posts to the Netlify-era URL
+// /stripe/webhook. On Vercel that path fell through to the SPA fallback,
+// and a POST to static index.html is a 405.
+describe('legacy Stripe webhook URL on Vercel', () => {
+  it('routes /stripe/webhook to the webhook function, not the SPA', () => {
+    expect(rewrite('/stripe/webhook')).toBe('/api/stripe/webhook');
+  });
+
+  it('the webhook function exists', () => {
+    expect(fs.existsSync(path.join(root, 'api/stripe/webhook.ts'))).toBe(true);
+  });
+});
