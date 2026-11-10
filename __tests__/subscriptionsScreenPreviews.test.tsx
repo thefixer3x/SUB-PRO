@@ -84,6 +84,15 @@ describe('Subscriptions screen', () => {
     expect(mockPush).toHaveBeenCalledWith('/(tabs)/upgrade');
   });
 
+  it('lets a Pro user share without being sent to the plans', () => {
+    mockCanAccess = true;
+    render(<Subscriptions />);
+    expect(screen.getByText('Share')).toBeTruthy();
+    expect(screen.queryByText('Share (Pro)')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Share Netflix'));
+    expect(mockPush).not.toHaveBeenCalledWith('/(tabs)/upgrade');
+  });
+
   it('opens the add form from the + button', () => {
     render(<Subscriptions />);
     fireEvent.press(screen.getByLabelText('Add subscription'));
