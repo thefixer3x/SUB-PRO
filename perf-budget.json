@@ -1,0 +1,13 @@
+{
+  "$comment": "Web bundle budget, enforced by scripts/check-bundle-size.js in CI. 'max' fails the build; 'target' is the blueprint goal and is reported only. Ratchet: when the bundle shrinks, lower 'max' to the new size + ~5%. Never raise 'max' to make a PR pass without recording why in docs/agents/BLUEPRINT_SCORE.md.",
+  "baseline": {
+    "measuredAt": "2026-11-10",
+    "commit": "277b3c9",
+    "initialJsGzipKB": 931.0,
+    "totalJsGzipKB": 931.0
+  },
+  "budgets": {
+    "initialJsGzipKB": { "max": 975, "target": 200 },
+    "totalJsGzipKB": { "max": 975 }
+  }
+}
