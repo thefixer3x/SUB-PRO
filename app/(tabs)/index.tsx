@@ -1,5 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Plus, ChevronRight } from 'lucide-react-native';
 import { UpgradeRibbon } from '@/components/monetization/UpgradeRibbon';
 import { AdBanner } from '@/components/monetization/AdBanner';
 import { PlanInbox } from '@/components/PlanInbox';
@@ -10,6 +12,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { getDashboardStats, splitByPrimaryCurrency } from '@/utils/subscriptionMath';
 import { ThemeColors } from '@/constants/theme';
+import { AddSubscriptionModal } from '@/components/subscriptions/AddSubscriptionModal';
+import { FeaturePreviewCard } from '@/components/features/FeaturePreviewCard';
+import { FEATURE_CATALOG } from '@/config/featureCatalog';
+
+// Features worth discovering from Home: everything that is not the screen
+// the user is already on. Coming-soon entries are descriptions only.
+const EXPLORE = FEATURE_CATALOG.filter((f) => f.id !== 'plan-inbox');
 
 /** Format a number as a locale-aware currency string, defaulting to USD. */
 function fmtCurrency(amount: number, currency = 'USD'): string {
@@ -30,6 +39,8 @@ export default function Dashboard() {
   const { colors } = useTheme();
   const { user } = useAuth();
   const dynamicStyles = React.useMemo(() => createStyles(colors), [colors]);
+  const router = useRouter();
+  const [showAdd, setShowAdd] = React.useState(false);
 
   const displayName = user?.user_metadata?.full_name
     || user?.email?.split('@')[0]
@@ -58,6 +69,15 @@ export default function Dashboard() {
         <View style={dynamicStyles.header}>
           <Text style={dynamicStyles.title}>Dashboard</Text>
           <Text style={dynamicStyles.subtitle}>Welcome back, {displayName}!</Text>
+          <TouchableOpacity
+            style={dynamicStyles.addButton}
+            onPress={() => setShowAdd(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Add subscription"
+          >
+            <Plus size={18} color={colors.textInverse} />
+            <Text style={dynamicStyles.addButtonText}>Add subscription</Text>
+          </TouchableOpacity>
         </View>
 
         <UpgradeRibbon />
@@ -100,7 +120,28 @@ export default function Dashboard() {
             <Text style={dynamicStyles.emptySubtitle}>
               Add your first subscription to start tracking spending.
             </Text>
+            <TouchableOpacity
+              style={[dynamicStyles.addButton, dynamicStyles.emptyAddButton]}
+              onPress={() => setShowAdd(true)}
+              accessibilityRole="button"
+            >
+              <Plus size={18} color={colors.textInverse} />
+              <Text style={dynamicStyles.addButtonText}>Add your first subscription</Text>
+            </TouchableOpacity>
           </View>
+        )}
+
+        {!!subscriptions?.length && (
+          <TouchableOpacity
+            style={dynamicStyles.linkRow}
+            onPress={() => router.push('/(tabs)/subscriptions')}
+            accessibilityRole="link"
+          >
+            <Text style={dynamicStyles.linkRowText}>
+              See all {subscriptions.length} subscription{subscriptions.length === 1 ? '' : 's'}
+            </Text>
+            <ChevronRight size={18} color={colors.primary} />
+          </TouchableOpacity>
         )}
 
         <AdBanner placement="home" />
@@ -146,12 +187,31 @@ export default function Dashboard() {
 
         <PlanInbox currency={currency} />
 
+        <View style={dynamicStyles.section}>
+          <View style={dynamicStyles.sectionHeaderRow}>
+            <Text style={[dynamicStyles.sectionTitle, dynamicStyles.sectionTitleInline]}>Explore SUB-PRO</Text>
+            <TouchableOpacity
+              onPress={() => router.push('/(tabs)/features')}
+              accessibilityRole="link"
+              accessibilityLabel="See all features"
+            >
+              <Text style={dynamicStyles.linkRowText}>All features</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {EXPLORE.map((feature) => (
+              <FeaturePreviewCard key={feature.id} feature={feature} compact />
+            ))}
+          </ScrollView>
+        </View>
+
         {currentTier === 'free' && <AdBanner placement="home" size="medium-rectangle" />}
 
         <View style={dynamicStyles.brandingSection}>
           <PoweredByLanOnasis variant="minimal" />
         </View>
       </ScrollView>
+      <AddSubscriptionModal visible={showAdd} onClose={() => setShowAdd(false)} />
     </SafeAreaView>
   );
 }
@@ -300,6 +360,48 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
     paddingVertical: 12,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginTop: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: colors.primary,
+  },
+  emptyAddButton: {
+    alignSelf: 'center',
+  },
+  addButtonText: {
+    color: colors.textInverse,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 20,
+    marginTop: -12,
+    marginBottom: 16,
+    gap: 2,
+  },
+  linkRowText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  sectionTitleInline: {
+    marginBottom: 0,
   },
   errorText: {
     fontSize: 14,

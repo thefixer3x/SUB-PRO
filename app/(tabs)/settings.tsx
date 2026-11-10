@@ -26,6 +26,8 @@ import {
   AlertTriangle,
   LogOut,
   HelpCircle,
+  LayoutGrid,
+  ListChecks,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -278,6 +280,21 @@ export default function Settings() {
         )}
 
         <ThemeSelector />
+
+        <SettingsSection title="Explore">
+          <SettingsItem
+            icon={<LayoutGrid size={20} color="#3B82F6" />}
+            title="All features"
+            subtitle="What SUB-PRO does today, what Pro unlocks, and what is coming"
+            onPress={() => router.push('/(tabs)/features')}
+          />
+          <SettingsItem
+            icon={<ListChecks size={20} color="#10B981" />}
+            title="My subscriptions"
+            subtitle="Every subscription you track, with add and share"
+            onPress={() => router.push('/(tabs)/subscriptions')}
+          />
+        </SettingsSection>
 
         <SettingsSection title="Notifications">
           <SettingsItem

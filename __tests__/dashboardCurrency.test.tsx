@@ -26,6 +26,9 @@ jest.mock('@/components/monetization/FeatureGate', () => ({
 }));
 jest.mock('@/components/branding/PoweredByLanOnasis', () => ({ PoweredByLanOnasis: () => null }));
 jest.mock('@/components/PlanInbox', () => ({ PlanInbox: () => null }));
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+jest.mock('@/components/subscriptions/AddSubscriptionModal', () => ({ AddSubscriptionModal: () => null }));
+jest.mock('@/components/features/FeaturePreviewCard', () => ({ FeaturePreviewCard: () => null }));
 
 // eslint-disable-next-line import/first
 import Dashboard from '@/app/(tabs)/index';

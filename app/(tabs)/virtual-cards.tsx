@@ -14,6 +14,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ThemeColors } from '@/constants/theme';
 import { useVirtualCardsEnabled } from '@/hooks/useFeatureFlags';
 import { virtualCardService } from '@/services/virtualCards';
+import { FeaturePreviewCard } from '@/components/features/FeaturePreviewCard';
+import { getFeature } from '@/config/featureCatalog';
+
+// What the card features will do. Descriptions only: no sample card is drawn,
+// so nothing on this screen can be mistaken for a real card.
+const CARD_PREVIEWS = ['virtual-cards', 'card-freeze', 'cancellation-assistant']
+  .map((id) => getFeature(id))
+  .filter((f): f is NonNullable<typeof f> => !!f);
 
 /**
  * The only card data this screen is allowed to render.
@@ -144,15 +152,20 @@ export default function VirtualCardsScreen() {
   if (!virtualCardsEnabled) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.centeredContainer}>
-          <CreditCard size={48} color={colors.textMuted} />
-          <Text style={styles.title}>Virtual Cards</Text>
-          <Text style={styles.comingSoonTitle}>Coming soon</Text>
-          <Text style={styles.comingSoonText}>
-            Secure, single-purpose payment cards for your subscriptions are not available yet.
-            We will let you know as soon as they are.
-          </Text>
-        </View>
+        <ScrollView contentContainerStyle={styles.previewContent}>
+          <View style={styles.previewHeader}>
+            <CreditCard size={40} color={colors.primary} />
+            <Text style={styles.title}>Virtual Cards</Text>
+            <Text style={styles.comingSoonTitle}>Coming soon</Text>
+            <Text style={styles.comingSoonText}>
+              Pay each subscription with its own card, and stop a charge without touching
+              your bank card. Here is what you will be able to do.
+            </Text>
+          </View>
+          {CARD_PREVIEWS.map((feature) => (
+            <FeaturePreviewCard key={feature.id} feature={feature} />
+          ))}
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -277,6 +290,17 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   loadingText: {
     fontSize: 16,
     color: colors.textMuted,
+  },
+  previewContent: {
+    padding: 20,
+    paddingBottom: 100,
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
+  },
+  previewHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
   },
   centeredContainer: {
     flex: 1,
