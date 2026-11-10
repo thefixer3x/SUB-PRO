@@ -10,6 +10,8 @@
  *   GET    /api/embedded-finance/virtual-cards/:cardId
  *   GET    /api/embedded-finance/virtual-cards/user/:userId
  *   PATCH  /api/embedded-finance/virtual-cards/:cardId/update
+ *   POST   /api/embedded-finance/virtual-cards/:cardId/ephemeral-key
+ *   GET    /api/embedded-finance/virtual-cards/:cardId/transactions
  */
 
 import { requireUser } from '../../../server/auth';
@@ -171,6 +173,30 @@ export async function handler(request: Request): Promise<Response> {
       const result = await vc.updateCard(cardId, userId, updates);
       if (!result.ok) return json(result.status ?? 400, { error: result.error }, origin);
       return json(200, result.data, origin);
+    }
+
+    // --- POST /:cardId/ephemeral-key (S304: Issuing Elements reveal) ---
+    if (request.method === 'POST' && segments.length === 2 && segments[1] === 'ephemeral-key') {
+      let body: Record<string, unknown>;
+      try {
+        body = JSON.parse(await request.text());
+      } catch {
+        return json(400, { error: 'Invalid JSON body' }, origin);
+      }
+      const result = await vc.createCardEphemeralKey(segments[0], userId, {
+        nonce: body?.nonce,
+        stripeVersion: request.headers.get('stripe-version') ?? body?.stripeVersion,
+      });
+      if (!result.ok) return json(result.status, { error: result.error }, origin);
+      return json(200, result.data, origin);
+    }
+
+    // --- GET /:cardId/transactions ---
+    if (request.method === 'GET' && segments.length === 2 && segments[1] === 'transactions') {
+      const limit = parseInt(url.searchParams.get('limit') ?? '20', 10) || 20;
+      const result = await vc.listCardTransactions(segments[0], userId, limit);
+      if (!result.ok) return json(result.status, { error: result.error }, origin);
+      return json(200, { transactions: result.data }, origin);
     }
 
     // --- 404 for unknown routes ---

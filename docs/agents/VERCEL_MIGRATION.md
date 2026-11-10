@@ -63,6 +63,8 @@ Route map. Every server route lives under `/api`, and the API base URL includes 
 | `/create-checkout-session` (`hooks/usePayments.ts`) | `/api/create-checkout-session` | `api/create-checkout-session.ts` |
 | Stripe → webhook | n/a | `api/stripe/webhook.ts` |
 | `/embedded-finance/virtual-cards/*` (`services/virtualCards.ts`) | `/api/embedded-finance/virtual-cards/*` | `api/embedded-finance/virtual-cards/[...path].ts` |
+| `/embedded-finance/virtual-cards/:id/ephemeral-key` (S304, web reveal via Stripe Issuing Elements) | `/api/embedded-finance/virtual-cards/:id/ephemeral-key` | same handler; nested path routed by the `vercel.json` rewrite |
+| `/embedded-finance/virtual-cards/:id/transactions` (S304, from `card_authorizations`) | `/api/embedded-finance/virtual-cards/:id/transactions` | same handler; nested path routed by the `vercel.json` rewrite |
 | `/banking/proxy` (`services/mcpBankingService.ts`; change its native constant from `/banking-proxy`) | `/api/banking/proxy` | `api/banking/proxy.ts` |
 | `/splitwise` (`services/sharedSubscriptions.ts`) | `/api/splitwise` | `api/splitwise.ts` |
 | `/hibp-check` | `/api/hibp-check` | `api/hibp-check.ts` |

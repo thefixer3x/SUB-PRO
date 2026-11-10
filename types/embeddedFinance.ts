@@ -2,11 +2,9 @@ export interface VirtualCard {
   id: string;
   subscriptionId: string;
   userId: string;
-  cardNumber: string; // Encrypted/tokenized
   last4: string;
   expiryMonth: number;
   expiryYear: number;
-  cvv: string; // Encrypted
   status: 'active' | 'blocked' | 'expired' | 'canceled';
   spendingLimit: number;
   merchantCategory?: string;
