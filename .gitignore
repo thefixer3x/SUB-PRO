@@ -65,3 +65,4 @@ graphify-out/
 
 # Lighthouse CI output
 .lighthouseci/
+lighthouse-reports/

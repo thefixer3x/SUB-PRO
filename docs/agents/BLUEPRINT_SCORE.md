@@ -4,8 +4,10 @@
 **Audited against:** `origin/main` = `9b4b02c3`
 **Audited:** 2026-11-04 · **Revised:** 2026-11-10 (performance budgets now enforced; see §3 and §11)
 
-> **Note on the summary table:** its rows add up to 49, not the 38 items stated. The per-section
-> tables below are the source of truth until the counts are recomputed.
+> **Snapshot vs. later changes:** the findings describe `origin/main` @ `9b4b02c3`. The exception is the
+> performance rows in §3, §9 and §11, which were re-measured on `277b3c9` (2026-11-10) when the
+> bundle budget and Lighthouse checks were added. The summary below was recounted from the
+> per-section tables on the same date.
 
 > The blueprint is a *standards + product-prompt* artefact from the Bolt.new era. It mixes
 > hard constraints (Tailwind, feature flags, `expo-local-authentication`, 200 KB bundle) with
@@ -19,23 +21,24 @@ Scoring: **Implemented** · **Partial** · **Planned/flagged-off** · **Not impl
 
 ## Score summary
 
-| Section | Implemented | Partial | Planned | Not built | Evolved |
+| Section | Implemented | Partial | Not built | Evolved | Items |
 |---|---|---|---|---|---|
-| Design & styling | 1 | 1 | 0 | 1 | 0 |
-| Content & media | 0 | 0 | 0 | 3 | 0 |
-| Performance & a11y | 1 | 2 | 0 | 2 | 0 |
-| Security & compliance | 1 | 2 | 0 | 2 | 0 |
-| CI/CD | 1 | 1 | 0 | 1 | 0 |
-| Feature flags | 1 | 1 | 0 | 1 | 0 |
-| Coding style | 2 | 1 | 0 | 1 | 0 |
-| Documentation | 0 | 1 | 0 | 1 | 0 |
-| **Product scope** | 8 | 6 | 3 | 2 | 2 |
-| **TOTAL (38 items)** | **15** | **15** | **3** | **14** | **2** |
+| 1. Design & styling | 2 | 0 | 4 | 0 | 6 |
+| 2. Content & media | 0 | 1 | 3 | 0 | 4 |
+| 3. Performance & a11y | 0 | 4 | 1 | 0 | 5 |
+| 4. Security & compliance | 1 | 3 | 2 | 0 | 6 |
+| 5. CI/CD | 3 | 0 | 0 | 1 | 4 |
+| 6. Feature flags | 1 | 5 | 1 | 0 | 7 |
+| 7. Coding style | 3 | 1 | 0 | 2 | 6 |
+| 8. Documentation | 0 | 2 | 1 | 0 | 3 |
+| 9. Product scope | 10 | 10 | 1 | 1 | 22 |
+| **TOTAL** | **20** | **26** | **13** | **4** | **63** |
 
-**Headline: ~39% fully implemented · ~39% partial · ~8% planned · ~37% not built.**
+**Headline: ~32% implemented · ~41% partial · ~21% not built · ~6% evolved** (63 blueprint items in §1–§9; §10 tracks newer work and is not counted).
+Counting rule: each row is classified by its final status, so "Evolved → Implemented" counts as Implemented, and "Evolved → Removed" or "Not built (superseded)" count as Not built.
 The product *core* (tracking, analytics, monetization, budgets) is in good shape. The
-**standards layer** (Tailwind, media pipeline, Lighthouse budget, Open Banking, MDX docs)
-is largely aspirational and was never built.
+**standards layer** (Tailwind, media pipeline, Open Banking, MDX docs) is largely aspirational
+and was never built.
 
 ---
 
@@ -64,7 +67,7 @@ is largely aspirational and was never built.
 | Requirement | Status | Evidence |
 |---|---|---|
 | Main JS bundle ≤ 200 KB gzipped | **Partial — enforced, target unmet** | Measured 2026-11-10 on `277b3c9`: one initial bundle, **4.46 MB raw / 931 KB gzipped** (4.6× the target). `scripts/check-bundle-size.js` + `perf-budget.json` now fail CI (`.github/workflows/performance-budget.yml`) if the gzipped initial or total JS exceeds **975 KB** (baseline + 5%). The 200 KB target is reported on every run. Ratchet `max` down as the bundle shrinks. |
-| Lighthouse ≥ 90 (Perf/A11y/PWA) | **Partial — enforced, perf target unmet** | Baseline (3 runs, production export): Performance **47–51** (LCP ≈ 6.3 s, TBT 1.3–1.7 s), Accessibility **100**, Best practices **100**, SEO **82**. `lighthouserc.json` now fails CI below Perf 35 / A11y 95 / BP 95 / SEO 80 or CLS > 0.1 (median of 3), and warns when LCP > 2.5 s or TBT > 300 ms. The Perf floor sits below the baseline to absorb runner noise; raise it as the bundle shrinks. The PWA category no longer exists in Lighthouse 12. |
+| Lighthouse ≥ 90 (Perf/A11y/PWA) | **Partial — enforced, perf target unmet** | Baseline (3 runs, production export): Performance **47–51** (LCP ≈ 6.3 s, TBT 1.3–1.7 s), Accessibility **100**, Best practices **100**, SEO **82**. `lighthouserc.json` now fails CI below Perf 35 / A11y 95 / BP 95 / SEO 80 or CLS > 0.1 (median of 3), and warns when LCP > 2.5 s or TBT > 300 ms. There is **no** warning for Performance < 90: the ≥ 90 target is tracked here, not in CI. The Perf floor sits below the baseline to absorb runner noise; raise it as the bundle shrinks. The PWA category no longer exists in Lighthouse 12. |
 | WCAG 2.1 AA contrast/focus/alt-text | **Partial** | `accessibilityLabel`/`accessibilityRole`: 12 files. `alt=`: 1 file. No automated contrast audit. |
 | Static generation/SSR for marketing | **Partial** | Expo Router static export (`expo export -p web`) — good for `app/(landing)`, but no per-page SSR/SSG split. |
 | Lighthouse/WebPageTest dashboard in Notion | **Not built** | No dashboard, no Notion. |
@@ -198,10 +201,10 @@ Lighthouse Performance is about **50**. A hard 200 KB / ≥ 90 gate would fail e
 now enforces a **ratchet**:
 
 - `perf-budget.json`: fails above 975 KB gzipped initial or total JS. The target is 200 KB.
-- `lighthouserc.json`: score floors just below the baseline, with the blueprint targets as warnings.
+- `lighthouserc.json`: score floors just below the baseline. It warns on LCP > 2.5 s and TBT > 300 ms; the Performance ≥ 90 target is not a CI warning.
 - `.github/workflows/performance-budget.yml`: runs both on every PR to `main` and every push to `main`, and uploads the reports.
 
-Any growth past today's size now fails the PR instead of slipping in silently. **Next step to
+Growth of up to about 44 KB above the 931 KB baseline still passes. Anything past 975 KB fails the PR instead of slipping in silently. **Next step to
 reach the target:** split the bundle. Lazy-load the tab routes (Expo Router async routes) and
 move heavy dependencies off the initial route (Recharts, Stripe, Sentry, Supabase realtime). Then
 lower `max` with each win.
@@ -235,8 +238,9 @@ These are cases where the code is *better* than the blueprint and the spec is th
 
 ## 13. Verification method
 
-Every status above was derived by querying the git object store for `origin/main` = `9b4b02c3`
-(not the working tree), so the audit reflects what is actually merged:
+Every status above, except the re-measured performance rows (see the note at the top), was derived
+by querying the git object store for `origin/main` = `9b4b02c3`, not the working tree. So the audit
+reflects what was actually merged:
 
 ```bash
 git grep -l -E "<pattern>" origin/main -- <path>   # existence checks
@@ -244,6 +248,7 @@ git show origin/main:<file>                        # content checks
 git ls-tree -r --name-only origin/main             # file-existence checks
 ```
 
-Local branch → `origin/main` content equivalence was checked with `git cherry -v`, which
-compares patch-ids and therefore survives the SHA rewrite of `main`
-(`a70584c0` → `9b4b02c3`).
+To check that a local branch has the same content as `origin/main`, compare trees with
+`git diff --quiet origin/main HEAD`: exit 0 means the tracked content is identical, even after
+the SHA rewrite of `main` (`a70584c0` → `9b4b02c3`). `git cherry -v` is not enough on its own.
+It compares patch-ids, and prints nothing when the local branch is merely behind.
