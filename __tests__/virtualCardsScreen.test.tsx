@@ -80,7 +80,7 @@ describe('Virtual Cards screen', () => {
 
   it('renders last4, brand, status and expiry, and points to the web for full details', async () => {
     mockUseVirtualCardsEnabled.mockReturnValue({ enabled: true, isLoading: false });
-    mockListCards.mockResolvedValue([activeCard]);
+    mockListCards.mockResolvedValue({ cards: [activeCard], complete: true });
 
     const { getByText, queryByText } = renderScreen();
 
@@ -95,7 +95,7 @@ describe('Virtual Cards screen', () => {
 
   it('copies only the last 4 digits', async () => {
     mockUseVirtualCardsEnabled.mockReturnValue({ enabled: true, isLoading: false });
-    mockListCards.mockResolvedValue([activeCard]);
+    mockListCards.mockResolvedValue({ cards: [activeCard], complete: true });
     const { getByLabelText } = renderScreen();
 
     await waitFor(() => getByLabelText('Copy last 4 digits'));
@@ -105,8 +105,8 @@ describe('Virtual Cards screen', () => {
 
   it('freezes a card only after the user confirms', async () => {
     mockUseVirtualCardsEnabled.mockReturnValue({ enabled: true, isLoading: false });
-    mockListCards.mockResolvedValue([activeCard]);
-    mockConfirm.mockResolvedValue(true);
+    mockListCards.mockResolvedValue({ cards: [activeCard], complete: true });
+    mockConfirm.mockResolvedValue('confirmed');
     const { getByLabelText } = renderScreen();
 
     await waitFor(() => getByLabelText('Freeze card'));
@@ -120,8 +120,8 @@ describe('Virtual Cards screen', () => {
 
   it('does not change the card when confirmation is refused', async () => {
     mockUseVirtualCardsEnabled.mockReturnValue({ enabled: true, isLoading: false });
-    mockListCards.mockResolvedValue([activeCard]);
-    mockConfirm.mockResolvedValue(false);
+    mockListCards.mockResolvedValue({ cards: [activeCard], complete: true });
+    mockConfirm.mockResolvedValue('declined');
     const { getByLabelText, findByText } = renderScreen();
 
     await waitFor(() => getByLabelText('Freeze card'));
@@ -131,10 +131,45 @@ describe('Virtual Cards screen', () => {
     expect(mockSetCardLocked).not.toHaveBeenCalled();
   });
 
+  it('refuses to change a card on a device with no screen lock', async () => {
+    mockUseVirtualCardsEnabled.mockReturnValue({ enabled: true, isLoading: false });
+    mockListCards.mockResolvedValue({ cards: [activeCard], complete: true });
+    mockConfirm.mockResolvedValue('no_device_lock');
+    const { getByLabelText, findByText } = renderScreen();
+
+    await waitFor(() => getByLabelText('Freeze card'));
+    fireEvent.press(getByLabelText('Freeze card'));
+
+    expect(await findByText(/Set up a screen lock/)).toBeTruthy();
+    expect(mockSetCardLocked).not.toHaveBeenCalled();
+  });
+
+  it('reports a failed device check instead of throwing', async () => {
+    mockUseVirtualCardsEnabled.mockReturnValue({ enabled: true, isLoading: false });
+    mockListCards.mockResolvedValue({ cards: [activeCard], complete: true });
+    mockConfirm.mockRejectedValue(new Error('biometric hardware error'));
+    const { getByLabelText, findByText } = renderScreen();
+
+    await waitFor(() => getByLabelText('Freeze card'));
+    fireEvent.press(getByLabelText('Freeze card'));
+
+    expect(await findByText('Could not update the card. Please try again.')).toBeTruthy();
+    expect(mockSetCardLocked).not.toHaveBeenCalled();
+  });
+
+  it('does not claim there are no cards when the list could not be fully loaded', async () => {
+    mockUseVirtualCardsEnabled.mockReturnValue({ enabled: true, isLoading: false });
+    mockListCards.mockResolvedValue({ cards: [], complete: false });
+    const { findByText, queryByText } = renderScreen();
+
+    expect(await findByText(/Some of your cards could not be loaded/)).toBeTruthy();
+    expect(queryByText('No virtual cards yet')).toBeNull();
+  });
+
   it('offers unfreeze for a frozen card', async () => {
     mockUseVirtualCardsEnabled.mockReturnValue({ enabled: true, isLoading: false });
-    mockListCards.mockResolvedValue([{ ...activeCard, status: 'inactive' }]);
-    mockConfirm.mockResolvedValue(true);
+    mockListCards.mockResolvedValue({ cards: [{ ...activeCard, status: 'inactive' }], complete: true });
+    mockConfirm.mockResolvedValue('confirmed');
     const { getByLabelText, getByText } = renderScreen();
 
     await waitFor(() => getByText('FROZEN'));
@@ -144,7 +179,7 @@ describe('Virtual Cards screen', () => {
 
   it("shows the card's own transactions from the API", async () => {
     mockUseVirtualCardsEnabled.mockReturnValue({ enabled: true, isLoading: false });
-    mockListCards.mockResolvedValue([activeCard]);
+    mockListCards.mockResolvedValue({ cards: [activeCard], complete: true });
     mockGetCardTransactions.mockResolvedValue([
       {
         id: 'a1',
@@ -169,7 +204,7 @@ describe('Virtual Cards screen', () => {
 
   it('shows an empty state when the user has no cards', async () => {
     mockUseVirtualCardsEnabled.mockReturnValue({ enabled: true, isLoading: false });
-    mockListCards.mockResolvedValue([]);
+    mockListCards.mockResolvedValue({ cards: [], complete: true });
 
     const { getByText, queryByText } = renderScreen();
 

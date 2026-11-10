@@ -53,12 +53,31 @@ describe('virtual card service', () => {
   });
 
   it('lists cards from /list with the bearer token', async () => {
-    mockFetch.mockResolvedValue(ok({ cards: [{ id: 'ic_1', last4: '4242', brand: 'visa', status: 'active' }] }));
-    const cards = await virtualCardService.listCards();
-    expect(cards).toHaveLength(1);
+    mockFetch.mockResolvedValue(ok({ cards: [{ id: 'ic_1', last4: '4242', brand: 'visa', status: 'active' }], has_more: false }));
+    const result = await virtualCardService.listCards();
+    expect(result.cards).toHaveLength(1);
+    expect(result.complete).toBe(true);
     const [url, init] = mockFetch.mock.calls[0];
-    expect(url).toBe('/api/embedded-finance/virtual-cards/list');
+    expect(url).toBe('/api/embedded-finance/virtual-cards/list?limit=100');
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer jwt-123');
+  });
+
+  it('follows next_cursor past empty pages until the list is done', async () => {
+    mockFetch
+      .mockResolvedValueOnce(ok({ cards: [], has_more: true, next_cursor: 'ic_scan_1' }))
+      .mockResolvedValueOnce(ok({ cards: [{ id: 'ic_2', last4: '0002', brand: 'visa', status: 'active' }], has_more: false, next_cursor: null }));
+    const result = await virtualCardService.listCards();
+    expect(result).toMatchObject({ complete: true });
+    expect(result.cards.map((c) => c.id)).toEqual(['ic_2']);
+    expect(mockFetch.mock.calls[1][0]).toBe('/api/embedded-finance/virtual-cards/list?limit=100&starting_after=ic_scan_1');
+  });
+
+  it('reports an incomplete list when the request budget runs out', async () => {
+    let n = 0;
+    mockFetch.mockImplementation(async () => ok({ cards: [], has_more: true, next_cursor: `ic_${(n += 1)}` }));
+    const result = await virtualCardService.listCards();
+    expect(result).toEqual({ cards: [], complete: false });
+    expect(mockFetch).toHaveBeenCalledTimes(10);
   });
 
   it('freezes through PATCH /:id/update with status inactive', async () => {

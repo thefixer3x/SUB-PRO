@@ -47,6 +47,7 @@ export default function VirtualCardsScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [listComplete, setListComplete] = useState(true);
 
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -60,7 +61,9 @@ export default function VirtualCardsScreen() {
 
     try {
       setError(null);
-      setCards(await virtualCardService.listCards());
+      const result = await virtualCardService.listCards();
+      setCards(result.cards);
+      setListComplete(result.complete);
     } catch (caught) {
       console.error('Failed to load virtual cards:', caught);
       setCards([]);
@@ -142,7 +145,7 @@ export default function VirtualCardsScreen() {
               <Text style={styles.emptyTitle}>{error}</Text>
               <Text style={styles.emptySubtitle}>Pull down to try again.</Text>
             </View>
-          ) : cards.length === 0 ? (
+          ) : cards.length === 0 && listComplete ? (
             <View style={styles.emptyState}>
               <CreditCard size={40} color={colors.textMuted} />
               <Text style={styles.emptyTitle}>No virtual cards yet</Text>
@@ -151,9 +154,16 @@ export default function VirtualCardsScreen() {
               </Text>
             </View>
           ) : (
-            cards.map((card) => (
-              <VirtualCardItem key={card.id} card={card} colors={colors} onChanged={loadCards} />
-            ))
+            <>
+              {cards.map((card) => (
+                <VirtualCardItem key={card.id} card={card} colors={colors} onChanged={loadCards} />
+              ))}
+              {!listComplete && (
+                <Text style={styles.emptySubtitle}>
+                  Some of your cards could not be loaded. Pull down to try again.
+                </Text>
+              )}
+            </>
           )}
         </View>
 
@@ -188,13 +198,17 @@ const VirtualCardItem: React.FC<{
 
   const toggleLock = async () => {
     setMessage(null);
-    const ok = await confirmCardAction(locked ? 'Unfreeze card' : 'Freeze card');
-    if (!ok) {
-      setMessage('Not confirmed. The card was not changed.');
-      return;
-    }
     setBusy(true);
     try {
+      const check = await confirmCardAction(locked ? 'Unfreeze card' : 'Freeze card');
+      if (check === 'no_device_lock') {
+        setMessage('Set up a screen lock (PIN, Face ID or fingerprint) on this device to change cards.');
+        return;
+      }
+      if (check !== 'confirmed') {
+        setMessage('Not confirmed. The card was not changed.');
+        return;
+      }
       await virtualCardService.setCardLocked(card.id, !locked);
       onChanged();
     } catch {

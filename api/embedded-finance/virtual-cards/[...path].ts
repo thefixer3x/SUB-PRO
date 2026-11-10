@@ -183,9 +183,12 @@ export async function handler(request: Request): Promise<Response> {
       } catch {
         return json(400, { error: 'Invalid JSON body' }, origin);
       }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return json(400, { error: 'Invalid JSON body' }, origin);
+      }
       const result = await vc.createCardEphemeralKey(segments[0], userId, {
-        nonce: body?.nonce,
-        stripeVersion: request.headers.get('stripe-version') ?? body?.stripeVersion,
+        nonce: body.nonce,
+        stripeVersion: request.headers.get('stripe-version') ?? body.stripeVersion,
       });
       if (!result.ok) return json(result.status, { error: result.error }, origin);
       return json(200, result.data, origin);

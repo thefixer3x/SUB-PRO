@@ -16,7 +16,13 @@ let stripePromise: Promise<Stripe | null> | null = null;
 const getStripe = () => {
   if (!stripePromise) {
     stripePromise = stripeConfig.publishableKey
-      ? loadStripe(stripeConfig.publishableKey, { apiVersion: STRIPE_ELEMENTS_API_VERSION })
+      ? loadStripe(stripeConfig.publishableKey, { apiVersion: STRIPE_ELEMENTS_API_VERSION }).catch(
+          (e) => {
+            // Let the next press retry instead of reusing a failed load.
+            stripePromise = null;
+            throw e;
+          },
+        )
       : Promise.resolve(null);
   }
   return stripePromise;
@@ -59,7 +65,7 @@ export function CardRevealPanel({ cardId }: Props) {
     setError(null);
     setState('loading');
     try {
-      if (!(await confirmCardAction('Show card details'))) {
+      if ((await confirmCardAction('Show card details')) !== 'confirmed') {
         throw new Error('Your session has expired. Please sign in again.');
       }
       const stripe = await getStripe();

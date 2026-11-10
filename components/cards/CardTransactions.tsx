@@ -22,6 +22,8 @@ export function CardTransactions({ cardId }: { cardId: string }) {
 
   useEffect(() => {
     let cancelled = false;
+    setRows(null);
+    setError(null);
     virtualCardService
       .getCardTransactions(cardId)
       .then((r) => !cancelled && setRows(r))

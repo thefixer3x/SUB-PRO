@@ -67,6 +67,8 @@ export function toCardSummary(raw: RawCard): VirtualCardSummary | null {
   };
 }
 
+const MAX_LIST_REQUESTS = 10;
+
 class VirtualCardService {
   private readonly apiBases: string[];
 
@@ -111,11 +113,32 @@ class VirtualCardService {
     );
   }
 
-  async listCards(): Promise<VirtualCardSummary[]> {
-    const payload = await this.request<{ cards?: RawCard[] }>('/embedded-finance/virtual-cards/list');
-    return (payload.cards ?? [])
-      .map(toCardSummary)
-      .filter((c): c is VirtualCardSummary => c !== null);
+  /**
+   * All of the user's cards. The server scans the shared Stripe account a few
+   * pages at a time and can return an empty page with a cursor, so follow
+   * `next_cursor` while `has_more` is set. `complete` is false only if the
+   * request budget ran out first, so the screen never presents a partial list
+   * as the whole list.
+   */
+  async listCards(): Promise<{ cards: VirtualCardSummary[]; complete: boolean }> {
+    const cards: VirtualCardSummary[] = [];
+    let cursor: string | null = null;
+    for (let i = 0; i < MAX_LIST_REQUESTS; i += 1) {
+      const query: string = cursor
+        ? `?limit=100&starting_after=${encodeURIComponent(cursor)}`
+        : '?limit=100';
+      const page: { cards?: RawCard[]; has_more?: boolean; next_cursor?: string | null } =
+        await this.request(`/embedded-finance/virtual-cards/list${query}`);
+      for (const raw of page.cards ?? []) {
+        const card = toCardSummary(raw);
+        if (card) cards.push(card);
+      }
+      if (!page.has_more || !page.next_cursor || page.next_cursor === cursor) {
+        return { cards, complete: true };
+      }
+      cursor = page.next_cursor;
+    }
+    return { cards, complete: false };
   }
 
   /** Freeze (inactive) or unfreeze (active) a card the user owns. */
