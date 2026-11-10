@@ -6,6 +6,14 @@
   "trailingSlash": false,
   "rewrites": [
     {
+      "source": "/api/embedded-finance/plan/([^/]+)/(.+)",
+      "destination": "/api/embedded-finance/plan/$1"
+    },
+    {
+      "source": "/api/embedded-finance/virtual-cards/([^/]+)/(.+)",
+      "destination": "/api/embedded-finance/virtual-cards/$1"
+    },
+    {
       "source": "/((?!api/|_expo|static|favicon.ico|manifest.json|service-worker.js).*)",
       "destination": "/index.html"
     }
