@@ -62,3 +62,6 @@ build-result.json
 # Local git worktrees created by the orchestrator
 .worktrees/
 graphify-out/
+
+# Lighthouse CI output
+.lighthouseci/
