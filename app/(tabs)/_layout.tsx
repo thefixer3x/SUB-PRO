@@ -108,6 +108,7 @@ export default function TabLayout() {
       <Tabs.Screen name="marketplace" options={{ href: null }} />
       <Tabs.Screen name="upgrade" options={{ href: null }} />
       <Tabs.Screen name="reminder-settings" options={{ href: null }} />
+      <Tabs.Screen name="features" options={{ href: null }} />
     </Tabs>
   );
 }

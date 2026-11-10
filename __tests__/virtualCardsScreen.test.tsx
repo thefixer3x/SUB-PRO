@@ -21,6 +21,12 @@ jest.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'user-1' } }),
 }));
 
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
+jest.mock('@/hooks/useSubscription', () => ({
+  useSubscription: () => ({ currentTier: 'free', canAccessFeature: () => false }),
+}));
+
 import VirtualCardsScreen from '@/app/(tabs)/virtual-cards';
 
 const renderScreen = () =>
@@ -55,9 +61,13 @@ describe('Virtual Cards screen', () => {
   });
 
   it('shows a coming soon screen and no card fields when the flag is off', () => {
-    const { getByText, queryByText } = renderScreen();
+    const { getAllByText, getByTestId, queryByText } = renderScreen();
 
-    expect(getByText('Coming soon')).toBeTruthy();
+    expect(getAllByText('Coming soon').length).toBeGreaterThan(0);
+    // What the cards will do is described, but nothing can be opened yet.
+    expect(getByTestId('feature-card-virtual-cards')).toBeTruthy();
+    expect(getByTestId('feature-card-card-freeze')).toBeTruthy();
+    expect(queryByText('Open')).toBeNull();
     expect(queryByText(/MUST-NOT-RENDER/)).toBeNull();
     expect(queryByText(/••••/)).toBeNull();
     expect(queryByText('ACTIVE')).toBeNull();

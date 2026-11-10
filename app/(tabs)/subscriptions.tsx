@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { SubscriptionLogo } from '@/components/SubscriptionLogo';
-import { Plus, Search, CreditCard, Bot, ExternalLink, Share2, Brain } from 'lucide-react-native';
+import { Plus, Search, Share2, ChevronRight } from 'lucide-react-native';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,15 +11,18 @@ import { getDashboardStats } from '@/utils/subscriptionMath';
 import type { Subscription } from '@/types/subscription';
 import { ThemeColors } from '@/constants/theme';
 import { AdBanner } from '@/components/monetization/AdBanner';
-import { FeatureGate } from '@/components/monetization/FeatureGate';
-import { VirtualCardManager } from '@/components/embeddedFinance/VirtualCardManager';
-import { VirtualCardInlineView } from '@/components/VirtualCardInlineView';
-import { CancellationBot } from '@/components/embeddedFinance/CancellationBot';
-import { AIAssistant } from '@/components/embeddedFinance/AIAssistant';
-import { SmartNotifications } from '@/components/embeddedFinance/SmartNotifications';
 import { ShareSubscriptionModal } from '@/components/social/ShareSubscriptionModal';
-import { ShareButton } from '@/components/social/ShareButton';
 import { PoweredByLanOnasis } from '@/components/branding/PoweredByLanOnasis';
+import { AddSubscriptionModal } from '@/components/subscriptions/AddSubscriptionModal';
+import { FeaturePreviewCard } from '@/components/features/FeaturePreviewCard';
+import { getFeature, STATUS_LABEL } from '@/config/featureCatalog';
+
+// Per-subscription actions that are not built yet. They are named here so the
+// user knows they are coming, but nothing simulated is rendered (no sample
+// card numbers, invented usage or fake approvals).
+const UPCOMING_ACTIONS = ['virtual-cards', 'card-freeze', 'cancellation-assistant']
+  .map((id) => getFeature(id))
+  .filter((f): f is NonNullable<typeof f> => !!f);
 
 /** Format a number as a locale-aware currency string, defaulting to USD. */
 function fmtCurrency(amount: number, currency = 'USD'): string {
@@ -34,6 +37,14 @@ function fmtCurrency(amount: number, currency = 'USD'): string {
     return `${currency} ${amount.toFixed(2)}`;
   }
 }
+
+/** The amount is charged once per billing cycle. */
+const CYCLE_UNIT: Record<string, string> = {
+  Weekly: 'week',
+  Monthly: 'month',
+  Quarterly: 'quarter',
+  Annually: 'year',
+};
 
 /** Normalised monthly cost used in the summary bar. */
 function toMonthly(sub: Subscription): number {
@@ -51,11 +62,8 @@ export default function Subscriptions() {
   const { colors } = useTheme();
   const { user } = useAuth();
   const dynamicStyles = React.useMemo(() => createStyles(colors), [colors]);
-  const [showVirtualCards, setShowVirtualCards] = useState<string | null>(null);
-  const [showCancellationBot, setShowCancellationBot] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState<string | null>(null);
-  const [expandedVirtualCard, setExpandedVirtualCard] = useState<string | null>(null);
-  const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
 
   const userId = user?.id;
   const { data: subscriptions, isLoading, error } = useSubscriptions(userId);
@@ -69,24 +77,16 @@ export default function Subscriptions() {
     ? subscriptions.reduce((sum, s) => sum + toMonthly(s), 0)
     : 0;
 
-  const handleShareSubscription = (subscriptionId: string) => {
-    setShowShareModal(subscriptionId);
-  };
-
+  // The plan cap is checked against the real list inside the add form.
   const remainingSlots = getRemainingLimit('maxSubscriptions');
-  const canAddMore = canAccessFeature('maxSubscriptions');
+  const canShare = canAccessFeature('subscriptionSharing');
 
-  const handleAddSubscription = () => {
-    if (!canAddMore) {
-      console.log('Upgrade required to add more subscriptions');
+  const handleShare = (subscriptionId: string) => {
+    if (!canShare) {
+      router.push('/(tabs)/upgrade');
       return;
     }
-    console.log('Add new subscription');
-  };
-
-  const handleSwitchPlan = (_subscription: Subscription) => {
-    // Vendor URL handling is deferred to S304+; open subscription name in search.
-    console.log('Switch plan for:', _subscription.name);
+    setShowShareModal(subscriptionId);
   };
 
   const renderSubscriptionCard = (subscription: Subscription) => (
@@ -103,6 +103,7 @@ export default function Subscriptions() {
         </View>
         <Text style={dynamicStyles.subscriptionCost}>
           {fmtCurrency(subscription.monthlyCost, subscription.currency)}
+          <Text style={dynamicStyles.subscriptionPlan}> / {CYCLE_UNIT[subscription.billingCycle] ?? 'cycle'}</Text>
         </Text>
       </View>
       <Text style={dynamicStyles.subscriptionPlan}>{subscription.planName}</Text>
@@ -110,123 +111,32 @@ export default function Subscriptions() {
         Next billing: {new Date(subscription.renewalDate).toLocaleDateString()}
       </Text>
       
-      {/* Embedded Finance Section */}
-      <FeatureGate
-        feature="smartInsights"
-        requiredTier="pro"
-        fallback={
-          <View style={dynamicStyles.embeddedFinanceSection}>
-            <View style={dynamicStyles.embeddedFinanceHeader}>
-              <Text style={dynamicStyles.embeddedFinanceTitle}>Embedded Finance</Text>
-              <Text style={dynamicStyles.embeddedFinanceSubtitle}>Advanced financial services for your subscriptions</Text>
-            </View>
-            <View style={dynamicStyles.featureComingSoon}>
-              <Text style={dynamicStyles.comingSoonText}>Virtual Cards for secure payments</Text>
-              <Text style={dynamicStyles.comingSoonText}>Credit services - we pay upfront</Text>
-              <Text style={dynamicStyles.comingSoonText}>Automated cancellation bot</Text>
-              <Text style={dynamicStyles.comingSoonText}>Payment optimization</Text>
-              <Text style={dynamicStyles.upgradePrompt}>Upgrade to Pro to unlock these features</Text>
-            </View>
-          </View>
-        }
+      <View style={dynamicStyles.embeddedFinanceActions}>
+        <TouchableOpacity
+          style={dynamicStyles.embeddedAction}
+          onPress={() => handleShare(subscription.id.toString())}
+          accessibilityRole="button"
+          accessibilityLabel={`Share ${subscription.name}`}
+        >
+          <Share2 size={16} color={colors.info} />
+          <Text style={dynamicStyles.embeddedActionText}>
+            {canShare ? 'Share' : 'Share (Pro)'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity
+        style={dynamicStyles.upcomingRow}
+        onPress={() => router.push('/(tabs)/features')}
+        accessibilityRole="link"
+        accessibilityLabel="See what is coming for your subscriptions"
       >
-        <View style={dynamicStyles.embeddedFinanceSection}>
-          <View style={dynamicStyles.embeddedFinanceHeader}>
-            <Text style={dynamicStyles.embeddedFinanceTitle}>Embedded Finance</Text>
-            <Text style={dynamicStyles.embeddedFinanceSubtitle}>Advanced financial services for your subscriptions</Text>
-          </View>
-
-          <VirtualCardInlineView
-            subscriptionId={subscription.id.toString()}
-            subscriptionName={subscription.name}
-            userId="current-user-id"
-            expanded={expandedVirtualCard === subscription.id.toString()}
-            onToggle={() => {
-              setExpandedVirtualCard(
-                expandedVirtualCard === subscription.id.toString() 
-                  ? null 
-                  : subscription.id.toString()
-              );
-            }}
-          />
-
-          <View style={dynamicStyles.financeServiceCard}>
-            <View style={dynamicStyles.serviceHeader}>
-              <Text style={dynamicStyles.serviceTitle}>Credit Service</Text>
-              <Text style={dynamicStyles.comingSoonBadge}>Coming Soon</Text>
-            </View>
-            <Text style={dynamicStyles.serviceDescription}>
-              We pay for this subscription upfront. Settle all payments monthly with flexible terms.
-            </Text>
-          </View>
-
-          <FeatureGate
-            feature="smartInsights"
-            requiredTier="pro"
-            fallback={
-              <View style={dynamicStyles.financeServiceCard}>
-                <View style={dynamicStyles.serviceHeader}>
-                  <Text style={dynamicStyles.serviceTitle}>AI Assistant</Text>
-                  <Text style={dynamicStyles.futureFlagBadge}>Premium Feature</Text>
-                </View>
-                <Text style={dynamicStyles.serviceDescription}>
-                  Get personalized recommendations on which subscriptions to pause, cancel, or optimize based on your usage patterns and spending habits.
-                </Text>
-              </View>
-            }
-          >
-            <View style={dynamicStyles.financeServiceCard}>
-              <View style={dynamicStyles.serviceHeader}>
-                <Text style={dynamicStyles.serviceTitle}>AI Assistant</Text>
-                <Text style={dynamicStyles.activeBadge}>Active</Text>
-              </View>
-              <Text style={dynamicStyles.serviceDescription}>
-                Your personal subscription optimizer. Get AI-powered insights and recommendations.
-              </Text>
-              <TouchableOpacity
-                style={dynamicStyles.serviceActionButton}
-                onPress={() => setShowAIAssistant(true)}
-              >
-                <Brain size={16} color={colors.info} />
-                <Text style={dynamicStyles.serviceActionText}>Open AI Assistant</Text>
-              </TouchableOpacity>
-            </View>
-          </FeatureGate>
-
-          <View style={dynamicStyles.embeddedFinanceActions}>
-            <TouchableOpacity
-              style={dynamicStyles.embeddedAction}
-              onPress={() => setShowCancellationBot(subscription.id.toString())}
-            >
-              <Bot size={16} color={colors.warning} />
-              <Text style={dynamicStyles.embeddedActionText}>Cancel via Bot</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={dynamicStyles.embeddedAction}
-              onPress={() => handleShareSubscription(subscription.id.toString())}
-            >
-              <Share2 size={16} color={colors.info} />
-              <Text style={dynamicStyles.embeddedActionText}>Share</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={dynamicStyles.embeddedAction}
-              onPress={() => handleSwitchPlan(subscription)}
-            >
-              <ExternalLink size={16} color={colors.success} />
-              <Text style={dynamicStyles.embeddedActionText}>
-                Switch Plan
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </FeatureGate>
+        <Text style={dynamicStyles.upcomingText} numberOfLines={2}>
+          {STATUS_LABEL.coming_soon}: {UPCOMING_ACTIONS.map((f) => f.title).join(' · ')}
+        </Text>
+        <ChevronRight size={16} color={colors.textMuted} />
+      </TouchableOpacity>
     </View>
-  );
-
-  const currentSubscription = subscriptions?.find(sub =>
-    sub.id === showVirtualCards || sub.id === showCancellationBot,
   );
 
   return (
@@ -265,14 +175,12 @@ export default function Subscriptions() {
           </View>
 
           <TouchableOpacity
-            style={[
-              dynamicStyles.addButton,
-              !canAddMore && dynamicStyles.addButtonDisabled,
-            ]}
-            onPress={handleAddSubscription}
-            disabled={!canAddMore}
+            style={dynamicStyles.addButton}
+            onPress={() => setShowAdd(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Add subscription"
           >
-            <Plus size={20} color={canAddMore ? "#ffffff" : colors.textMuted} />
+            <Plus size={20} color="#ffffff" />
           </TouchableOpacity>
         </View>
 
@@ -288,6 +196,13 @@ export default function Subscriptions() {
             <Text style={dynamicStyles.emptySubtitle}>
               Add your first subscription to start tracking spending.
             </Text>
+            <TouchableOpacity
+              style={dynamicStyles.emptyAddButton}
+              onPress={() => setShowAdd(true)}
+              accessibilityRole="button"
+            >
+              <Text style={dynamicStyles.emptyAddButtonText}>Add your first subscription</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <View style={dynamicStyles.subscriptionsList}>
@@ -295,22 +210,9 @@ export default function Subscriptions() {
           </View>
         )}
 
-        <FeatureGate
-          feature="bulkUpload"
-          requiredTier="pro"
-          fallback={
-            <View style={dynamicStyles.featurePrompt}>
-              <Text style={dynamicStyles.featurePromptTitle}>Bulk Import</Text>
-              <Text style={dynamicStyles.featurePromptText}>
-                Import multiple subscriptions at once with CSV upload. Available in Pro plan.
-              </Text>
-            </View>
-          }
-        >
-          <TouchableOpacity style={dynamicStyles.bulkUploadButton}>
-            <Text style={dynamicStyles.bulkUploadText}>Import from CSV</Text>
-          </TouchableOpacity>
-        </FeatureGate>
+        <View style={dynamicStyles.previewSection}>
+          {getFeature('bulk-import') && <FeaturePreviewCard feature={getFeature('bulk-import')!} />}
+        </View>
 
         {currentTier === 'free' && <AdBanner placement="subscriptions" size="medium-rectangle" />}
 
@@ -335,31 +237,6 @@ export default function Subscriptions() {
         </View>
       </ScrollView>
 
-      {/* Virtual Card Manager Modal */}
-      {showVirtualCards && currentSubscription && (
-        <VirtualCardManager
-          subscriptionId={showVirtualCards}
-          userId={userId ?? ''}
-          visible={!!showVirtualCards}
-          onClose={() => setShowVirtualCards(null)}
-        />
-      )}
-
-      {/* Cancellation Bot Modal */}
-      {showCancellationBot && currentSubscription && (
-        <CancellationBot
-          subscriptionId={showCancellationBot}
-          userId={userId ?? ''}
-          vendorUrl=""
-          subscriptionName={currentSubscription.name}
-          visible={!!showCancellationBot}
-          onClose={() => setShowCancellationBot(null)}
-          onSuccess={() => {
-            setShowCancellationBot(null);
-          }}
-        />
-      )}
-
       {/* Share Subscription Modal */}
       {showShareModal && (
         <ShareSubscriptionModal
@@ -370,24 +247,41 @@ export default function Subscriptions() {
         />
       )}
 
-      {/* AI Assistant Modal */}
-      <AIAssistant
-        subscriptions={subscriptions ?? []}
-        userId={userId ?? ''}
-        visible={showAIAssistant}
-        onClose={() => setShowAIAssistant(false)}
-      />
-
-      {/* Smart Notifications */}
-      <SmartNotifications
-        subscriptions={subscriptions ?? []}
-        userId={userId ?? ''}
-      />
+      <AddSubscriptionModal visible={showAdd} onClose={() => setShowAdd(false)} />
     </SafeAreaView>
   );
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  upcomingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+    gap: 6,
+  },
+  upcomingText: {
+    flex: 1,
+    fontSize: 12,
+    color: colors.textMuted,
+  },
+  emptyAddButton: {
+    marginTop: 16,
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  emptyAddButtonText: {
+    color: colors.textInverse,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  previewSection: {
+    paddingHorizontal: 20,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.background,
