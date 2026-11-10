@@ -597,3 +597,131 @@ export const updateCard = async (
     return { ok: false, error: 'Failed to update card' };
   }
 };
+
+// ── S304: secure reveal and transactions ───────────────────────────────────
+
+/**
+ * Stripe Issuing Elements nonces look like `ephkn_pub_...`, and the Stripe
+ * version is the client library's dated API version. Both are checked before
+ * any Stripe call so a malformed request cannot reach the API.
+ */
+const NONCE_RE = /^ephkn_[A-Za-z0-9_]{8,200}$/;
+const STRIPE_VERSION_RE = /^\d{4}-\d{2}-\d{2}(\.[a-z]+)?$/;
+
+export interface EphemeralKeyInput {
+  nonce: unknown;
+  stripeVersion: unknown;
+}
+
+export interface EphemeralKeyOutput {
+  /** Short-lived secret that lets Issuing Elements show this one card. */
+  secret: string;
+  /** Unix seconds. */
+  expires: number;
+}
+
+/**
+ * Create an ephemeral key for exactly one card the caller owns. The browser
+ * hands it to Stripe Issuing Elements, which fetch and draw the number and
+ * CVC inside Stripe's own iframe: the full card details never pass through
+ * this server, the API response or app state.
+ */
+export const createCardEphemeralKey = async (
+  cardId: string,
+  userId: string,
+  input: EphemeralKeyInput,
+): Promise<{ ok: true; data: EphemeralKeyOutput } | { ok: false; error: string; status: number }> => {
+  if (typeof input.nonce !== 'string' || !NONCE_RE.test(input.nonce)) {
+    return { ok: false, error: 'Invalid nonce', status: 400 };
+  }
+  if (typeof input.stripeVersion !== 'string' || !STRIPE_VERSION_RE.test(input.stripeVersion)) {
+    return { ok: false, error: 'Invalid Stripe version', status: 400 };
+  }
+
+  const ownershipError = await verifyCardOwnership(cardId, userId);
+  if (ownershipError) return { ok: false, error: ownershipError, status: 403 };
+
+  try {
+    const client = ensureStripe();
+    const card = await client.issuing.cards.retrieve(cardId);
+    if (card.metadata?.user_id !== userId) {
+      return { ok: false, error: 'Access denied', status: 403 };
+    }
+
+    const key = await client.ephemeralKeys.create(
+      { issuing_card: cardId, nonce: input.nonce },
+      { apiVersion: input.stripeVersion },
+    );
+    if (!key.secret) return { ok: false, error: 'Could not create a reveal key', status: 502 };
+
+    return { ok: true, data: { secret: key.secret, expires: key.expires } };
+  } catch (error) {
+    console.error(
+      '[server/virtual-cards] Ephemeral key failed:',
+      (error as { message?: string })?.message ?? 'unknown error',
+    );
+    return { ok: false, error: 'Could not create a reveal key', status: 502 };
+  }
+};
+
+export interface CardTransaction {
+  id: string;
+  /** Minor units (cents), as Stripe reports them. */
+  amount: number;
+  currency: string;
+  merchantName: string | null;
+  merchantCategory: string | null;
+  approved: boolean;
+  date: string;
+  livemode: boolean;
+}
+
+/** Authorizations recorded by the webhook for one card the caller owns. */
+export const listCardTransactions = async (
+  cardId: string,
+  userId: string,
+  limit = 20,
+): Promise<{ ok: true; data: CardTransaction[] } | { ok: false; error: string; status: number }> => {
+  const ownershipError = await verifyCardOwnership(cardId, userId);
+  if (ownershipError) return { ok: false, error: ownershipError, status: 403 };
+
+  const adminClient = createSupabaseAdmin();
+  if (!adminClient) return { ok: false, error: 'Transactions service is not configured', status: 503 };
+
+  const { data, error } = await adminClient
+    .from('card_authorizations')
+    .select('id, amount, currency, merchant_name, merchant_category, approved, transaction_date, livemode')
+    .eq('stripe_card_id', cardId)
+    .order('transaction_date', { ascending: false })
+    .limit(Math.max(1, Math.min(limit, 100)));
+
+  if (error) {
+    console.error('[server/virtual-cards] Transactions read failed:', error.message);
+    return { ok: false, error: 'Failed to load transactions', status: 500 };
+  }
+
+  type Row = {
+    id: string;
+    amount: number | string | null;
+    currency: string | null;
+    merchant_name: string | null;
+    merchant_category: string | null;
+    approved: boolean | null;
+    transaction_date: string | null;
+    livemode: boolean | null;
+  };
+
+  return {
+    ok: true,
+    data: ((data ?? []) as Row[]).map((r) => ({
+      id: r.id,
+      amount: Number(r.amount ?? 0),
+      currency: (r.currency ?? 'usd').toLowerCase(),
+      merchantName: r.merchant_name,
+      merchantCategory: r.merchant_category,
+      approved: r.approved === true,
+      date: r.transaction_date ?? '',
+      livemode: r.livemode !== false,
+    })),
+  };
+};

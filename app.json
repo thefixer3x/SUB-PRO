@@ -84,6 +84,12 @@
       "expo-web-browser",
       "expo-document-picker",
       [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Use Face ID to securely access your subscription data."
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "The app accesses your photos to let you select subscription documents.",

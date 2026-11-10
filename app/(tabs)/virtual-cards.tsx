@@ -8,12 +8,16 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
-import { CreditCard, Eye } from 'lucide-react-native';
+import { CreditCard, Copy, Snowflake, Play, ChevronDown, ChevronUp } from 'lucide-react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ThemeColors } from '@/constants/theme';
 import { useVirtualCardsEnabled } from '@/hooks/useFeatureFlags';
-import { virtualCardService } from '@/services/virtualCards';
+import { virtualCardService, type VirtualCardSummary } from '@/services/virtualCards';
+import { CardRevealPanel } from '@/components/cards/CardRevealPanel';
+import { CardTransactions } from '@/components/cards/CardTransactions';
+import { confirmCardAction } from '@/components/cards/cardSecurity';
 import { FeaturePreviewCard } from '@/components/features/FeaturePreviewCard';
 import { getFeature } from '@/config/featureCatalog';
 
@@ -22,64 +26,6 @@ import { getFeature } from '@/config/featureCatalog';
 const CARD_PREVIEWS = ['virtual-cards', 'card-freeze', 'cancellation-assistant']
   .map((id) => getFeature(id))
   .filter((f): f is NonNullable<typeof f> => !!f);
-
-/**
- * The only card data this screen is allowed to render.
- *
- * A card number, expiry or CVV must never reach the client in the first place
- * (the issuer only hands out `last4` and `brand`), and the screen must not
- * invent one either — see docs/agents/EXECUTION_PLAN.md, card S103.
- */
-interface VirtualCardSummary {
-  id: string;
-  last4?: string;
-  brand?: string;
-  status?: string;
-}
-
-const asRecord = (value: unknown): Record<string, unknown> =>
-  value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
-
-/**
- * Reduce a card payload to the fields we are allowed to show.
- *
- * Anything that is not a recognised plain string is dropped rather than
- * displayed, so an unexpected payload can never leak a card number, an expiry
- * or a CVV into the UI.
- */
-const toCardSummary = (raw: unknown): VirtualCardSummary | null => {
-  const card = asRecord(raw);
-  const id = typeof card.id === 'string' ? card.id : '';
-  if (!id) {
-    return null;
-  }
-
-  return {
-    id,
-    last4: typeof card.last4 === 'string' ? card.last4 : undefined,
-    brand: typeof card.brand === 'string' ? card.brand : undefined,
-    status: typeof card.status === 'string' ? card.status : undefined,
-  };
-};
-
-/**
- * Normalise the list payload.
- *
- * The list endpoint answers with `{ cards: [...] }`; the service is typed as a
- * bare array. Both shapes are accepted, and anything else yields an empty list
- * rather than a partially rendered card.
- */
-const toCardSummaries = (payload: unknown): VirtualCardSummary[] => {
-  const list = Array.isArray(payload)
-    ? payload
-    : Array.isArray(asRecord(payload).cards)
-      ? (asRecord(payload).cards as unknown[])
-      : [];
-
-  return list
-    .map(toCardSummary)
-    .filter((card): card is VirtualCardSummary => card !== null);
-};
 
 const statusTone = (status?: string): 'success' | 'warning' | 'error' => {
   switch (status) {
@@ -101,6 +47,7 @@ export default function VirtualCardsScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [listComplete, setListComplete] = useState(true);
 
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -114,8 +61,9 @@ export default function VirtualCardsScreen() {
 
     try {
       setError(null);
-      const payload: unknown = await virtualCardService.getCardsByUser(userId);
-      setCards(toCardSummaries(payload));
+      const result = await virtualCardService.listCards();
+      setCards(result.cards);
+      setListComplete(result.complete);
     } catch (caught) {
       console.error('Failed to load virtual cards:', caught);
       setCards([]);
@@ -197,7 +145,7 @@ export default function VirtualCardsScreen() {
               <Text style={styles.emptyTitle}>{error}</Text>
               <Text style={styles.emptySubtitle}>Pull down to try again.</Text>
             </View>
-          ) : cards.length === 0 ? (
+          ) : cards.length === 0 && listComplete ? (
             <View style={styles.emptyState}>
               <CreditCard size={40} color={colors.textMuted} />
               <Text style={styles.emptyTitle}>No virtual cards yet</Text>
@@ -206,76 +154,158 @@ export default function VirtualCardsScreen() {
               </Text>
             </View>
           ) : (
-            cards.map((card) => (
-              <VirtualCardItem key={card.id} card={card} colors={colors} />
-            ))
+            <>
+              {cards.map((card) => (
+                <VirtualCardItem key={card.id} card={card} colors={colors} onChanged={loadCards} />
+              ))}
+              {!listComplete && (
+                <Text style={styles.emptySubtitle}>
+                  Some of your cards could not be loaded. Pull down to try again.
+                </Text>
+              )}
+            </>
           )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Transactions</Text>
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>No transactions to show yet</Text>
-            <Text style={styles.emptySubtitle}>
-              Transaction history becomes available once your cards are in use.
-            </Text>
-          </View>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 // Virtual Card Item Component
+//
+// Shows last4, brand, status and expiry only. The full number and CVC are
+// drawn by Stripe on web (CardRevealPanel) and never shown in the native app.
 const VirtualCardItem: React.FC<{
   card: VirtualCardSummary;
   colors: ThemeColors;
-}> = ({ card, colors }) => {
+  onChanged: () => void;
+}> = ({ card, colors, onChanged }) => {
   const styles = createStyles(colors);
   const tone = statusTone(card.status);
   const toneColor = colors[tone];
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [showTransactions, setShowTransactions] = useState(false);
+  const locked = card.status === 'inactive';
+  const canceled = card.status === 'canceled';
+
+  const copyLast4 = async () => {
+    // Only the last 4 digits are ever copied.
+    await Clipboard.setStringAsync(card.last4);
+    setMessage('Last 4 digits copied.');
+  };
+
+  const toggleLock = async () => {
+    setMessage(null);
+    setBusy(true);
+    try {
+      const check = await confirmCardAction(locked ? 'Unfreeze card' : 'Freeze card');
+      if (check === 'no_device_lock') {
+        setMessage('Set up a screen lock (PIN, Face ID or fingerprint) on this device to change cards.');
+        return;
+      }
+      if (check !== 'confirmed') {
+        setMessage('Not confirmed. The card was not changed.');
+        return;
+      }
+      await virtualCardService.setCardLocked(card.id, !locked);
+      onChanged();
+    } catch {
+      setMessage('Could not update the card. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
-    <View style={[styles.cardItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <View
+      style={[styles.cardItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+      testID={`virtual-card-${card.id}`}
+    >
       <View style={styles.cardHeader}>
         <View style={styles.cardInfo}>
           <View style={styles.cardBrand}>
             <CreditCard size={24} color={toneColor} />
-            <Text style={[styles.cardBrandText, { color: colors.text }]}>
-              {card.brand ? card.brand.toUpperCase() : 'CARD'}
-            </Text>
-            <Text style={[styles.cardLast4, { color: colors.text }]}>
-              •••• {card.last4 ?? '••••'}
+            <Text style={[styles.cardBrandText, { color: colors.text }]}>{card.brand.toUpperCase()}</Text>
+            <Text style={[styles.cardLast4, { color: colors.text }]}>•••• {card.last4}</Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: toneColor + '20' }]}>
+            <Text style={[styles.statusText, { color: toneColor }]}>
+              {locked ? 'FROZEN' : card.status.toUpperCase()}
             </Text>
           </View>
-          {card.status ? (
-            <View style={[styles.statusBadge, { backgroundColor: toneColor + '20' }]}>
-              <Text style={[styles.statusText, { color: toneColor }]}>
-                {card.status.toUpperCase()}
-              </Text>
-            </View>
-          ) : null}
         </View>
+        {card.expMonth && card.expYear ? (
+          <Text style={[styles.expiry, { color: colors.textMuted }]}>
+            Expires {String(card.expMonth).padStart(2, '0')}/{String(card.expYear).slice(-2)}
+          </Text>
+        ) : null}
       </View>
 
-      {/* Revealing card details is not implemented yet: the control stays
-          disabled and says so, instead of showing invented details. */}
+      <View style={styles.actions}>
+        <TouchableOpacity style={styles.action} onPress={copyLast4} accessibilityRole="button" accessibilityLabel="Copy last 4 digits">
+          <Copy size={16} color={colors.primary} />
+          <Text style={[styles.actionText, { color: colors.primary }]}>Copy last 4</Text>
+        </TouchableOpacity>
+        {!canceled && (
+          <TouchableOpacity
+            style={styles.action}
+            onPress={toggleLock}
+            disabled={busy}
+            accessibilityRole="button"
+            accessibilityLabel={locked ? 'Unfreeze card' : 'Freeze card'}
+          >
+            {locked ? <Play size={16} color={colors.success} /> : <Snowflake size={16} color={colors.info} />}
+            <Text style={[styles.actionText, { color: locked ? colors.success : colors.info }]}>
+              {busy ? 'Saving…' : locked ? 'Unfreeze' : 'Freeze'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {message && <Text style={[styles.message, { color: colors.textMuted }]}>{message}</Text>}
+
+      {!canceled && <CardRevealPanel cardId={card.id} />}
+
       <TouchableOpacity
-        style={styles.revealButton}
-        disabled
+        style={styles.action}
+        onPress={() => setShowTransactions((v) => !v)}
         accessibilityRole="button"
-        accessibilityState={{ disabled: true }}
+        accessibilityLabel={showTransactions ? 'Hide transactions' : 'Show transactions'}
       >
-        <Eye size={18} color={colors.textMuted} />
-        <Text style={[styles.revealText, { color: colors.textMuted }]}>
-          Card details are shown securely in a later update
-        </Text>
+        {showTransactions ? <ChevronUp size={16} color={colors.textMuted} /> : <ChevronDown size={16} color={colors.textMuted} />}
+        <Text style={[styles.actionText, { color: colors.textMuted }]}>Transactions</Text>
       </TouchableOpacity>
+      {showTransactions && <CardTransactions cardId={card.id} />}
     </View>
   );
 };
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  expiry: {
+    fontSize: 12,
+    marginTop: 6,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: 20,
+    marginTop: 12,
+  },
+  action: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+  },
+  actionText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  message: {
+    fontSize: 13,
+    marginTop: 4,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -387,15 +417,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 0.5,
-  },
-  revealButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  revealText: {
-    fontSize: 14,
-    flex: 1,
   },
   emptyState: {
     alignItems: 'center',
