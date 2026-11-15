@@ -39,7 +39,7 @@ jobs:
       - name: Run Claude Code
         id: claude
         # Pinned to the v1 release commit for supply-chain integrity
-        uses: anthropics/claude-code-action@4845bacbb38b3c4b15d948f035349786f678e068
+        uses: anthropics/claude-code-action@8a29bc6f0ae11a363721054b6739feba6adabe57
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           
